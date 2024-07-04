@@ -19,6 +19,10 @@ Peruca is a virtual assistant designed to offer natural and contextually relevan
 - **Integration with Virtual Assistant**: Connect and customize your virtual assistant easily.
 - **Flexibility and Extensibility**: Adapt and expand Peruca to meet your specific needs.
 
+## Use Case Diagram
+
+![Use Case Diagram]("docs/diagrams/Peruca-Component Diagram.drawio.png")
+
 ## Prerequisites
 
 - **Node-RED** (optional, for integration with automated workflows)
