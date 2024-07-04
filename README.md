@@ -23,6 +23,10 @@ Peruca is a virtual assistant designed to offer natural and contextually relevan
 
 ![Use Case Diagram](docs/diagrams/Peruca-Use%20Case.drawio.png)
 
+## BPMN Diagram
+
+![Use Case Diagram](docs/diagrams/bpmn.svg)
+
 ## Component Diagram
 
 ![Use Case Diagram](docs/diagrams/Peruca-Component%20Diagram.drawio.png)
