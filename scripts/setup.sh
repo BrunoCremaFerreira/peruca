@@ -4,7 +4,7 @@
 VENV_DIR="venv"
 
 # Dependency install
-API_REQUIREMENTS_FILE="../src/api/requirements.txt"
+API_REQUIREMENTS_FILE="../src/requirements.txt"
 
 _create_venv()
 {

@@ -10,9 +10,9 @@ def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
     openapi_schema = get_openapi(
-        title="LLM API",
+        title="Peruca - LLM Virtual Assistant",
         version="1.0.0",
-        description="API para interação com diferentes modelos de LLM",
+        description="Peruca is an advanced virtual assistant that utilizes large language models (LLMs) such as ChatGPT and Local AI. This repository contains everything you need to set up, integrate, and use Peruca as a virtual assistant, compatible with Node-RED and Virtual Assistant.",
         routes=app.routes,
     )
     app.openapi_schema = openapi_schema
