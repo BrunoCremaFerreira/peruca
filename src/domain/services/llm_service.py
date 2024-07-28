@@ -1,5 +1,5 @@
-from application.ports.inbound.llm_inbound_port import LLMInboundPort
-from application.ports.outbound.llm_outbound_port import LLMOutboundPort
+from domain.ports.inbound.llm_inbound_port import LLMInboundPort
+from domain.ports.outbound.llm_outbound_port import LLMOutboundPort
 
 class LLMService(LLMInboundPort):
     def __init__(self, provider: LLMOutboundPort):

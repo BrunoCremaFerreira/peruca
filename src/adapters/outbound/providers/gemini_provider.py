@@ -1,4 +1,4 @@
-from application.ports.outbound.llm_outbound_port import LLMOutboundPort
+from domain.ports.outbound.llm_outbound_port import LLMOutboundPort
 
 class GeminiProvider(LLMOutboundPort):
     def __init__(self, api_key: str):
