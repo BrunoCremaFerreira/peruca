@@ -10,4 +10,4 @@ class OpenAIProvider(LLMOutboundPort):
         response = await self.aclient.chat.completions.create(model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
         max_tokens=150)
-        return response['choices'][0]['message']['content'].strip()
+        return response.choices[0].message.content.strip()
