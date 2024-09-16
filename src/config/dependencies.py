@@ -14,6 +14,8 @@ def get_llm_service():
     IOC for LLMOutboundPort interface
     """
     settings = Settings()
+    settings.validate()
+
     api_key = settings.llm_provider.api_key
     provider_type = settings.llm_provider.type
 

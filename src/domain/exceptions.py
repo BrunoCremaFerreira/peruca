@@ -1,0 +1,2 @@
+class InvalidEnvironmentSettingsError(ValueError):
+    pass
