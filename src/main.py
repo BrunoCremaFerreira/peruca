@@ -6,6 +6,7 @@ app = FastAPI()
 
 app.include_router(prompt_router)
 
+
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
@@ -18,8 +19,10 @@ def custom_openapi():
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
+
 app.openapi = custom_openapi
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
