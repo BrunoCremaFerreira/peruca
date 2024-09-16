@@ -21,14 +21,7 @@ class CacheOutboundPort(ABC):
         pass
 
     @abstractmethod
-    async def delete_key(self, key: str):
-        """
-        Deletes a key from the cache.
-        """
-        pass
-
-    @abstractmethod
-    async def update_key(self, key: str, value: str):
+    async def delete_key(self, key: str) -> bool:
         """
         Deletes a key from the cache.
         """
