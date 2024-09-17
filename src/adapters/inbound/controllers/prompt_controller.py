@@ -6,14 +6,25 @@ from config.dependencies import get_chat_response_use_case
 router = APIRouter()
 
 
-class PromptRequest(BaseModel):
-    prompt: str
+class ChatRequest(BaseModel):
+    message: str
+    user_name: str
+    chat_id: str
+
+
+class ChatResponse(BaseModel):
+    response: str
+    for_user: str
+    chat_id: str
 
 
 @router.post("/chat", tags=["LLM"])
-async def generate_response(
-    request: PromptRequest,
+async def chat(
+    request: ChatRequest,
     use_case: ChatUseCase = Depends(get_chat_response_use_case),
-):
-    response = await use_case.execute(request.prompt)
-    return {"response": response}
+) -> ChatResponse:
+    response_str = await use_case.execute(request.message)
+    response = ChatResponse(
+        response=response_str, chat_id=request.chat_id, for_user=request.user_name
+    )
+    return response
