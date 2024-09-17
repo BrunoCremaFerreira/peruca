@@ -6,7 +6,7 @@ from adapters.outbound.llm_providers.llama_provider import LLaMAProvider
 from config.settings import Settings
 from domain.ports.outbound.cache_outbound_port import CacheOutboundPort
 from domain.services.llm_service import LLMService
-from application.use_cases.generate_response_use_case import GenerateResponseUseCase
+from application.use_cases.chat_use_case import ChatUseCase
 
 
 def get_llm_service():
@@ -46,6 +46,6 @@ def get_cache_database() -> CacheOutboundPort:
     return RedisCache(connection_string)
 
 
-def get_generate_response_use_case():
+def get_chat_response_use_case():
     llm_service = get_llm_service()
-    return GenerateResponseUseCase(llm_service)
+    return ChatUseCase(llm_service)
