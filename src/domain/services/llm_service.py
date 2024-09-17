@@ -12,5 +12,5 @@ class LLMService(LLMInboundPort):
         self.provider = provider
         self.cache_database = cache_database
 
-    async def generate_response(self, prompt: str) -> str:
+    async def chat(self, prompt: str) -> str:
         return await self.provider.generate_response(prompt)

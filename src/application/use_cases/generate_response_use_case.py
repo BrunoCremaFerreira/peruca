@@ -6,4 +6,4 @@ class GenerateResponseUseCase:
         self.llm_service = llm_service
 
     async def execute(self, prompt: str) -> str:
-        return await self.llm_service.generate_response(prompt)
+        return await self.llm_service.chat(prompt)
