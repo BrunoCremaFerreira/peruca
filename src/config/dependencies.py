@@ -1,4 +1,3 @@
-import os
 from adapters.outbound.cache.redis_cache import RedisCache
 from adapters.outbound.llm_providers.openai_provider import OpenAIProvider
 from adapters.outbound.llm_providers.gemini_provider import GeminiProvider
@@ -14,10 +13,9 @@ def get_llm_service():
     IOC for LLMOutboundPort interface
     """
     settings = Settings()
-    settings.validate()
 
-    api_key = settings.llm_provider.api_key
-    provider_type = settings.llm_provider.type
+    api_key = settings.llm_provider_api_key
+    provider_type = settings.llm_provider_type
 
     # Instancing LLM Provider
     if provider_type == "openai":
@@ -41,7 +39,7 @@ def get_cache_database() -> CacheOutboundPort:
     IOC for cache database
     """
     settings = Settings()
-    connection_string = settings.cache_database.connection_string
+    connection_string = settings.cache_db_connection_string
 
     return RedisCache(connection_string)
 
