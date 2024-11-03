@@ -1,2 +1,0 @@
-class InvalidEnvironmentSettingsError(ValueError):
-    pass
