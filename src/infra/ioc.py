@@ -1,3 +1,4 @@
+from application.appservices.llm_app_service import LlmAppService
 from domain.interfaces.repository import ContextRepository
 from domain.services.llm_service import LlmService
 from infra.data.context_repository_redis import RedisContextRepository
@@ -6,10 +7,26 @@ from infra.data.llm_repository_llama3 import Llama3LlmRepository
 from infra.data.llm_repository_open_ai import OpenAiLlmRepository
 from infra.settings import Settings
 
+# ====================================
+# App Services
+# ====================================
 
-def get_llm_service():
+
+def get_llm_app_service() -> LlmAppService:
     """
-    IOC for LLMService interface
+    IOC for LLM App Service
+    """
+    return LlmAppService(get_llm_service())
+
+
+# ====================================
+# Domain Services
+# ====================================
+
+
+def get_llm_service() -> LlmService:
+    """
+    IOC for LLM Service
     """
     settings = Settings()
 
@@ -33,6 +50,11 @@ def get_llm_service():
     return LlmService(
         llm_repository=llm_repository, context_repository=context_repository
     )
+
+
+# ====================================
+# Repositories
+# ====================================
 
 
 def get_context_repository() -> ContextRepository:
