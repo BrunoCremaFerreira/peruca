@@ -1,18 +1,27 @@
-from flask import Flask
-from flask_restx import Api  # type: ignore
-from routes import llm_bp
+from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
+from routes import llm_router
 
-app = Flask(__name__)
+app = FastAPI()
+app.include_router(llm_router)
 
-api = Api(
-    app,
-    version="1.0",
-    title="Peruca LLM Assistant API",
-    description="",
-)
 
-app.register_blueprint(llm_bp)
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title="Peruca - LLM Virtual Assistant",
+        version="1.0.0",
+        description="Peruca is an advanced virtual assistant that utilizes large language models (LLMs) such as ChatGPT and Local AI. This repository contains everything you need to set up, integrate, and use Peruca as a virtual assistant, compatible with Node-RED and Virtual Assistant.",
+        routes=app.routes,
+    )
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
 
+
+app.openapi = custom_openapi
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)
