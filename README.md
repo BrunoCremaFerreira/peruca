@@ -1,6 +1,9 @@
-# Peruca - LLM Virtual Assistant (UNDER CONSTRUCTION)
+# Peruca - LLM Virtual Assistant 
+<img src="docs/peruca.webp" alt="Use Case Diagram" height="400px">
+
 
 Peruca is an advanced virtual assistant that utilizes large language models (LLMs) such as ChatGPT and Local AI. This repository contains everything you need to set up, integrate, and use Peruca as a virtual assistant, compatible with Node-RED and Virtual Assistant.
+(UNDER CONSTRUCTION)
 
 ## Table of Contents
 
