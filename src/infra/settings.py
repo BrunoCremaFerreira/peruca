@@ -10,8 +10,14 @@ class Settings(BaseSettings):
     # LLM Provider Configs
     # ===============================
 
-    llm_provider_type: str = "openai"
+    llm_provider_type: str = "OLLAMA"
+    llm_provider_url: str = "http://localhost:11434"
     llm_provider_api_key: str = ""
+
+    # ===============================
+    # LLM Models config
+    # ===============================
+    llm_main_graph_chat_model: str = "qwen3:14b"
 
     # ===============================
     # Databases Config

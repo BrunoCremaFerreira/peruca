@@ -4,3 +4,7 @@ pydantic==2.9.2
 pydantic-settings==2.6.1
 redis
 openai==1.53.0
+
+langchain>=0.1.20
+langgraph>=0.0.38
+langchain-community>=0.0.36

@@ -1,10 +1,8 @@
 from application.appservices.llm_app_service import LlmAppService
+from domain.graphs.main_graph import MainGraph
 from domain.interfaces.repository import ContextRepository
-from domain.services.llm_service import LlmService
 from infra.data.context_repository_redis import RedisContextRepository
-from infra.data.llm_repository_gemini import GeminiLlmRepository
-from infra.data.llm_repository_llama3 import Llama3LlmRepository
-from infra.data.llm_repository_open_ai import OpenAiLlmRepository
+from langchain_community.chat_models import ChatOllama
 from infra.settings import Settings
 
 # ====================================
@@ -14,32 +12,20 @@ from infra.settings import Settings
 
 def get_llm_app_service() -> LlmAppService:
     """
-    IOC for LLM App Service
-    """
-    return LlmAppService(get_llm_service())
-
-
-# ====================================
-# Domain Services
-# ====================================
-
-
-def get_llm_service() -> LlmService:
-    """
-    IOC for LLM Service
+    IOC for LLMAppService class
     """
     settings = Settings()
 
-    api_key = settings.llm_provider_api_key
-    provider_type = settings.llm_provider_type
+    provider_type = settings.llm_provider_type.upper()
 
     # Instancing LLM Provider
-    if provider_type == "openai":
-        llm_repository = OpenAiLlmRepository(api_key)
-    elif provider_type == "gemini":
-        llm_repository = GeminiLlmRepository(api_key)
-    elif provider_type == "llama":
-        llm_repository = Llama3LlmRepository()
+    if provider_type == "OPENAI":
+        raise ValueError("Open Ai not supported yet!")
+    elif provider_type == "OLLAMA":
+        llm_chat=ChatOllama(
+            base_url=settings.llm_provider_url, 
+            model=settings.llm_main_graph_chat_model,
+            temperature=0.5)
     else:
         raise ValueError("Invalid provider type")
 
@@ -47,9 +33,17 @@ def get_llm_service() -> LlmService:
     context_repository = get_context_repository()
 
     # Instancing
-    return LlmService(
-        llm_repository=llm_repository, context_repository=context_repository
+    return LlmAppService(
+        context_repository=context_repository, 
+        llm_chat=llm_chat,
+        main_graph=MainGraph()
     )
+
+
+# ====================================
+# Domain Services
+# ====================================
+
 
 
 # ====================================

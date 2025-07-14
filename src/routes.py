@@ -12,23 +12,27 @@ llm_router = APIRouter()
 
 class ChatRequest(BaseModel):
     message: str
-    user_name: str
+    user_id: str
     chat_id: str
 
 
 class ChatResponse(BaseModel):
     response: str
-    for_user: str
+    user_id: str
     chat_id: str
 
 
 @llm_router.post("/chat", tags=["LLM"])
-async def chat(
+def chat(
     request: ChatRequest,
     llm_app_service: LlmAppService = Depends(get_llm_app_service),
 ) -> ChatResponse:
-    response_str = await llm_app_service.chat(request.message)
+    response_str = llm_app_service.chat(
+        message=request.message, 
+        user_id=request.user_id,
+        chat_id=request.chat_id
+    )
     response = ChatResponse(
-        response=response_str, chat_id=request.chat_id, for_user=request.user_name
+        response=response_str, chat_id=request.chat_id, user_id=request.chat_id
     )
     return response

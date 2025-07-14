@@ -1,19 +1,5 @@
 from abc import ABC, abstractmethod
 
-
-class LlmRepository(ABC):
-    """
-    LLM Repository Interface
-    """
-
-    @abstractmethod
-    async def generate_response(self, prompt: str) -> str:
-        """
-        Generates a response based on the given prompt.
-        """
-        pass
-
-
 class ContextRepository(ABC):
     """
     Interface for LLM Context operations.
