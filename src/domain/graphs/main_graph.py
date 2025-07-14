@@ -105,6 +105,6 @@ Responda apenas com uma lista Python. Ex: ["shopping_list", "smart_home_lights"]
     #===============================================
     # Public Methods
     #===============================================
-    def invoke(self, user_message):
+    def invoke(self, user_message) -> dict:
         app = self._compile()
         return app.invoke({"input": user_message})

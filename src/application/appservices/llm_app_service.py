@@ -16,6 +16,8 @@ class LlmAppService:
     #===============================================
 
     def chat(self, message: str, user_id: str, chat_id: str) -> str:
-        return self.main_graph.invoke(user_message=message)
+        result = self.main_graph.invoke(user_message=message)
+        print(f"=========RESULT==============/n{result}/n==================================")
+        return f"{result}"
 
         
