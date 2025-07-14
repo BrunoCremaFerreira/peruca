@@ -6,6 +6,13 @@ class ContextRepository(ABC):
     """
 
     @abstractmethod
+    def connect() -> None:
+        """
+        Connect to database
+        """
+        pass
+
+    @abstractmethod
     async def set_key(self, key: str, value: str):
         """
         Stores a value associated with a key.

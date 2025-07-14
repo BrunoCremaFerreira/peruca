@@ -75,6 +75,9 @@ Responda apenas com uma lista Python. Ex: ["shopping_list", "smart_home_lights"]
         response = self.chat_llm.invoke(f"/no_think Usuário: {data['input']}\nPeruca:")
         return {"output_only": response.content.replace("<think>\n\n</think>\n\n", "").strip()}
 
+    #===============================================
+    # Private Methods
+    #===============================================
     def _compile(self):
         workflow = StateGraph(MainGraphState)
 
@@ -99,6 +102,9 @@ Responda apenas com uma lista Python. Ex: ["shopping_list", "smart_home_lights"]
 
         return workflow.compile()
 
+    #===============================================
+    # Public Methods
+    #===============================================
     def invoke(self, user_message):
         app = self._compile()
         return app.invoke({"input": user_message})

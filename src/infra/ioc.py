@@ -8,8 +8,6 @@ from infra.settings import Settings
 # ====================================
 # App Services
 # ====================================
-
-
 def get_llm_app_service() -> LlmAppService:
     """
     IOC for LLMAppService class
@@ -21,6 +19,7 @@ def get_llm_app_service() -> LlmAppService:
     # Instancing LLM Provider
     if provider_type == "OPENAI":
         raise ValueError("Open Ai not supported yet!")
+    
     elif provider_type == "OLLAMA":
         llm_chat=ChatOllama(
             base_url=settings.llm_provider_url, 
@@ -35,8 +34,7 @@ def get_llm_app_service() -> LlmAppService:
     # Instancing
     return LlmAppService(
         context_repository=context_repository, 
-        llm_chat=llm_chat,
-        main_graph=MainGraph()
+        main_graph=MainGraph(llm_chat)
     )
 
 
