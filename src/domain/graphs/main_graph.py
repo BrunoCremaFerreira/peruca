@@ -3,6 +3,9 @@ from langgraph.graph import StateGraph, END
 from langchain_core.prompts import ChatPromptTemplate
 from typing import TypedDict, Optional
 
+from domain.graphs.graph import Graph
+from domain.graphs.only_talk_graph import OnlyTalkGraph
+
 class MainGraphState(TypedDict):
         input: str
         intent: Optional[list[str]]
@@ -11,10 +14,11 @@ class MainGraphState(TypedDict):
         output_cams: Optional[str]
         output_only: Optional[str]
 
-class MainGraph:
+class MainGraph(Graph):
 
     def __init__(self, chat_llm):
         self.chat_llm = chat_llm
+        self.only_talk_graph = OnlyTalkGraph(chat_llm)
         self.classification_prompt = ChatPromptTemplate.from_template(
         """/no_think
 Você se chama Peruca. Você é um assistente virtual de uma casa automatizada. 
@@ -37,7 +41,7 @@ Responda apenas com uma lista Python. Ex: ["shopping_list", "smart_home_lights"]
     def _classify_intent(self, data):
         chain = self.classification_prompt | self.chat_llm
         response = chain.invoke({"input": data["input"]})
-        cleaned = response.content.replace("<think>\n\n</think>\n\n", "").strip()
+        cleaned = self._remove_thinking_tag(response.content)
         try:
             intents = eval(cleaned) if isinstance(cleaned, str) else []
             if isinstance(intents, str):
@@ -72,12 +76,15 @@ Responda apenas com uma lista Python. Ex: ["shopping_list", "smart_home_lights"]
 
     def _handle_only_talking(self, data):
         print(f"[handle_only_talking]: Triggered...")
-        response = self.chat_llm.invoke(f"/no_think Usuário: {data['input']}\nPeruca:")
-        return {"output_only": response.content.replace("<think>\n\n</think>\n\n", "").strip()}
+        result = self.only_talk_graph.invoke(user_message=data['input'])
+        return {"output_only": f"{self._remove_thinking_tag(result.content)}"}
 
     #===============================================
     # Private Methods
     #===============================================
+    def _remove_thinking_tag(self, input_str: str) -> str:
+        return input_str.replace("<think>\n\n</think>\n\n", "").strip()
+
     def _compile(self):
         workflow = StateGraph(MainGraphState)
 
