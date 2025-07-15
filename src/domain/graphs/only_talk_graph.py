@@ -1,6 +1,5 @@
 from domain.graphs.graph import Graph
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_community.chat_models import ChatOllama
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
 from langchain.prompts import PromptTemplate, ChatPromptTemplate, MessagesPlaceholder
@@ -11,22 +10,29 @@ class OnlyTalkGraph(Graph):
     Only talk category graph
     """
 
+    _context_memory_store = {}
+
     def __init__(self, llm_chat: BaseChatModel):
         self.llm_chat = llm_chat
 
         # Mocked user - Test
         self.user = {
+            "id":"8f6e13b7-2931-4f3e-bf0d-22cf7fbd0847",
             "name": "Bruno",
             "description": ""
         }
-        self.context_memory = ConversationBufferMemory(return_messages=True)
-        
 
     def invoke(self, user_message: str) -> dict:
         personality_template = PromptTemplate(
             input_variables=["user_name", "user_description", "current_datetime"],
             template=self.load_prompt("only_talk_graph.md")
         )
+
+        user_id = self.user["id"]
+        if user_id not in OnlyTalkGraph._context_memory_store:
+            OnlyTalkGraph._context_memory_store[user_id] = ConversationBufferMemory(return_messages=True)
+
+        user_context_memory = OnlyTalkGraph._context_memory_store[user_id]
 
         formatted_system_message = personality_template.format(
             user_name=self.user["name"],
@@ -42,7 +48,7 @@ class OnlyTalkGraph(Graph):
 
         conversation = ConversationChain(
             llm=self.llm_chat,
-            memory=self.context_memory,
+            memory=user_context_memory,
             prompt=chat_prompt,
             verbose=False
         )
