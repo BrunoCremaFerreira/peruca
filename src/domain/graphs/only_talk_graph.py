@@ -13,20 +13,37 @@ class OnlyTalkGraph(Graph):
 
     def __init__(self, llm_chat: BaseChatModel):
         self.llm_chat = llm_chat
+
+        # Mocked user - Test
         self.user = {
             "name": "Bruno",
             "description": ""
         }
-        self.context_memory = []
-        self.personality_template = PromptTemplate(
+        self.context_memory = ConversationBufferMemory(return_messages=True)
+        
+
+    def invoke(self, user_message: str) -> dict:
+        personality_template = PromptTemplate(
             input_variables=["user_name", "user_description", "current_datetime"],
             template=self.load_prompt("only_talk_graph.md")
         )
 
-    def invoke(self, user_message) -> dict:
-        formatted_system_message = self.personality_template.format(
-        user_name=self.user["name"],
-        user_description=self.user["description"],
-        current_datetime=datetime.now().strftime("%d/%m/%Y %H:%M")
-)
-        return self.llm_chat.invoke(f"/no_think Usuário: {user_message}\nPeruca:")
+        formatted_system_message = personality_template.format(
+            user_name=self.user["name"],
+            user_description=self.user["description"],
+            current_datetime=datetime.now().strftime("%d/%m/%Y %H:%M")
+        )
+
+        chat_prompt = ChatPromptTemplate.from_messages([
+            ("system", formatted_system_message),
+            MessagesPlaceholder(variable_name="history"),
+            ("human", "{input}")
+        ])
+
+        conversation = ConversationChain(
+            llm=self.llm_chat,
+            memory=self.context_memory,
+            prompt=chat_prompt,
+            verbose=False
+        )
+        return conversation.predict(input=user_message)

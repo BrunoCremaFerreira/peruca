@@ -63,7 +63,7 @@ class MainGraph(Graph):
     def _handle_only_talking(self, data):
         print(f"[handle_only_talking]: Triggered...")
         result = self.only_talk_graph.invoke(user_message=data['input'])
-        return {"output_only": f"{self._remove_thinking_tag(result.content)}"}
+        return {"output_only": f"{self._remove_thinking_tag(result)}"}
 
     #===============================================
     # Private Methods
