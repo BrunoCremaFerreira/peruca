@@ -18,7 +18,7 @@ class LlmAppService:
 
     def chat(self, message: str, user_id: str, chat_id: str) -> str:
         print(f"[LlmAppService.chat]: Request: {{ user_id='{user_id}' message='{message}' }}")
-        user = User(id=user_id, name= "Bruno", summary="Arquiteto de Software e engenheiro elétrico, gosta de temas complexos sobre filosofia, psicologia e tecnologia.")
+        user = User(id=user_id, name= "Bruno", summary="- Arquiteto de Software e engenheiro elétrico, gosta de temas complexos sobre filosofia, psicologia e tecnologia.")
 
         invoke_request = GraphInvokeRequest(message=message, user=user)
         result = self.main_graph.invoke(invoke_request=invoke_request)

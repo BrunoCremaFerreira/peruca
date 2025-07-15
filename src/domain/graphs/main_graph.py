@@ -26,8 +26,9 @@ class MainGraph(Graph):
     # Graph Nodes
     #===============================================
     def _classify_intent(self, data):
+        print(f">>>>>>>>>>>>>>>>>>>>>>>> {data}")
         chain = self.classification_prompt | self.llm_chat
-        response = chain.invoke({"input": data["input"]})
+        response = chain.invoke({"input": data["input"].message})
         cleaned = self._remove_thinking_tag(response.content)
         try:
             intents = eval(cleaned) if isinstance(cleaned, str) else []
@@ -63,7 +64,7 @@ class MainGraph(Graph):
 
     def _handle_only_talking(self, data):
         print(f"[main_graph.handle_only_talking]: Triggered...")
-        result = self.only_talk_graph.invoke(user_message=data['input'])
+        result = self.only_talk_graph.invoke(invoke_request=data['input'])
         return {"output_only": f"{self._remove_thinking_tag(result)}"}
 
     #===============================================
@@ -101,4 +102,4 @@ class MainGraph(Graph):
     #===============================================
     def invoke(self, invoke_request: GraphInvokeRequest) -> dict:
         app = self._compile()
-        return app.invoke({"input": invoke_request.message})
+        return app.invoke({"input": invoke_request})
