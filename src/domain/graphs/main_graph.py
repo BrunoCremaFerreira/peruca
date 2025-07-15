@@ -3,6 +3,7 @@ from langgraph.graph import StateGraph, END
 from langchain_core.prompts import ChatPromptTemplate
 from typing import TypedDict, Optional
 from langchain_core.language_models.chat_models import BaseChatModel
+from domain.entities import GraphInvokeRequest
 from domain.graphs.graph import Graph
 from domain.graphs.only_talk_graph import OnlyTalkGraph
 
@@ -49,19 +50,19 @@ class MainGraph(Graph):
         return {**data, "output": resposta_final}
     
     def _handle_smart_home_lights(self, data):
-        print(f"[handle_smart_home_lights]: Triggered...")
+        print(f"[main_graph.handle_smart_home_lights]: Triggered...")
         return {"output_lights": "Luz ajustada com sucesso."}
 
     def _handle_smart_home_security_cams(self, data):
-        print(f"[handle_smart_home_security_cams]: Triggered...")
+        print(f"[main_graph.handle_smart_home_security_cams]: Triggered...")
         return {"output_cams": "Desculpe. Você não tem acesso para ver as câmeras."}
 
     def _handle_shopping_list(self, data):
-        print(f"[handle_shopping_list]: : Triggered...")
+        print(f"[main_graph.handle_shopping_list]: : Triggered...")
         return {"output_shopping": "Item adicionado à lista de compras."}
 
     def _handle_only_talking(self, data):
-        print(f"[handle_only_talking]: Triggered...")
+        print(f"[main_graph.handle_only_talking]: Triggered...")
         result = self.only_talk_graph.invoke(user_message=data['input'])
         return {"output_only": f"{self._remove_thinking_tag(result)}"}
 
@@ -98,6 +99,6 @@ class MainGraph(Graph):
     #===============================================
     # Public Methods
     #===============================================
-    def invoke(self, user_message) -> dict:
+    def invoke(self, invoke_request: GraphInvokeRequest) -> dict:
         app = self._compile()
-        return app.invoke({"input": user_message})
+        return app.invoke({"input": invoke_request.message})

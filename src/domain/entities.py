@@ -3,18 +3,25 @@ from enum import Enum
 import uuid
 
 # ========================
-# Prompt Classes
+# User Related Classes
 # ========================
 
+@dataclass
+class User:
+    id: str
+    name: str
+    summary: str = ""
 
-class PromptType(Enum):
-    CLASSIFICATION = "CLASSIFICATION"
-    EXECUTION = "EXECUTION"
 
+# ========================
+# Graph Related Classes
+# ========================
 
 @dataclass
-class SystemPrompt:
-    __table__ = "system_prompts"
+class GraphInvokeRequest:
+    """
+    LLM processing request entity
+    """
 
-    id: uuid.UUID
-    data: object
+    message: str
+    user: User

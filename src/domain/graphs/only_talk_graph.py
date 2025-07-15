@@ -1,3 +1,4 @@
+from domain.entities import GraphInvokeRequest
 from domain.graphs.graph import Graph
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain.chains import ConversationChain
@@ -15,28 +16,22 @@ class OnlyTalkGraph(Graph):
     def __init__(self, llm_chat: BaseChatModel):
         self.llm_chat = llm_chat
 
-        # Mocked user - Test
-        self.user = {
-            "id":"8f6e13b7-2931-4f3e-bf0d-22cf7fbd0847",
-            "name": "Bruno",
-            "description": ""
-        }
-
-    def invoke(self, user_message: str) -> dict:
+    def invoke(self, invoke_request: GraphInvokeRequest) -> dict:
         personality_template = PromptTemplate(
-            input_variables=["user_name", "user_description", "current_datetime"],
+            input_variables=["user_name", "user_summary", "current_datetime"],
             template=self.load_prompt("only_talk_graph.md")
         )
 
-        user_id = self.user["id"]
+        user = invoke_request.user
+        user_id = user.id
         if user_id not in OnlyTalkGraph._context_memory_store:
             OnlyTalkGraph._context_memory_store[user_id] = ConversationBufferMemory(return_messages=True)
 
         user_context_memory = OnlyTalkGraph._context_memory_store[user_id]
 
         formatted_system_message = personality_template.format(
-            user_name=self.user["name"],
-            user_description=self.user["description"],
+            user_name=user.name,
+            user_summary=user.summary,
             current_datetime=datetime.now().strftime("%d/%m/%Y %H:%M")
         )
 
@@ -52,4 +47,4 @@ class OnlyTalkGraph(Graph):
             prompt=chat_prompt,
             verbose=False
         )
-        return conversation.predict(input=user_message)
+        return conversation.predict(input=invoke_request.message)
