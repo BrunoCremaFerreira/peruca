@@ -1,5 +1,6 @@
 from application.appservices.llm_app_service import LlmAppService
 from domain.graphs.main_graph import MainGraph
+from domain.graphs.only_talk_graph import OnlyTalkGraph
 from domain.interfaces.repository import ContextRepository
 from infra.data.context_repository_redis import RedisContextRepository
 from langchain_community.chat_models import ChatOllama
@@ -19,7 +20,23 @@ def get_main_graph() -> MainGraph:
     # Instancing LLM Provider
     llm_chat = get_llm_chat(model=settings.llm_main_graph_chat_model,
             temperature=settings.llm_main_graph_chat_temperature)
-    return MainGraph(llm_chat)
+    
+    only_talk_graph = get_only_talk_graph()
+    
+    return MainGraph(llm_chat=llm_chat, only_talk_graph=only_talk_graph)
+
+def get_only_talk_graph() -> OnlyTalkGraph:
+    """
+    IOC for Only Talk Graph
+    """
+
+    settings = Settings()
+    
+    # Instancing LLM Provider
+    llm_chat = get_llm_chat(model=settings.llm_only_talk_graph_chat_model,
+            temperature=settings.llm_only_talk_graph_chat_temperature)
+    
+    return OnlyTalkGraph(llm_chat=llm_chat)
 
 # ====================================
 # App Services

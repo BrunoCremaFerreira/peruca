@@ -17,8 +17,12 @@ class Settings(BaseSettings):
     # ===============================
     # LLM Models config
     # ===============================
+    
     llm_main_graph_chat_model: str = "qwen3:14b"
     llm_main_graph_chat_temperature: float = 0.5
+
+    llm_only_talk_graph_chat_model: str = "qwen3:14b"
+    llm_only_talk_graph_chat_temperature: float = 0.5
 
     # ===============================
     # Databases Config

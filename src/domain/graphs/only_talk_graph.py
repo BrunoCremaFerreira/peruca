@@ -1,4 +1,5 @@
 from domain.graphs.graph import Graph
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_community.chat_models import ChatOllama
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
@@ -10,8 +11,8 @@ class OnlyTalkGraph(Graph):
     Only talk category graph
     """
 
-    def __init__(self, chat_llm):
-        self.chat_llm = chat_llm
+    def __init__(self, llm_chat: BaseChatModel):
+        self.llm_chat = llm_chat
         self.user = {
             "name": "Bruno",
             "description": ""
@@ -28,4 +29,4 @@ class OnlyTalkGraph(Graph):
         user_description=self.user["description"],
         current_datetime=datetime.now().strftime("%d/%m/%Y %H:%M")
 )
-        return self.chat_llm.invoke(f"/no_think Usuário: {user_message}\nPeruca:")
+        return self.llm_chat.invoke(f"/no_think Usuário: {user_message}\nPeruca:")

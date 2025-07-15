@@ -2,7 +2,7 @@ from langchain_core.runnables import RunnableLambda
 from langgraph.graph import StateGraph, END
 from langchain_core.prompts import ChatPromptTemplate
 from typing import TypedDict, Optional
-
+from langchain_core.language_models.chat_models import BaseChatModel
 from domain.graphs.graph import Graph
 from domain.graphs.only_talk_graph import OnlyTalkGraph
 
@@ -16,16 +16,16 @@ class MainGraphState(TypedDict):
 
 class MainGraph(Graph):
 
-    def __init__(self, chat_llm):
-        self.chat_llm = chat_llm
-        self.only_talk_graph = OnlyTalkGraph(chat_llm)
+    def __init__(self, llm_chat: BaseChatModel, only_talk_graph: OnlyTalkGraph):
+        self.llm_chat = llm_chat
+        self.only_talk_graph = only_talk_graph
         self.classification_prompt = ChatPromptTemplate.from_template(self.load_prompt("main_graph.md"))
     
     #===============================================
     # Graph Nodes
     #===============================================
     def _classify_intent(self, data):
-        chain = self.classification_prompt | self.chat_llm
+        chain = self.classification_prompt | self.llm_chat
         response = chain.invoke({"input": data["input"]})
         cleaned = self._remove_thinking_tag(response.content)
         try:
