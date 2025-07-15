@@ -19,21 +19,7 @@ class MainGraph(Graph):
     def __init__(self, chat_llm):
         self.chat_llm = chat_llm
         self.only_talk_graph = OnlyTalkGraph(chat_llm)
-        self.classification_prompt = ChatPromptTemplate.from_template(
-        """/no_think
-Você se chama Peruca. Você é um assistente virtual de uma casa automatizada. 
-Classifique a entrada do usuário nas seguintes categorias de intenções. Retorne uma lista, se mais de uma categoria estiver presente:
-
-- smart_home_lights
-- smart_home_security_cams
-- shopping_list
-- only_talking
-
-Entrada: {input}
-
-Responda apenas com uma lista Python. Ex: ["shopping_list", "smart_home_lights"]
-"""
-)
+        self.classification_prompt = ChatPromptTemplate.from_template(self.load_prompt("main_graph.md"))
     
     #===============================================
     # Graph Nodes
