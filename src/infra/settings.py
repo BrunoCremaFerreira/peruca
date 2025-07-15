@@ -11,13 +11,14 @@ class Settings(BaseSettings):
     # ===============================
 
     llm_provider_type: str = "OLLAMA"
-    llm_provider_url: str = "http://localhost:11434"
+    llm_provider_url: str = "http://10.10.1.10:11434"
     llm_provider_api_key: str = ""
 
     # ===============================
     # LLM Models config
     # ===============================
     llm_main_graph_chat_model: str = "qwen3:14b"
+    llm_main_graph_chat_temperature: float = 0.5
 
     # ===============================
     # Databases Config

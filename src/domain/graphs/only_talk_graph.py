@@ -5,7 +5,6 @@ from langchain.memory import ConversationBufferMemory
 from langchain.prompts import PromptTemplate, ChatPromptTemplate, MessagesPlaceholder
 from datetime import datetime
 
-
 class OnlyTalkGraph(Graph):
     """
     Only talk category graph
