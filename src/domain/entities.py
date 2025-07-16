@@ -8,8 +8,8 @@ import uuid
 
 @dataclass
 class User:
-    id: str
-    name: str
+    id: str = str(uuid.uuid4())
+    name: str = ""
     summary: str = ""
 
 

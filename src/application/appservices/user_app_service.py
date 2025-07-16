@@ -2,6 +2,7 @@ from typing import List
 from application.appservices.view_models import UserAdd, UserResponse, UserUpdate
 from domain.entities import User
 from domain.interfaces.repository import UserRepository
+from domain.services.user_service import UserService
 from infra.utils import auto_map
 
 
@@ -10,7 +11,8 @@ class UserAppService:
     Application User App Service
     """
 
-    def __init__(self, user_repository: UserRepository):
+    def __init__(self, user_service: UserService, user_repository: UserRepository):
+        self.user_service = user_service
         self.user_repository = user_repository
 
     # =====================================
@@ -31,9 +33,9 @@ class UserAppService:
 
     def add(self, user_add: UserAdd) -> None:
         user = auto_map(user_add, User)
-        pass
+        self.user_service.add(user=user)
 
     def update(self, user_update: UserUpdate) -> None:
         user = auto_map(user_update, User)
-        pass
+        self.user_service.add(user=user)
         
