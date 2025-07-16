@@ -32,19 +32,19 @@ def chat(
 
 @router.get("/user", tags=["User"])
 def user_get_all(user_app_service: UserAppService = Depends(get_user_app_service)) -> List[UserResponse]:
-    pass
+    return user_app_service.get_all()
 
 @router.get("/user/{id}", tags=["User"])
 def user_get(id: str,
              user_app_service: UserAppService = Depends(get_user_app_service)) -> UserResponse:
-    pass
+    return user_app_service.get_by_id(user_id=id)
 
 @router.post("/user", tags=["User"])
 def user_add(request: UserAdd,
              user_app_service: UserAppService = Depends(get_user_app_service)) -> None:
-    pass
+    user_app_service.add(user_add=request)
 
 @router.put("/user", tags=["User"])
 def user_update(request: UserUpdate,
                 user_app_service: UserAppService = Depends(get_user_app_service)) -> None:
-    pass
+    user_app_service.update(user_update=request)
