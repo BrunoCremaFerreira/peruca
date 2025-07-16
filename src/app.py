@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
-from routes import llm_router
+from routes import router
 
 app = FastAPI()
-app.include_router(llm_router)
+app.include_router(router)
 
 
 def custom_openapi():

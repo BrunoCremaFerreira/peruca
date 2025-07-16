@@ -1,4 +1,5 @@
 from application.appservices.llm_app_service import LlmAppService
+from application.appservices.user_app_service import UserAppService
 from domain.graphs.main_graph import MainGraph
 from domain.graphs.only_talk_graph import OnlyTalkGraph
 from domain.interfaces.repository import ContextRepository, UserRepository
@@ -47,13 +48,20 @@ def get_llm_app_service() -> LlmAppService:
     IOC for LLMAppService class
     """
 
-    # Instancing Cache Database
-    context_repository = get_context_repository()
-
     # Instancing
     return LlmAppService(
         main_graph=get_main_graph(),
-        context_repository=context_repository, 
+        context_repository=get_context_repository(), 
+        user_repository=get_user_repository()
+    )
+
+def get_user_app_service() -> UserAppService:
+    """
+    IOC for UserAppService class
+    """
+
+    # Instancing
+    return UserAppService(
         user_repository=get_user_repository()
     )
 
