@@ -1,10 +1,11 @@
 from application.appservices.llm_app_service import LlmAppService
 from domain.graphs.main_graph import MainGraph
 from domain.graphs.only_talk_graph import OnlyTalkGraph
-from domain.interfaces.repository import ContextRepository
+from domain.interfaces.repository import ContextRepository, UserRepository
 from infra.data.context_repository_redis import RedisContextRepository
 from langchain_community.chat_models import ChatOllama
 from langchain_core.language_models.chat_models import BaseChatModel
+from infra.data.user_repository_sqlite import UserRepositorySqlite
 from infra.settings import Settings
 
 # ====================================
@@ -51,8 +52,9 @@ def get_llm_app_service() -> LlmAppService:
 
     # Instancing
     return LlmAppService(
+        main_graph=get_main_graph(),
         context_repository=context_repository, 
-        main_graph=get_main_graph()
+        user_repository=get_user_repository()
     )
 
 # ====================================
@@ -74,6 +76,13 @@ def get_context_repository() -> ContextRepository:
     connection_string = settings.cache_db_connection_string
 
     return RedisContextRepository(connection_string)
+
+def get_user_repository() -> UserRepository:
+    """
+    User Repository
+    """
+    settings = Settings()
+    return UserRepositorySqlite(db_path= settings.peruca_db_connection_string)
 
 # ====================================
 # LLM Classes

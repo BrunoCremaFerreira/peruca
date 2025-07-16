@@ -1,4 +1,55 @@
 from abc import ABC, abstractmethod
+from typing import List, Optional
+
+from domain.entities import User
+
+
+class UserRepository(ABC):
+    """
+    User Repository
+    """
+
+    @abstractmethod
+    def connect() -> None:
+        """
+        Connect to database
+        """
+        pass
+
+    @abstractmethod
+    def add(self, user: User):
+        """
+        Add User
+        """
+        pass
+
+    @abstractmethod
+    def get_by_id(self, user_id: str) -> Optional[User]:
+        """
+        Get User By Id
+        """
+        pass
+
+    @abstractmethod
+    def list(self) -> List[User]:
+        """
+        List User
+        """
+        pass
+
+    @abstractmethod
+    def update(self, user: User):
+        """
+        Update User
+        """
+        pass
+
+    def delete(self, user_id: str):
+        """
+        Delete User
+        """
+        pass
+
 
 class ContextRepository(ABC):
     """

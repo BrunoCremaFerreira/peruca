@@ -30,5 +30,5 @@ class Settings(BaseSettings):
 
     cache_db_connection_string: str = ""
     peruca_db_connection_string: str = (
-        "postgresql://username:password@localhost:5432/peruca"
+        "sqlite:///peruca.db"
     )
