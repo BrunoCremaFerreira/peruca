@@ -25,7 +25,8 @@ class UserRepositorySqlite(UserRepository):
                 CREATE TABLE IF NOT EXISTS users (
                     id TEXT PRIMARY KEY,
                     name TEXT NOT NULL,
-                    summary TEXT
+                    summary TEXT,
+                    when_created TIMESTAMP        
                 )
             """)
 
@@ -36,8 +37,8 @@ class UserRepositorySqlite(UserRepository):
     def add(self, user: User):
         with self.conn:
             self.conn.execute(
-                "INSERT INTO users (id, name, summary) VALUES (?, ?, ?)",
-                (user.id, user.name, user.summary)
+                "INSERT INTO users (id, name, summary, when_created) VALUES (?, ?, ?, ?)",
+                (user.id, user.name, user.summary, user.when_created)
             )
 
     def get_by_id(self, user_id: str) -> Optional[User]:

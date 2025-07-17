@@ -31,11 +31,11 @@ class UserAppService:
     # Commands
     # =====================================
 
-    def add(self, user_add: UserAdd) -> None:
+    def add(self, user_add: UserAdd) -> str:
         user = auto_map(user_add, User)
         self.user_service.add(user=user)
 
     def update(self, user_update: UserUpdate) -> None:
         user = auto_map(user_update, User)
-        self.user_service.add(user=user)
+        self.user_service.update(user=user)
         

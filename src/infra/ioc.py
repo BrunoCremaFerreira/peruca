@@ -3,6 +3,7 @@ from application.appservices.user_app_service import UserAppService
 from domain.graphs.main_graph import MainGraph
 from domain.graphs.only_talk_graph import OnlyTalkGraph
 from domain.interfaces.repository import ContextRepository, UserRepository
+from domain.services.user_service import UserService
 from infra.data.context_repository_redis import RedisContextRepository
 from langchain_community.chat_models import ChatOllama
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -62,14 +63,19 @@ def get_user_app_service() -> UserAppService:
 
     # Instancing
     return UserAppService(
+        user_service=get_user_service(),
         user_repository=get_user_repository()
     )
 
 # ====================================
 # Domain Services
 # ====================================
+def get_user_service() -> UserService:
+    """
+    IOC for User Service
+    """
 
-
+    return UserService(user_repository=get_user_repository())
 
 # ====================================
 # Repositories

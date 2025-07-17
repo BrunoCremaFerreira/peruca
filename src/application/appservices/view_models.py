@@ -20,17 +20,17 @@ class ChatResponse:
 # =====================================
 @dataclass
 class UserAdd:
-    name: str
-    summary: str
+    name: str = ""
+    summary: str = ""
 
 @dataclass
 class UserUpdate:
-    id:str
-    name: str
-    summary: str
+    id: str = ""
+    name: str = ""
+    summary: str = ""
 
 @dataclass
 class UserResponse:
-    id:str
-    name: str
-    summary: str
+    id: str = ""
+    name: str = ""
+    summary: str = ""

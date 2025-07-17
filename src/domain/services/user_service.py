@@ -18,6 +18,12 @@ class UserService:
         """
         Add a new User
         """
+        
+        if not user:
+            raise ValidationError({f"The user is null"})
+
+        if not user.id:
+            user.id = str(uuid.uuid4())
 
         UserValidator() \
             .validate_id(user.id) \

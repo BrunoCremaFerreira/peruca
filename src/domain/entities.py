@@ -1,14 +1,22 @@
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import Enum
 import uuid
+
+# ========================
+# Base entities Classes
+# ========================
+@dataclass
+class BaseEntity:
+    id: str = ""
+    when_created: datetime = datetime.now(timezone.utc)
 
 # ========================
 # User Related Classes
 # ========================
 
 @dataclass
-class User:
-    id: str = str(uuid.uuid4())
+class User(BaseEntity):
     name: str = ""
     summary: str = ""
 

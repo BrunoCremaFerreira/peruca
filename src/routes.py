@@ -41,8 +41,9 @@ def user_get(id: str,
 
 @router.post("/user", tags=["User"])
 def user_add(request: UserAdd,
-             user_app_service: UserAppService = Depends(get_user_app_service)) -> None:
-    user_app_service.add(user_add=request)
+             user_app_service: UserAppService = Depends(get_user_app_service)) -> dict:
+    user_id = user_app_service.add(user_add=request)
+    return {"user_id": user_id}
 
 @router.put("/user", tags=["User"])
 def user_update(request: UserUpdate,
