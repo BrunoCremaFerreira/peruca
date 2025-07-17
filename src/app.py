@@ -1,7 +1,10 @@
+from domain.exceptions import ValidationError
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from fastapi.middleware.cors import CORSMiddleware
 from infra.settings import Settings
+from fastapi.responses import JSONResponse
+from fastapi.requests import Request
 from routes import router
 
 settings = Settings()
@@ -30,6 +33,12 @@ def custom_openapi():
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
+@app.exception_handler(ValidationError)
+async def app_validation_exception_handler(request: Request, exc: ValidationError):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"message": str(exc), "errors": exc.errors},
+    )
 
 app.openapi = custom_openapi
 
