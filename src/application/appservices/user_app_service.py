@@ -21,9 +21,11 @@ class UserAppService:
 
     def get_by_id(self, user_id: str)-> UserResponse:
         user = self.user_repository.get_by_id(user_id=user_id)
-        result = auto_map(user, UserResponse)
-        print(f">>>>>>>>>>>>>>>>>>>>>>>>>> {user}")
-        return result
+        return auto_map(user, UserResponse, True)
+    
+    def get_by_external_id(self, user_external_id: str)-> UserResponse:
+        user = self.user_repository.get_by_external_id(user_external_id=user_external_id)
+        return auto_map(user, UserResponse, True)
     
     def get_all(self)-> List[UserResponse]:
         users = self.user_repository.list()
@@ -35,7 +37,7 @@ class UserAppService:
 
     def add(self, user_add: UserAdd) -> str:
         user = auto_map(user_add, User)
-        self.user_service.add(user=user)
+        return self.user_service.add(user=user)
 
     def update(self, user_update: UserUpdate) -> None:
         user = auto_map(user_update, User)

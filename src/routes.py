@@ -39,6 +39,11 @@ def user_get(id: str,
              user_app_service: UserAppService = Depends(get_user_app_service)) -> UserResponse:
     return user_app_service.get_by_id(user_id=id)
 
+@router.get("/user/external-id/{external_id}", tags=["User"])
+def user_get(external_id: str,
+             user_app_service: UserAppService = Depends(get_user_app_service)) -> UserResponse:
+    return user_app_service.get_by_external_id(user_external_id=external_id)
+
 @router.post("/user", tags=["User"])
 def user_add(request: UserAdd,
              user_app_service: UserAppService = Depends(get_user_app_service)) -> dict:

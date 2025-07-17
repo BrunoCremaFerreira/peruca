@@ -31,6 +31,13 @@ class UserRepository(ABC):
         pass
 
     @abstractmethod
+    def get_by_external_id(self, user_external_id: str) -> Optional[User]:
+        """
+        Get User By external_Id
+        """
+        pass
+
+    @abstractmethod
     def list(self) -> List[User]:
         """
         List User

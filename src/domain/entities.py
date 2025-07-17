@@ -17,6 +17,7 @@ class BaseEntity:
 
 @dataclass
 class User(BaseEntity):
+    external_id: str = ""
     name: str = ""
     summary: str = ""
 
