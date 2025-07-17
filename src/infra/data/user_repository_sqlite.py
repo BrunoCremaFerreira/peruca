@@ -43,9 +43,15 @@ class UserRepositorySqlite(UserRepository):
 
     def get_by_id(self, user_id: str) -> Optional[User]:
         cursor = self.conn.execute(
-            "SELECT id, name, summary FROM users WHERE id = ?", (user_id,))
+            "SELECT id, name, summary, when_created FROM users WHERE id = ?", (user_id,))
         row = cursor.fetchone()
-        return User(*row) if row else None
+        if row:
+            return User(
+                id=row[0],
+                name=row[1],
+                summary=row[2],
+                when_created=row[3])
+        return None
 
     def update(self, user: User):
         with self.conn:
@@ -59,7 +65,7 @@ class UserRepositorySqlite(UserRepository):
             self.conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
 
     def list(self) -> List[User]:
-        cursor = self.conn.execute("SELECT id, name, summary FROM users")
+        cursor = self.conn.execute("SELECT id, name, summary, when_created FROM users")
         return [User(*row) for row in cursor.fetchall()]
 
     def close(self):

@@ -21,11 +21,13 @@ class UserAppService:
 
     def get_by_id(self, user_id: str)-> UserResponse:
         user = self.user_repository.get_by_id(user_id=user_id)
-        return auto_map(user, UserResponse)
+        result = auto_map(user, UserResponse)
+        print(f">>>>>>>>>>>>>>>>>>>>>>>>>> {user}")
+        return result
     
     def get_all(self)-> List[UserResponse]:
         users = self.user_repository.list()
-        return auto_map(users, List[UserResponse])
+        return [auto_map(user, UserResponse) for user in users]
 
     # =====================================
     # Commands
