@@ -1,10 +1,22 @@
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
+from fastapi.middleware.cors import CORSMiddleware
+from infra.settings import Settings
 from routes import router
+
+settings = Settings()
 
 app = FastAPI()
 app.include_router(router)
 
+# CORS configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.cors_origin],   # CORS origin
+    allow_credentials=True,
+    allow_methods=["*"],                    # Allow all HTTP Methods (GET, POST, etc)
+    allow_headers=["*"],                    # Allow all headers
+)
 
 def custom_openapi():
     if app.openapi_schema:
