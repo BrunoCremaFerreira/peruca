@@ -45,13 +45,7 @@ class UserRepositorySqlite(UserRepository):
         cursor = self.conn.execute(
             "SELECT id, name, summary, when_created FROM users WHERE id = ?", (user_id,))
         row = cursor.fetchone()
-        if row:
-            return User(
-                id=row[0],
-                name=row[1],
-                summary=row[2],
-                when_created=row[3])
-        return None
+        return self._map_user(row) if row else None
 
     def update(self, user: User):
         with self.conn:
@@ -66,7 +60,14 @@ class UserRepositorySqlite(UserRepository):
 
     def list(self) -> List[User]:
         cursor = self.conn.execute("SELECT id, name, summary, when_created FROM users")
-        return [User(*row) for row in cursor.fetchall()]
+        return [self._map_user(row) for row in cursor.fetchall()]
+
+    def _map_user(self, row):
+        return User(
+            id=row[0],
+            name=row[1],
+            summary=row[2],
+            when_created=row[3])
 
     def close(self):
         self.conn.close()
