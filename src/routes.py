@@ -16,13 +16,9 @@ def chat(
     request: ChatRequest,
     llm_app_service: LlmAppService = Depends(get_llm_app_service),
 ) -> ChatResponse:
-    response_str = llm_app_service.chat(
-        message=request.message, 
-        user_id=request.user_id,
-        chat_id=request.chat_id
-    )
+    response_str = llm_app_service.chat(request)
     response = ChatResponse(
-        response=response_str, chat_id=request.chat_id, user_id=request.chat_id
+        response=response_str, chat_id=request.chat_id, external_user_id=request.external_user_id
     )
     return response
 

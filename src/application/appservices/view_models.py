@@ -6,13 +6,13 @@ from dataclasses import dataclass
 @dataclass
 class ChatRequest:
     message: str = ""
-    user_id: str = ""
+    external_user_id: str = ""
     chat_id: str = ""
 
 @dataclass
 class ChatResponse:
     response: str = ""
-    user_id: str = ""
+    external_user_id: str = ""
     chat_id: str = ""
 
 # =====================================

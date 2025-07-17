@@ -1,4 +1,6 @@
+from application.appservices.view_models import ChatRequest
 from domain.entities import GraphInvokeRequest, User
+from domain.exceptions import NofFoundValidationError
 from domain.graphs.main_graph import MainGraph
 from domain.interfaces.repository import ContextRepository, UserRepository
 
@@ -17,12 +19,15 @@ class LlmAppService:
     # Public Methods
     #===============================================
 
-    def chat(self, message: str, user_id: str, chat_id: str) -> str:
-        print(f"[LlmAppService.chat]: Request: {{ user_id='{user_id}' message='{message}' }}")
+    def chat(self, chat_request: ChatRequest) -> str:
+        print(f"[LlmAppService.chat]: Request: {{ {chat_request} }}")
         
-        user = self.user_repository.get_by_id(user_id=user_id)
+        user = self.user_repository.get_by_external_id(user_external_id=chat_request.external_user_id)
 
-        invoke_request = GraphInvokeRequest(message=message, user=user)
+        if not user:
+            raise NofFoundValidationError(entity_name="user", key_name="external_id", value= ChatRequest.external_user_id)
+
+        invoke_request = GraphInvokeRequest(message=chat_request.message, user=user)
         result = self.main_graph.invoke(invoke_request=invoke_request)
 
         print(f"[LlmAppService.chat]: Response: '{result}'")
