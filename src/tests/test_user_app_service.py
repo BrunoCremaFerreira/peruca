@@ -10,6 +10,10 @@ from domain.exceptions import ValidationError
 from infra.data.user_repository_sqlite import UserRepositorySqlite
 
 
+"""
+UserAppService Unit Test
+"""
+
 DB_PATH = "/home/brn/tests/data/tests.db"
 
 @pytest.fixture
