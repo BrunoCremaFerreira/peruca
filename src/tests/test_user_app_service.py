@@ -65,18 +65,16 @@ def test_add_user_with_long_summary(setup_app_service):
     # Assert
     assert "summary" in str(exc.value.errors)
 
-def test_add_user_with_duplicate_id(setup_app_service):
+def test_add_user_with_duplicate_external_id(setup_app_service):
     # Arrange
+    external_id="123"
     app_service, repo = setup_app_service
-    user_add = UserAdd(name="Joana", summary="test user")
-    user_id = app_service.add(user_add)
-    user = repo.get_by_id(user_id)
-    # force the same id
-    user.external_id = str(uuid.uuid4())
-    repo.add(user)  # save duplicated
+    user_add = UserAdd(name="Joana", summary="test user", external_id=external_id)
+    app_service.add(user_add)
+    
     # Act
     with pytest.raises(ValidationError) as exc:
-        app_service.add(UserAdd(name="Joana", summary="Duplicated", external_id=user.external_id))
+        app_service.add(UserAdd(name="Joana", summary="Duplicated", external_id=external_id)) # save duplicated
     # Assert
     assert "already exist" in str(exc.value.errors)
 
