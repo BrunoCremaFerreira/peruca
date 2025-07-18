@@ -22,7 +22,7 @@ class LlmAppService:
     def chat(self, chat_request: ChatRequest) -> str:
         print(f"[LlmAppService.chat]: Request: {{ {chat_request} }}")
         
-        user = self.user_repository.get_by_external_id(user_external_id=chat_request.external_user_id)
+        user = self.user_repository.get_by_external_id(external_id=chat_request.external_user_id)
 
         if not user:
             raise NofFoundValidationError(entity_name="user", key_name="external_id", value= chat_request.external_user_id)
