@@ -25,7 +25,7 @@ class LlmAppService:
         user = self.user_repository.get_by_external_id(user_external_id=chat_request.external_user_id)
 
         if not user:
-            raise NofFoundValidationError(entity_name="user", key_name="external_id", value= ChatRequest.external_user_id)
+            raise NofFoundValidationError(entity_name="user", key_name="external_id", value= chat_request.external_user_id)
 
         invoke_request = GraphInvokeRequest(message=chat_request.message, user=user)
         result = self.main_graph.invoke(invoke_request=invoke_request)

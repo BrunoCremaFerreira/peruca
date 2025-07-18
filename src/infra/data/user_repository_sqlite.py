@@ -48,9 +48,9 @@ class UserRepositorySqlite(UserRepository):
         row = cursor.fetchone()
         return self._map_user(row) if row else None
     
-    def get_by_external_id(self, user_external_id: str) -> Optional[User]:
+    def get_by_external_id(self, external_id: str) -> Optional[User]:
         cursor = self.conn.execute(
-            "SELECT id, external_id, name, summary, when_created FROM users WHERE external_id = ?", (user_external_id,))
+            "SELECT id, external_id, name, summary, when_created FROM users WHERE external_id = ?", (external_id,))
         row = cursor.fetchone()
         return self._map_user(row) if row else None
 

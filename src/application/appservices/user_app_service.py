@@ -23,8 +23,8 @@ class UserAppService:
         user = self.user_repository.get_by_id(user_id=user_id)
         return auto_map(user, UserResponse, True)
     
-    def get_by_external_id(self, user_external_id: str)-> UserResponse:
-        user = self.user_repository.get_by_external_id(user_external_id=user_external_id)
+    def get_by_external_id(self, external_id: str)-> UserResponse:
+        user = self.user_repository.get_by_external_id(external_id=external_id)
         return auto_map(user, UserResponse, True)
     
     def get_all(self)-> List[UserResponse]:

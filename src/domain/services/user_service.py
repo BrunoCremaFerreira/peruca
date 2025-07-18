@@ -38,7 +38,7 @@ class UserService:
         if self.user_repository.get_by_id(user_id=user.id):
             raise ValidationError({f"The user with id {user.id} already exist"})
         
-        if self.user_repository.get_by_external_id(external_user_id=user.external_id):
+        if self.user_repository.get_by_external_id(external_id=user.external_id):
             raise ValidationError({f"The user with external_id {user.external_id} already exist"})
 
         self.user_repository.add(user=user)
@@ -60,7 +60,8 @@ class UserService:
         if not db_user:
             raise ValidationError({f"The User with id '{user.id}' was not found"})
         
-        if self.user_repository.get_by_external_id(external_user_id=user.external_id):
+        db_user_with_ext_id = self.user_repository.get_by_external_id(external_id=user.external_id)
+        if db_user_with_ext_id and db_user_with_ext_id.id != db_user.id:
             raise ValidationError({f"The user with external_id {user.external_id} already exist"})
 
         self.user_repository.update(user=user)
