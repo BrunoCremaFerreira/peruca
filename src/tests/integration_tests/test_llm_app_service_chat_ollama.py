@@ -161,41 +161,6 @@ def test_chat_only_talking_not_smart_home_security_cams(message):
 #======================================================
 # Smart Home Lights Classification Only
 #======================================================
-@pytest.mark.parametrize("message", [
-    "Vi um vídeo engraçado da câmera de segurança de uma loja, parecia cena de filme.",
-    "Lembrei da época em que câmera era coisa só de banco.",
-    "Já pensou se as câmeras tivessem sentimentos sobre o que veem?",
-    "A câmera do meu celular tá melhor que muita câmera profissional hoje em dia.",
-    "Sempre me sinto observado quando vejo aquelas câmeras em praça pública.",
-    "Tem gente que acha que só porque tem câmera está tudo seguro.",
-    "Vi um passarinho pousar bem em frente à câmera da portaria ontem, ficou fofo.",
-    "Acho meio assustador quando as câmeras giram sozinhas.",
-    "Meu cachorro late sempre que vê o reflexo da câmera de vigilância.",
-    "Antigamente era comum colocar câmera só quando algo ruim acontecia.",
-    "Assistir gravações antigas às vezes traz umas boas lembranças.",
-    "O pessoal do condomínio vive discutindo onde colocar câmera, mas nunca resolve.",
-    "Estava vendo um documentário sobre vigilância urbana, é assustador.",
-    "As câmeras capturaram a neblina de manhã, parecia cena de terror.",
-    "Toda vez que passo pela portaria fico tentando não olhar pra câmera.",
-    "A câmera da entrada está apontada para uma árvore cheia de flores agora.",
-    "Você já viu aquelas câmeras antigas com fita cassete? Eram enormes!",
-    "Lembrei de um vídeo que viralizou com uma câmera pegando um gato roubando sapato.",
-    "Parece que hoje tudo é filmado, até espirro em público.",
-    "Se as câmeras pudessem falar, contariam cada história inacreditável..."
-])
-def test_chat_only_talking_not_smart_home_security_cams(message):
-    # Arrange
-    llm_app_service, user_app_service = setup_app_service()
-    user = UserAdd(name="Bruno", external_id="1000", summary="")
-    user_app_service.add(user)
-    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
-    # Act
-    response = llm_app_service.chat(chat_request=chat_request)
-    # Assert
-    assert "intent': ['smart_home_lights']" in response
-    assert "only_talking" not in response
-    assert "smart_home_security_cams" not in response
-    assert "shopping_list" not in response
 
 @pytest.mark.parametrize("message", [
     "Ligue a luz da sala.",
@@ -219,7 +184,7 @@ def test_chat_only_talking_not_smart_home_security_cams(message):
     "Mude a iluminação do escritório para modo leitura.",
     "Acenda a luz do jardim por 10 minutos."
 ])
-def test_chat_smart_home_lights_not_only_talking(message):
+def test_chat_smart_home_lights_only(message):
     # Arrange
     llm_app_service, user_app_service = setup_app_service()
     user = UserAdd(name="Bruno", external_id="1000", summary="")
@@ -232,3 +197,84 @@ def test_chat_smart_home_lights_not_only_talking(message):
     assert "only_talking" not in response
     assert "smart_home_security_cams" not in response
     assert "shopping_list" not in response
+
+#======================================================
+# Smart Home Security Classification Only
+#======================================================
+
+@pytest.mark.parametrize("message", [
+    "Mostre a câmera da garagem.",
+    "Quero ver a câmera da entrada agora.",
+    "Ative a câmera do portão.",
+    "Me mostra o que a câmera da sala está vendo.",
+    "Ligue a câmera da varanda.",
+    "O que a câmera do corredor está gravando neste momento?",
+    "Exiba a gravação de hoje da câmera da frente.",
+    "Consigo ver a imagem da câmera dos fundos agora?",
+    "Verifique a câmera do quintal para mim.",
+    "Quero revisar as imagens da câmera da cozinha.",
+    "Me avise se a câmera detectar algum movimento.",
+    "Tem algo sendo captado pela câmera do escritório?",
+    "Mostre a última gravação da câmera da garagem.",
+    "Abra o vídeo ao vivo da câmera do portão.",
+    "A câmera do hall está online?",
+    "Quero acessar a câmera da área externa.",
+    "Ative a visualização noturna da câmera da frente.",
+    "Consigo ver a câmera da entrada pelo celular?",
+    "Quero ver o que as câmeras estão captando agora.",
+    "A câmera detectou algum movimento esta noite?"
+])
+def test_chat_smart_home_security_cams_only(message):
+    # Arrange
+    llm_app_service, user_app_service = setup_app_service()
+    user = UserAdd(name="Bruno", external_id="1000", summary="")
+    user_app_service.add(user)
+    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+    # Act
+    response = llm_app_service.chat(chat_request=chat_request)
+    # Assert
+    assert "intent': ['smart_home_security_cams']" in response
+    assert "only_talking" not in response
+    assert "smart_home_lights" not in response
+    assert "shopping_list" not in response
+
+
+#======================================================
+# Shopping List Classification Only
+#======================================================
+
+@pytest.mark.parametrize("message", [
+    "Adicione leite na minha lista de compras.",
+    "Preciso comprar ovos e pão.",
+    "Coloque arroz e feijão na lista, por favor.",
+    "Adiciona sabão em pó na minha lista.",
+    "Tira o macarrão da lista de compras.",
+    "Quero lembrar de comprar café amanhã.",
+    "Anota papel higiênico na lista.",
+    "Acrescente queijo e presunto na lista.",
+    "Me mostra o que tem na minha lista de compras.",
+    "Pode colocar cenoura e batata na lista?",
+    "Adicione ração para o cachorro na lista.",
+    "Preciso comprar frutas e legumes.",
+    "Coloca leite condensado e creme de leite na lista.",
+    "Adiciona detergente e esponja na lista de compras.",
+    "Remova refrigerante da lista.",
+    "Verifique o que já tem na lista de mercado.",
+    "Adiciona produtos de limpeza na lista.",
+    "Preciso de sabonete e pasta de dente, adiciona aí.",
+    "Coloca chocolate e biscoito na lista pra mim.",
+    "Tira o açúcar da lista, já comprei."
+])
+def test_chat_shopping_list_only(message):
+    # Arrange
+    llm_app_service, user_app_service = setup_app_service()
+    user = UserAdd(name="Bruno", external_id="1000", summary="")
+    user_app_service.add(user)
+    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+    # Act
+    response = llm_app_service.chat(chat_request=chat_request)
+    # Assert
+    assert "intent': ['shopping_list']" in response
+    assert "only_talking" not in response
+    assert "smart_home_lights" not in response
+    assert "smart_home_security_cams" not in response

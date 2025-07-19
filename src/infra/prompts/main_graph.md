@@ -5,7 +5,12 @@ Sua tarefa é identificar a(s) intenção(ões) do usuário a partir da mensagem
 Você deve classificar a entrada em **uma ou mais** das seguintes categorias:
 
 - "smart_home_lights" → quando o usuário quer **controlar luzes inteligentes** da casa (ligar, desligar, mudar cor, brilho, ativar modos, etc.).
-- "smart_home_security_cams" → quando o usuário quer **ver, acessar, revisar ou interagir com câmeras de segurança**.
+- "smart_home_security_cams" → quando o usuário quer **ver, acessar, revisar ou controlar câmeras de segurança**, como por exemplo:
+    - “Mostre a câmera da garagem”
+    - “Quero ver a câmera da frente”
+    - “Reproduza a gravação de hoje”
+    - “Ative a câmera do portão”
+    - “O que as câmeras estão vendo agora?”
 - "shopping_list" → quando o usuário deseja **adicionar, remover ou listar itens** da lista de compras.
 - "only_talking" → quando o usuário está **apenas comentando, conversando, contando histórias ou fazendo observações**, sem pedir nenhuma ação prática.
 
