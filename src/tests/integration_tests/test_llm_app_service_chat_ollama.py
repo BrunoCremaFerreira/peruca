@@ -278,3 +278,82 @@ def test_chat_shopping_list_only(message):
     assert "only_talking" not in response
     assert "smart_home_lights" not in response
     assert "smart_home_security_cams" not in response
+
+#======================================================
+# Shopping List And Smart Home Lights
+#======================================================
+
+@pytest.mark.parametrize("message", [
+    "Ligue a luz da cozinha e adicione arroz na lista.",
+    "Apague as luzes da sala e coloque sabão em pó na lista de compras.",
+    "Coloca leite na lista e acenda a luz do quarto.",
+    "Quero que desligue as luzes e adicione papel toalha na lista.",
+    "Acenda a luz da varanda e me lembre de comprar pão.",
+    "Diminua a intensidade da luz e adicione café e açúcar na lista.",
+    "Adicione frutas na lista e mude a cor da luz da sala para azul.",
+    "Ative o modo noturno nas luzes e coloque leite condensado na lista.",
+    "Acenda a luz do escritório e adicione canetas na lista.",
+    "Adicione ração na lista e ligue as luzes da garagem.",
+    "Quero comprar sabão líquido, e também acender a luz da lavanderia.",
+    "Adiciona ovos e queijo na lista e muda a luz do quarto para cor quente.",
+    "Apaga a luz do corredor e adiciona detergente na lista.",
+    "Acende a luz do banheiro e coloca papel higiênico na lista.",
+    "Coloque biscoitos na lista e ilumine melhor a cozinha.",
+    "Ligue a iluminação principal e adicione shampoo e sabonete na lista.",
+    "Acenda as luzes da casa e adicione velas e fósforos na lista.",
+    "Desliga as luzes do andar de cima e adiciona vinho tinto na lista.",
+    "Diminui a luz do ambiente e acrescenta suco de laranja na lista.",
+    "Adiciona água com gás na lista e muda a luz da sala para o modo relax."
+])
+def test_chat_shopping_list_and_smart_home_lights(message):
+    # Arrange
+    llm_app_service, user_app_service = setup_app_service()
+    user = UserAdd(name="Bruno", external_id="1000", summary="")
+    user_app_service.add(user)
+    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+    # Act
+    response = llm_app_service.chat(chat_request=chat_request)
+    # Assert
+    assert "'shopping_list'" in response
+    assert "'smart_home_lights'" in response
+    assert "only_talking" not in response
+    assert "smart_home_security_cams" not in response
+
+#=============================================================
+# Shopping List And Only Talking but Shopping List required
+#=============================================================
+
+@pytest.mark.parametrize("message", [
+    "Acho que vou precisar de mais arroz essa semana, pode adicionar na lista?",
+    "Ontem fiz uma lasanha deliciosa, preciso lembrar de comprar queijo.",
+    "Falando nisso, coloca sabão em pó na lista porque o meu acabou.",
+    "Nossa, como o tempo passou rápido... coloca café na lista pra mim?",
+    "Fiquei pensando em fazer bolo no fim de semana, adiciona farinha e ovos aí.",
+    "Estava lembrando da receita da minha avó, coloca leite condensado na lista.",
+    "Depois daquela bagunça, preciso de mais papel toalha — adiciona na lista.",
+    "Adiciona desinfetante na lista, essa casa precisa de um bom faxinão!",
+    "Ontem sonhei que a geladeira estava vazia... coloca leite e iogurte na lista.",
+    "Falando em churrasco, coloca carvão e linguiça na lista de compras.",
+    "Essa semana foi corrida demais, adiciona miojo na lista.",
+    "Me bateu uma vontade de cozinhar... coloca azeite e alho na lista.",
+    "Você acredita que esqueci de comprar sabonete? Adiciona aí, por favor.",
+    "Lembrei da festa do João — coloca refrigerante e salgadinho na lista.",
+    "Fiquei com saudade da casa da minha mãe, coloca feijão preto na lista.",
+    "Nossa, hoje tá um dia ótimo pra cozinhar... põe batata e cebola na lista.",
+    "Fiquei sem ideias de almoço... adiciona macarrão e molho de tomate.",
+    "Ontem fiz uma limpa na despensa, coloca arroz integral e óleo na lista.",
+    "Lembrei que o vizinho recomendou aquele sabão, põe ele na lista também.",
+    "Sabe aquele cheiro de bolo no forno? Me inspirou — coloca fermento na lista."
+])
+def test_chat_shopping_list_and_only_talking_bu_shopping_list_required(message):
+    # Arrange
+    llm_app_service, user_app_service = setup_app_service()
+    user = UserAdd(name="Bruno", external_id="1000", summary="")
+    user_app_service.add(user)
+    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+    # Act
+    response = llm_app_service.chat(chat_request=chat_request)
+    # Assert
+    assert "'shopping_list'" in response
+    assert "smart_home_lights" not in response
+    assert "smart_home_security_cams" not in response
