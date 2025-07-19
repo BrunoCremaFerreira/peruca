@@ -357,3 +357,43 @@ def test_chat_shopping_list_and_only_talking_bu_shopping_list_required(message):
     assert "'shopping_list'" in response
     assert "smart_home_lights" not in response
     assert "smart_home_security_cams" not in response
+
+#======================================================
+# Smart Home Security Cams And Smart Home Lights
+#======================================================
+
+@pytest.mark.parametrize("message", [
+    "Acenda a luz da entrada e mostre a câmera da porta agora.",
+    "Ligue as luzes do quintal e veja se a câmera captou algum movimento.",
+    "Apague a luz da sala e mostre o que a câmera da sala está gravando.",
+    "Quero ver a câmera da garagem e acender a luz de lá também.",
+    "Mostre a câmera da cozinha e ligue as luzes do ambiente.",
+    "Ligue a luz da frente e veja se tem alguém na câmera da entrada.",
+    "Mude a cor da luz da varanda e abra a câmera do jardim.",
+    "Apague as luzes externas e mostre a câmera do quintal.",
+    "Acenda as luzes da garagem e veja se o portão está fechado na câmera.",
+    "Ative as luzes do corredor e abra a câmera do andar de cima.",
+    "Desligue as luzes da casa e me mostre a câmera da frente.",
+    "Mostre a câmera da sala e ajuste a luz para o modo relax.",
+    "Veja se há movimento na câmera dos fundos e acenda a luz lá.",
+    "Ligue a luz da varanda e veja se a câmera detectou algo estranho.",
+    "Mostre a câmera da escada e aumente a intensidade da luz no local.",
+    "Quero ver a câmera da frente enquanto você acende a luz do portão.",
+    "Abaixe a luz do quarto e abra a câmera do corredor.",
+    "Ilumine o jardim e veja a última gravação da câmera de segurança.",
+    "Desligue a luz da garagem e verifique se a câmera captou algo ontem à noite.",
+    "Acenda as luzes do hall de entrada e mostre a visão da câmera nesse local."
+])
+def test_chat_smart_home_security_cams_and_smart_home_lights(message):
+    # Arrange
+    llm_app_service, user_app_service = setup_app_service()
+    user = UserAdd(name="Bruno", external_id="1000", summary="")
+    user_app_service.add(user)
+    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+    # Act
+    response = llm_app_service.chat(chat_request=chat_request)
+    # Assert
+    assert "'smart_home_security_cams'" in response
+    assert "'smart_home_lights'" in response
+    assert "only_talking" not in response
+    assert "shopping_list" not in response
