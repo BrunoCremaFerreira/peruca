@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 
 # =====================================
 # LLM 
@@ -37,3 +38,29 @@ class UserResponse:
     external_id: str = ""
     name: str = ""
     summary: str = ""
+
+# =====================================
+# Shopping List
+# =====================================
+@dataclass
+class ShoppingListItemAdd:
+    name : str = ""
+    quantity : float = 1
+
+@dataclass
+class ShoppingListItemUpdate:
+    id: str = ""
+    name : str = ""
+    quantity : float = 1
+
+@dataclass
+class ShoppingListItemResponse:
+    id: str = ""
+    name : str = ""
+    quantity : float = 1
+    numeric_order: int = 0
+    group_name: str = ""
+
+class ShoppingListCleanType(Enum):
+    ALL = "ALL"
+    CHECKED = "CHECKED"

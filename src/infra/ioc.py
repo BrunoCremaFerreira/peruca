@@ -1,4 +1,5 @@
 from application.appservices.llm_app_service import LlmAppService
+from application.appservices.shopping_list_app_service import ShoppingListAppService
 from application.appservices.user_app_service import UserAppService
 from domain.graphs.main_graph import MainGraph
 from domain.graphs.only_talk_graph import OnlyTalkGraph
@@ -66,6 +67,13 @@ def get_user_app_service() -> UserAppService:
         user_service=get_user_service(),
         user_repository=get_user_repository()
     )
+
+def get_shopping_list_app_service() -> ShoppingListAppService:
+    """
+    IOC for ShoppingListAppService class
+    """
+
+    return ShoppingListAppService()
 
 # ====================================
 # Domain Services

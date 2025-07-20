@@ -1,9 +1,10 @@
 from typing import List
 from fastapi import APIRouter, Depends
 from application.appservices.llm_app_service import LlmAppService
+from application.appservices.shopping_list_app_service import ShoppingListAppService
 from application.appservices.user_app_service import UserAppService
-from application.appservices.view_models import ChatRequest, ChatResponse, UserAdd, UserResponse, UserUpdate
-from infra.ioc import get_llm_app_service, get_user_app_service
+from application.appservices.view_models import ChatRequest, ChatResponse, ShoppingListItemAdd, ShoppingListItemResponse, ShoppingListItemUpdate, UserAdd, UserResponse, UserUpdate
+from infra.ioc import get_llm_app_service, get_shopping_list_app_service, get_user_app_service
 
 router = APIRouter()
 
@@ -50,3 +51,28 @@ def user_add(request: UserAdd,
 def user_update(request: UserUpdate,
                 user_app_service: UserAppService = Depends(get_user_app_service)) -> None:
     user_app_service.update(user_update=request)
+
+
+# =====================================
+# Shopping List Routes
+# =====================================
+
+@router.get("/shopping-list", tags=["Shopping List"])
+def shopping_list_get_all(shopping_list_app_service: ShoppingListAppService = Depends(get_shopping_list_app_service)) -> List[ShoppingListItemResponse]:
+    return shopping_list_app_service.get_all()
+
+@router.get("/shopping-list/{id}", tags=["Shopping List"])
+def shopping_list_get(id: str,
+             shopping_list_app_service: ShoppingListAppService = Depends(get_shopping_list_app_service)) -> ShoppingListItemResponse:
+    return shopping_list_app_service.get_by_id(item_id=id)
+
+@router.post("/shopping-list", tags=["Shopping List"])
+def shopping_list_add(request: ShoppingListItemAdd,
+             shopping_list_app_service: ShoppingListAppService = Depends(get_shopping_list_app_service)) -> dict:
+    item_id = shopping_list_app_service.add(item=request)
+    return {"shopping_list_id": item_id}
+
+@router.put("/shopping-list", tags=["Shopping List"])
+def shopping_list_update(request: ShoppingListItemUpdate,
+                shopping_list_app_service: ShoppingListAppService = Depends(get_shopping_list_app_service)) -> None:
+    shopping_list_app_service.update(item=request)
