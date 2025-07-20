@@ -8,7 +8,7 @@ from domain.services.user_service import UserService
 from infra.data.context_repository_redis import RedisContextRepository
 from langchain_community.chat_models import ChatOllama
 from langchain_core.language_models.chat_models import BaseChatModel
-from infra.data.user_repository_sqlite import UserRepositorySqlite
+from infra.data.sqlite_user_repository import SqliteUserRepository
 from infra.settings import Settings
 
 # ====================================
@@ -104,7 +104,7 @@ def get_user_repository() -> UserRepository:
     User Repository
     """
     settings = Settings()
-    return UserRepositorySqlite(db_path= settings.peruca_db_connection_string)
+    return SqliteUserRepository(db_path= settings.peruca_db_connection_string)
 
 # ====================================
 # LLM Classes

@@ -1,12 +1,13 @@
 import os
+from unittest.mock import patch
 import uuid
 import pytest
 
 from application.appservices.user_app_service import UserAppService
 from domain.commands import UserAdd, UserUpdate
-from domain.services.user_service import UserService
+from domain.interfaces.repository import UserRepository
 from domain.exceptions import ValidationError
-from infra.data.user_repository_sqlite import UserRepositorySqlite
+from infra.ioc import get_user_app_service, get_user_repository
 
 
 """
@@ -17,15 +18,17 @@ DB_PATH = "/home/brn/tests/data/tests.db"
 
 @pytest.fixture
 def setup_app_service():
-    if os.path.exists(DB_PATH):
-        os.remove(DB_PATH)
-    repo = UserRepositorySqlite(f"sqlite://{DB_PATH}")
-    service = UserService(repo)
-    app_service = UserAppService(service, repo)
-    yield app_service, repo
-    repo.close()
-    if os.path.exists(DB_PATH):
-        os.remove(DB_PATH)
+    with patch.dict(os.environ, {
+        "PERUCA_DB_CONNECTION_STRING": f"sqlite://{DB_PATH}",
+    }):
+        if os.path.exists(DB_PATH):
+            os.remove(DB_PATH)
+        repo = get_user_repository()
+        app_service = get_user_app_service()
+        yield app_service, repo
+        repo.close()
+        if os.path.exists(DB_PATH):
+            os.remove(DB_PATH)
 
 def test_add_user_success(setup_app_service):
     # Arrange

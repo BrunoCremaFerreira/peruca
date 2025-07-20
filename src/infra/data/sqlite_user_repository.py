@@ -4,13 +4,17 @@ import uuid
 
 from domain.entities import User
 from domain.interfaces.repository import UserRepository
+from infra.data.sqlite_base_repository import SqliteBaseRepository
 
-class UserRepositorySqlite(UserRepository):
+class SqliteUserRepository(SqliteBaseRepository, UserRepository):
+    """
+    User Sqlite implementation repository
+    """
+
     def __init__(self, db_path: str):
-        self.db_path = db_path.replace("sqlite://", "")
-        self._startup()
+        super().__init__(db_path=db_path)
 
-    def _startup(self):
+    def _startup(self) -> None:
         self.connect()
         self._create_table()
         if not self.list():
@@ -19,7 +23,7 @@ class UserRepositorySqlite(UserRepository):
             self.add(admin_user)
             print(f"[UserRepositorySqlite]: Admin user was created {admin_user}.")
 
-    def _create_table(self):
+    def _create_table(self) -> None:
         with self.conn:
             self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS users (
