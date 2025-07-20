@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends
 from application.appservices.llm_app_service import LlmAppService
 from application.appservices.shopping_list_app_service import ShoppingListAppService
 from application.appservices.user_app_service import UserAppService
-from application.appservices.view_models import ChatRequest, ChatResponse, ShoppingListCleanType, ShoppingListItemAdd, ShoppingListItemResponse, ShoppingListItemUpdate, UserAdd, UserResponse, UserUpdate
+from application.appservices.view_models import ChatRequest, ChatResponse, ShoppingListCleanType, ShoppingListItemResponse,UserResponse
+from domain.commands import ShoppingListItemAdd, ShoppingListItemUpdate, UserAdd, UserUpdate
 from infra.ioc import get_llm_app_service, get_shopping_list_app_service, get_user_app_service
 
 router = APIRouter()

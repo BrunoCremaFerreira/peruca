@@ -1,5 +1,6 @@
 from typing import List
-from application.appservices.view_models import UserAdd, UserResponse, UserUpdate
+from application.appservices.view_models import UserResponse
+from domain.commands import UserAdd, UserUpdate
 from domain.entities import User
 from domain.interfaces.repository import UserRepository
 from domain.services.user_service import UserService

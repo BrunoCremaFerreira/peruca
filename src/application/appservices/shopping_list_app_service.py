@@ -1,5 +1,6 @@
 from typing import List
-from application.appservices.view_models import ShoppingListCleanType, ShoppingListItemResponse, ShoppingListItemAdd, ShoppingListItemUpdate
+from application.appservices.view_models import ShoppingListCleanType, ShoppingListItemResponse
+from domain.commands import ShoppingListItemAdd, ShoppingListItemUpdate
 
 class ShoppingListAppService:
     """

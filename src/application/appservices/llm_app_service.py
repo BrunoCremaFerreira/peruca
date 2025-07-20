@@ -1,8 +1,9 @@
 from application.appservices.view_models import ChatRequest
 from domain.entities import GraphInvokeRequest, User
-from domain.exceptions import NofFoundValidationError
+from domain.exceptions import EmptyParamValidationError, NofFoundValidationError
 from domain.graphs.main_graph import MainGraph
 from domain.interfaces.repository import ContextRepository, UserRepository
+from infra.utils import is_null_or_whitespace
 
 class LlmAppService:
     """
@@ -22,6 +23,9 @@ class LlmAppService:
     def chat(self, chat_request: ChatRequest) -> str:
         print(f"[LlmAppService.chat]: Request: {{ {chat_request} }}")
         
+        if is_null_or_whitespace(chat_request.external_user_id):
+            raise EmptyParamValidationError(param_name="external_user_id")
+
         user = self.user_repository.get_by_external_id(external_id=chat_request.external_user_id)
 
         if not user:

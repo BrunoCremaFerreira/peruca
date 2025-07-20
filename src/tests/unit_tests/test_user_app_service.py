@@ -1,10 +1,9 @@
 import os
 import uuid
 import pytest
-from datetime import datetime
 
 from application.appservices.user_app_service import UserAppService
-from application.appservices.view_models import UserAdd, UserUpdate
+from domain.commands import UserAdd, UserUpdate
 from domain.services.user_service import UserService
 from domain.exceptions import ValidationError
 from infra.data.user_repository_sqlite import UserRepositorySqlite
