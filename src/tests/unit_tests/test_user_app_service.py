@@ -3,9 +3,7 @@ from unittest.mock import patch
 import uuid
 import pytest
 
-from application.appservices.user_app_service import UserAppService
 from domain.commands import UserAdd, UserUpdate
-from domain.interfaces.repository import UserRepository
 from domain.exceptions import ValidationError
 from infra.ioc import get_user_app_service, get_user_repository
 
