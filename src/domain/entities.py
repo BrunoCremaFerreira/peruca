@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Optional
 
 # ====================================
 # Base entities Classes
@@ -8,6 +9,8 @@ from datetime import datetime, timezone
 class BaseEntity:
     id: str = ""
     when_created: datetime = datetime.now(timezone.utc)
+    when_updated: Optional[datetime] = None
+    when_deleted: Optional[datetime] = None
 
 # ====================================
 # User Related Classes

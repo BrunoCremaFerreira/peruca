@@ -24,7 +24,9 @@ class SqliteShoppingListRepository(SqliteBaseRepository, ShoppingListRepository)
                     name TEXT NOT NULL UNIQUE,
                     quantity FLOAT,
                     checked BOOLEAN NOT NULL DEFAULT 0,
-                    when_created TIMESTAMP
+                    when_created TIMESTAMP,
+                    when_updated TIMESTAMP DEFAULT NULL,
+                    when_deleted TIMESTAMP DEFAULT NULL
                 )
             """)
 
@@ -44,7 +46,7 @@ class SqliteShoppingListRepository(SqliteBaseRepository, ShoppingListRepository)
         Get Shopping List Item By Id
         """
         cursor = self.conn.execute(
-            "SELECT id, name, quantity, checked, when_created FROM shopping_list WHERE id = ?", (item_id,))
+            "SELECT id, name, quantity, checked, when_created, when_updated, when_deleted FROM shopping_list WHERE id = ?", (item_id,))
         row = cursor.fetchone()
         return self._map_shopping_list_item(row) if row else None
     
@@ -52,7 +54,7 @@ class SqliteShoppingListRepository(SqliteBaseRepository, ShoppingListRepository)
         """
         List All Shopping List
         """
-        cursor = self.conn.execute("SELECT id, name, quantity, checked, when_created  FROM shopping_list")
+        cursor = self.conn.execute("SELECT id, name, quantity, checked, when_created, when_updated, when_deleted  FROM shopping_list")
         return [self._map_shopping_list_item(row) for row in cursor.fetchall()]
 
 
@@ -79,5 +81,6 @@ class SqliteShoppingListRepository(SqliteBaseRepository, ShoppingListRepository)
             name=row["name"],
             quantity=row["quantity"],
             checked=row["checked"],
-            when_created=row["when_created"]
-        )
+            when_created=row["when_created"],
+            when_updated=row["when_updated"],
+            when_deleted=row["when_deleted"])

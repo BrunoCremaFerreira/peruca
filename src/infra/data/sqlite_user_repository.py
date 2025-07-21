@@ -16,7 +16,7 @@ class SqliteUserRepository(SqliteBaseRepository, UserRepository):
     def _startup(self) -> None:
         self.connect()
         self._create_table()
-        if not self.list():
+        if not self.get_all():
             print("[UserRepositorySqlite]: Creating Admin user...")
             user_id = str(uuid.uuid4())
             admin_user = User(id=user_id, external_id=user_id, name="Admin", summary="")
@@ -31,7 +31,9 @@ class SqliteUserRepository(SqliteBaseRepository, UserRepository):
                     external_id NOT NULL UNIQUE,
                     name TEXT NOT NULL,
                     summary TEXT,
-                    when_created TIMESTAMP        
+                    when_created TIMESTAMP,
+                    when_updated TIMESTAMP DEFAULT NULL,
+                    when_deleted TIMESTAMP DEFAULT NULL
                 )
             """)
 
@@ -44,13 +46,13 @@ class SqliteUserRepository(SqliteBaseRepository, UserRepository):
 
     def get_by_id(self, user_id: str) -> Optional[User]:
         cursor = self.conn.execute(
-            "SELECT id, external_id, name, summary, when_created FROM users WHERE id = ?", (user_id,))
+            "SELECT id, external_id, name, summary, when_created, when_updated, when_deleted FROM users WHERE id = ?", (user_id,))
         row = cursor.fetchone()
         return self._map_user(row) if row else None
     
     def get_by_external_id(self, external_id: str) -> Optional[User]:
         cursor = self.conn.execute(
-            "SELECT id, external_id, name, summary, when_created FROM users WHERE external_id = ?", (external_id,))
+            "SELECT id, external_id, name, summary, when_created, when_updated, when_deleted FROM users WHERE external_id = ?", (external_id,))
         row = cursor.fetchone()
         return self._map_user(row) if row else None
 
@@ -65,8 +67,18 @@ class SqliteUserRepository(SqliteBaseRepository, UserRepository):
         with self.conn:
             self.conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
 
-    def list(self) -> List[User]:
-        cursor = self.conn.execute("SELECT id, external_id, name, summary, when_created FROM users")
+    def get_all(self) -> List[User]:
+        cursor = self.conn.execute("""
+                            SELECT 
+                                id, 
+                                external_id, 
+                                name, 
+                                summary, 
+                                when_created, 
+                                when_updated,
+                                when_deleted 
+                            FROM users
+                """)
         return [self._map_user(row) for row in cursor.fetchall()]
 
     def _map_user(self, row):
@@ -75,7 +87,9 @@ class SqliteUserRepository(SqliteBaseRepository, UserRepository):
             external_id=row["external_id"],
             name=row["name"],
             summary=row["summary"],
-            when_created=row["when_created"])
+            when_created=row["when_created"],
+            when_updated=row["when_updated"],
+            when_deleted=row["when_deleted"])
 
     def close(self):
         self.conn.close()

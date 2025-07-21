@@ -29,7 +29,7 @@ class UserAppService:
         return auto_map(user, UserResponse, True)
     
     def get_all(self)-> List[UserResponse]:
-        users = self.user_repository.list()
+        users = self.user_repository.get_all()
         return [auto_map(user, UserResponse) for user in users]
 
     # =====================================

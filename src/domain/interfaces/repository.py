@@ -31,9 +31,9 @@ class UserRepository(ABC):
         pass
 
     @abstractmethod
-    def list(self) -> List[User]:
+    def get_all(self) -> List[User]:
         """
-        List User
+        Get all Users
         """
         pass
 
