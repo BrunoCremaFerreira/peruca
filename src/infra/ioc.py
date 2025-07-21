@@ -4,6 +4,7 @@ from application.appservices.user_app_service import UserAppService
 from domain.graphs.main_graph import MainGraph
 from domain.graphs.only_talk_graph import OnlyTalkGraph
 from domain.interfaces.repository import ContextRepository, ShoppingListRepository, UserRepository
+from domain.services.shopping_list_service import ShoppingListService
 from domain.services.user_service import UserService
 from infra.data.context_repository_redis import RedisContextRepository
 from langchain_community.chat_models import ChatOllama
@@ -75,7 +76,8 @@ def get_shopping_list_app_service() -> ShoppingListAppService:
     """
 
     return ShoppingListAppService(
-        shopping_list_repository=get_shopping_list_repository()
+        shopping_list_repository=get_shopping_list_repository(),
+        shopping_list_service=get_shopping_list_service()
     )
 
 # ====================================
@@ -87,6 +89,13 @@ def get_user_service() -> UserService:
     """
 
     return UserService(user_repository=get_user_repository())
+
+def get_shopping_list_service() -> ShoppingListRepository:
+    """
+    IOC for Shopping List Service
+    """
+
+    return ShoppingListService(shopping_list_repository=get_shopping_list_repository())
 
 # ====================================
 # Repositories

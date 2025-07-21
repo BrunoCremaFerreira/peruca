@@ -46,10 +46,8 @@ class UserAppService:
     # =====================================
 
     def add(self, user_add: UserAdd) -> str:
-        user = auto_map(user_add, User)
-        return self.user_service.add(user=user)
+        return self.user_service.add(user_add=user_add)
 
     def update(self, user_update: UserUpdate) -> None:
-        user = auto_map(user_update, User)
-        self.user_service.update(user=user)
+        self.user_service.update(user_update=user_update)
         

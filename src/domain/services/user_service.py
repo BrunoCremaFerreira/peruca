@@ -1,9 +1,11 @@
 
 import uuid
+from domain.commands import UserAdd, UserUpdate
 from domain.entities import User
 from domain.exceptions import ValidationError
 from domain.interfaces.repository import UserRepository
 from domain.validations.user_validation import UserValidator
+from infra.utils import auto_map
 
 
 class UserService:
@@ -14,11 +16,13 @@ class UserService:
     def __init__(self, user_repository: UserRepository):
         self.user_repository = user_repository
 
-    def add(self, user: User) -> str:
+    def add(self, user_add: UserAdd) -> str:
         """
         Add a new User
         """
-        
+
+        user = auto_map(user_add, User)
+
         if not user:
             raise ValidationError({f"The user is null"})
 
@@ -44,10 +48,15 @@ class UserService:
         self.user_repository.add(user=user)
         return user.id
     
-    def update(self, user: User) -> None:
+    def update(self, user_update: UserUpdate) -> None:
         """
         Update a existing User
         """
+
+        user = auto_map(user_update, User)
+
+        if not user:
+            raise ValidationError({f"The user is null"})
 
         UserValidator() \
             .validate_id(user.id) \

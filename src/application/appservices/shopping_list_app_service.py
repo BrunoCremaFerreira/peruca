@@ -3,6 +3,7 @@ from application.appservices.view_models import ShoppingListCleanType, ShoppingL
 from domain.commands import ShoppingListItemAdd, ShoppingListItemUpdate
 from domain.exceptions import EmptyParamValidationError
 from domain.interfaces.repository import ShoppingListRepository
+from domain.services.shopping_list_service import ShoppingListService
 from infra.utils import auto_map, is_null_or_whitespace
 
 class ShoppingListAppService:
@@ -10,8 +11,11 @@ class ShoppingListAppService:
     Shopping List Application Service
     """
 
-    def __init__(self, shopping_list_repository: ShoppingListRepository):
+    def __init__(self, 
+                 shopping_list_repository: ShoppingListRepository,
+                 shopping_list_service: ShoppingListService):
         self.shopping_list_repository = shopping_list_repository
+        self.shopping_list_service = shopping_list_service
 
     # =====================================
     # Queries
@@ -32,17 +36,24 @@ class ShoppingListAppService:
     # Commands
     # =====================================
 
-    def add(self, item_add: ShoppingListItemAdd):
-        pass
+    def add(self, item_add: ShoppingListItemAdd) -> str:
+        return self.shopping_list_service.add(item_add=item_add)
 
     def update(self, item: ShoppingListItemUpdate):
-        pass
+        return self.shopping_list_service.update(item=item)
 
-    def delete(self, item: str):
-        pass
+    def delete(self, item_id: str):
+        return self.shopping_list_repository.delete(item_id=item_id)
 
     def clear(self, clean_type: ShoppingListCleanType):
-        pass
+
+        all_items = self.shopping_list_repository.get_all()
+        
+        for item in all_items:
+            if clean_type == ShoppingListCleanType.CHECKED and item.checked:
+                continue
+            
+            self.shopping_list_repository.delete(item_id=item.id)
 
     def check(self, item_id: str):
         pass
