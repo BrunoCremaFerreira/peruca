@@ -1,20 +1,13 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from domain.entities import User
+from domain.entities import ShoppingListItem, User
 
 
 class UserRepository(ABC):
     """
     User Repository
     """
-
-    @abstractmethod
-    def connect() -> None:
-        """
-        Connect to database
-        """
-        pass
 
     @abstractmethod
     def add(self, user: User):
@@ -54,6 +47,46 @@ class UserRepository(ABC):
     def delete(self, user_id: str):
         """
         Delete User
+        """
+        pass
+
+
+class ShoppingListRepository(ABC):
+    """
+    User Repository
+    """
+
+    @abstractmethod
+    def add(self, item: ShoppingListItem):
+        """
+        Add Shopping List
+        """
+        pass
+
+    @abstractmethod
+    def get_by_id(self, item_id: str) -> Optional[ShoppingListItem]:
+        """
+        Get Shopping List Item By Id
+        """
+        pass
+
+    @abstractmethod
+    def get_all(self) -> List[ShoppingListItem]:
+        """
+        List All Shopping List
+        """
+        pass
+
+    @abstractmethod
+    def update(self, item: ShoppingListItem):
+        """
+        Update Shopping List Item
+        """
+        pass
+
+    def delete(self, item_id: str):
+        """
+        Delete Shopping List Item
         """
         pass
 

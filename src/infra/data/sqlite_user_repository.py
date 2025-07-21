@@ -1,4 +1,3 @@
-import sqlite3
 from typing import Optional, List
 import uuid
 
@@ -19,7 +18,8 @@ class SqliteUserRepository(SqliteBaseRepository, UserRepository):
         self._create_table()
         if not self.list():
             print("[UserRepositorySqlite]: Creating Admin user...")
-            admin_user = User(id=str(uuid.uuid4()), name="Admin", summary="")
+            user_id = str(uuid.uuid4())
+            admin_user = User(id=user_id, external_id=user_id, name="Admin", summary="")
             self.add(admin_user)
             print(f"[UserRepositorySqlite]: Admin user was created {admin_user}.")
 
@@ -34,10 +34,6 @@ class SqliteUserRepository(SqliteBaseRepository, UserRepository):
                     when_created TIMESTAMP        
                 )
             """)
-
-    def connect(self):
-        print(f"[UserRepositorySqlite]: Connecting to '{self.db_path}'...")
-        self.conn = sqlite3.connect(database=self.db_path)
 
     def add(self, user: User):
         with self.conn:
@@ -75,11 +71,11 @@ class SqliteUserRepository(SqliteBaseRepository, UserRepository):
 
     def _map_user(self, row):
         return User(
-            id=row[0],
-            external_id=row[1],
-            name=row[2],
-            summary=row[3],
-            when_created=row[4])
+            id=row["id"],
+            external_id=row["external_id"],
+            name=row["name"],
+            summary=row["summary"],
+            when_created=row["when_created"])
 
     def close(self):
         self.conn.close()
