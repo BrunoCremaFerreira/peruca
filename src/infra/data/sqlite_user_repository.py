@@ -46,20 +46,49 @@ class SqliteUserRepository(SqliteBaseRepository, UserRepository):
 
     def get_by_id(self, user_id: str) -> Optional[User]:
         cursor = self.conn.execute(
-            "SELECT id, external_id, name, summary, when_created, when_updated, when_deleted FROM users WHERE id = ?", (user_id,))
+            """SELECT 
+                id, 
+                external_id, 
+                name, 
+                summary, 
+                when_created, 
+                when_updated, 
+                when_deleted 
+            FROM 
+                users 
+            WHERE 
+                id = ?
+            """, (user_id,))
         row = cursor.fetchone()
         return self._map_user(row) if row else None
     
     def get_by_external_id(self, external_id: str) -> Optional[User]:
         cursor = self.conn.execute(
-            "SELECT id, external_id, name, summary, when_created, when_updated, when_deleted FROM users WHERE external_id = ?", (external_id,))
+            """SELECT 
+                id, 
+                external_id, 
+                name, 
+                summary, 
+                when_created, 
+                when_updated, 
+                when_deleted 
+            FROM 
+                users 
+            WHERE 
+                external_id = ?
+            """, (external_id,))
         row = cursor.fetchone()
         return self._map_user(row) if row else None
 
     def update(self, user: User):
         with self.conn:
             self.conn.execute(
-                "UPDATE users SET name = ?, summary = ?, external_id = ? WHERE id = ?",
+                """UPDATE users SET 
+                        name = ?, 
+                        summary = ?, 
+                        external_id = ? 
+                    WHERE id = ?
+                """,
                 (user.name, user.summary, user.external_id, user.id)
             )
 
