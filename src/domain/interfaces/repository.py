@@ -44,6 +44,7 @@ class UserRepository(ABC):
         """
         pass
 
+    @abstractmethod
     def delete(self, user_id: str):
         """
         Delete User
@@ -84,6 +85,7 @@ class ShoppingListRepository(ABC):
         """
         pass
 
+    @abstractmethod
     def delete(self, item_id: str):
         """
         Delete Shopping List Item

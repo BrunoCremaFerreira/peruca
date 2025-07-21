@@ -3,11 +3,12 @@ from application.appservices.shopping_list_app_service import ShoppingListAppSer
 from application.appservices.user_app_service import UserAppService
 from domain.graphs.main_graph import MainGraph
 from domain.graphs.only_talk_graph import OnlyTalkGraph
-from domain.interfaces.repository import ContextRepository, UserRepository
+from domain.interfaces.repository import ContextRepository, ShoppingListRepository, UserRepository
 from domain.services.user_service import UserService
 from infra.data.context_repository_redis import RedisContextRepository
 from langchain_community.chat_models import ChatOllama
 from langchain_core.language_models.chat_models import BaseChatModel
+from infra.data.sqlite_shopping_list_repository import SqliteShoppingListRepository
 from infra.data.sqlite_user_repository import SqliteUserRepository
 from infra.settings import Settings
 
@@ -73,7 +74,9 @@ def get_shopping_list_app_service() -> ShoppingListAppService:
     IOC for ShoppingListAppService class
     """
 
-    return ShoppingListAppService()
+    return ShoppingListAppService(
+        shopping_list_repository=get_shopping_list_repository()
+    )
 
 # ====================================
 # Domain Services
@@ -94,6 +97,7 @@ def get_context_repository() -> ContextRepository:
     """
     IOC for Cache Repository
     """
+
     settings = Settings()
     connection_string = settings.cache_db_connection_string
 
@@ -103,8 +107,17 @@ def get_user_repository() -> UserRepository:
     """
     User Repository
     """
+
     settings = Settings()
-    return SqliteUserRepository(db_path= settings.peruca_db_connection_string)
+    return SqliteUserRepository(db_path=settings.peruca_db_connection_string)
+
+def get_shopping_list_repository() -> ShoppingListRepository:
+    """
+    Shopping List Repository
+    """
+
+    settings = Settings()
+    return SqliteShoppingListRepository(db_path=settings.peruca_db_connection_string)
 
 # ====================================
 # LLM Classes

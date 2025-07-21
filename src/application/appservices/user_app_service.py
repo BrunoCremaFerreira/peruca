@@ -2,9 +2,10 @@ from typing import List
 from application.appservices.view_models import UserResponse
 from domain.commands import UserAdd, UserUpdate
 from domain.entities import User
+from domain.exceptions import EmptyParamValidationError
 from domain.interfaces.repository import UserRepository
 from domain.services.user_service import UserService
-from infra.utils import auto_map
+from infra.utils import auto_map, is_null_or_whitespace
 
 
 class UserAppService:
@@ -21,10 +22,18 @@ class UserAppService:
     # =====================================
 
     def get_by_id(self, user_id: str)-> UserResponse:
+        
+        if is_null_or_whitespace(user_id):
+            raise EmptyParamValidationError(param_name="user_id")
+        
         user = self.user_repository.get_by_id(user_id=user_id)
         return auto_map(user, UserResponse, True)
     
     def get_by_external_id(self, external_id: str)-> UserResponse:
+        
+        if is_null_or_whitespace(external_id):
+            raise EmptyParamValidationError(param_name="external_id")
+        
         user = self.user_repository.get_by_external_id(external_id=external_id)
         return auto_map(user, UserResponse, True)
     
