@@ -56,7 +56,7 @@ class ShoppingListAppService:
             self.shopping_list_repository.delete(item_id=item.id)
 
     def check(self, item_id: str):
-        pass
+        return self.shopping_list_service.check(item_id=item_id)
 
     def uncheck(self, item_id: str):
-        pass
+        return self.uncheck(item_id=item_id)
