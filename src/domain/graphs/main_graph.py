@@ -45,9 +45,8 @@ class MainGraph(Graph):
             data.get("output_cams"),
             data.get("output_only")
         ]
-        resposta_final = "\n".join(o for o in outputs if o)
         
-        return {**data, "output": resposta_final}
+        return {"output": outputs}
     
     def _handle_smart_home_lights(self, data):
         print(f"[main_graph.handle_smart_home_lights]: Triggered...")
