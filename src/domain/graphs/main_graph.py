@@ -40,14 +40,25 @@ class MainGraph(Graph):
 
 
     def _handle_final_response(self, data):
-        outputs = [
+        outputs = [e for e in [
             data.get("output_lights"),
             data.get("output_shopping"),
             data.get("output_cams"),
             data.get("output_only_talking")
-        ]
-        
-        return {"output": outputs}
+        ] if e is not None]
+
+        if len(outputs) > 1:
+            # Merging multiple cathegory responses into a friendly response
+            responses = '\n\n'.join([f"{i+1}. {s}" for i, s in enumerate(outputs)])
+            final_response_prompt = ChatPromptTemplate.from_template(self.load_prompt("main_graph_final_response.md"))
+            final_reponse_chain = final_response_prompt | self.llm_chat
+            llm_response = final_reponse_chain.invoke({"input": data["input"].message, "responses": responses})
+            response = self._remove_thinking_tag(llm_response.content)
+        else:
+            # Unique response
+            response = outputs[0]
+
+        return {"output": response}
     
     def _handle_smart_home_lights(self, data):
         print(f"[main_graph.handle_smart_home_lights]: Triggered...")
