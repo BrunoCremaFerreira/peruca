@@ -45,10 +45,10 @@ def test_chat_only_talking_greetings():
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
-    assert "intent': ['only_talking']" in response
-    assert "smart_home_lights" not in response
-    assert "smart_home_security_cams" not in response
-    assert "shopping_list" not in response
+    intents = response.get("intents")
+    output = response.get("output")
+    assert  intents == ["only_talking"]
+    assert output
 
 @pytest.mark.parametrize("message", [
     "A luz do sol hoje tá tão bonita que nem preciso acender nada.", 
@@ -81,11 +81,10 @@ def test_chat_only_talking_not_home_lights(message):
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
-    assert "intent': ['only_talking']" in response
-    assert "smart_home_lights" not in response
-    assert "smart_home_security_cams" not in response
-    assert "shopping_list" not in response
-
+    intents = response.get("intents")
+    output = response.get("output")
+    assert  intents == ["only_talking"]
+    assert output
 
 @pytest.mark.parametrize("message", [
     "Estava lembrando de quando minha mãe esquecia sempre de comprar o leite.",
@@ -118,10 +117,10 @@ def test_chat_only_talking_not_shopping_list(message):
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
-    assert "intent': ['only_talking']" in response
-    assert "smart_home_lights" not in response
-    assert "smart_home_security_cams" not in response
-    assert "shopping_list" not in response
+    intents = response.get("intents")
+    output = response.get("output")
+    assert  intents == ["only_talking"]
+    assert output
 
 @pytest.mark.parametrize("message", [
     "Vi um vídeo engraçado da câmera de segurança de uma loja, parecia cena de filme.",
@@ -154,10 +153,10 @@ def test_chat_only_talking_not_smart_home_security_cams(message):
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
-    assert "intent': ['only_talking']" in response
-    assert "smart_home_lights" not in response
-    assert "smart_home_security_cams" not in response
-    assert "shopping_list" not in response
+    intents = response.get("intents")
+    output = response.get("output")
+    assert  intents == ["only_talking"]
+    assert output
 
 #======================================================
 # Smart Home Lights Classification Only
@@ -194,10 +193,10 @@ def test_chat_smart_home_lights_only(message):
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
-    assert "intent': ['smart_home_lights']" in response
-    assert "only_talking" not in response
-    assert "smart_home_security_cams" not in response
-    assert "shopping_list" not in response
+    intents = response.get("intents")
+    output = response.get("output")
+    assert  intents == ["smart_home_lights"]
+    assert output
 
 #======================================================
 # Smart Home Security Classification Only
@@ -234,11 +233,10 @@ def test_chat_smart_home_security_cams_only(message):
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
-    assert "intent': ['smart_home_security_cams']" in response
-    assert "only_talking" not in response
-    assert "smart_home_lights" not in response
-    assert "shopping_list" not in response
-
+    intents = response.get("intents")
+    output = response.get("output")
+    assert  intents == ["smart_home_security_cams"]
+    assert output
 
 #======================================================
 # Shopping List Classification Only
@@ -275,10 +273,10 @@ def test_chat_shopping_list_only(message):
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
-    assert "intent': ['shopping_list']" in response
-    assert "only_talking" not in response
-    assert "smart_home_lights" not in response
-    assert "smart_home_security_cams" not in response
+    intents = response.get("intents")
+    output = response.get("output")
+    assert  intents == ["shopping_list"]
+    assert output
 
 #======================================================
 # Shopping List And Smart Home Lights
@@ -315,10 +313,13 @@ def test_chat_shopping_list_and_smart_home_lights(message):
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
-    assert "'shopping_list'" in response
-    assert "'smart_home_lights'" in response
-    assert "only_talking" not in response
-    assert "smart_home_security_cams" not in response
+    intents = response.get("intents")
+    output = response.get("output")
+    assert "shopping_list" in intents
+    assert "smart_home_lights" in intents
+    assert "only_talking" not in intents
+    assert "smart_home_security_cams" not in intents
+    assert output
 
 #=============================================================
 # Shopping List And Only Talking but Shopping List required
@@ -355,9 +356,12 @@ def test_chat_shopping_list_and_only_talking_bu_shopping_list_required(message):
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
-    assert "'shopping_list'" in response
-    assert "smart_home_lights" not in response
-    assert "smart_home_security_cams" not in response
+    intents = response.get("intents")
+    output = response.get("output")
+    assert "shopping_list" in intents
+    assert "smart_home_lights" not in intents
+    assert "smart_home_security_cams" not in intents
+    assert output
 
 #======================================================
 # Smart Home Security Cams And Smart Home Lights
@@ -394,7 +398,10 @@ def test_chat_smart_home_security_cams_and_smart_home_lights(message):
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
-    assert "'smart_home_security_cams'" in response
-    assert "'smart_home_lights'" in response
-    assert "only_talking" not in response
-    assert "shopping_list" not in response
+    intents = response.get("intents")
+    output = response.get("output")
+    assert "smart_home_security_cams" in intents
+    assert "smart_home_lights" in intents
+    assert "only_talking" not in intents
+    assert "shopping_list" not in intents
+    assert output

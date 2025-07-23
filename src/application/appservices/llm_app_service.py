@@ -33,8 +33,10 @@ class LlmAppService:
 
         invoke_request = GraphInvokeRequest(message=chat_request.message, user=user)
         result = self.main_graph.invoke(invoke_request=invoke_request)
+        output = result.get("output")
+        intents = result.get("intent")
 
         print(f"[LlmAppService.chat]: Response: '{result}'")
-        return f"{result}"
+        return {"intents": intents, "output": output}
 
         

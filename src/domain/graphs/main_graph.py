@@ -13,7 +13,8 @@ class MainGraphState(TypedDict):
         output_lights: Optional[str]
         output_shopping: Optional[str]
         output_cams: Optional[str]
-        output_only: Optional[str]
+        output_only_talking: Optional[str]
+        output: Optional[str]
 
 class MainGraph(Graph):
 
@@ -43,7 +44,7 @@ class MainGraph(Graph):
             data.get("output_lights"),
             data.get("output_shopping"),
             data.get("output_cams"),
-            data.get("output_only")
+            data.get("output_only_talking")
         ]
         
         return {"output": outputs}
@@ -63,7 +64,7 @@ class MainGraph(Graph):
     def _handle_only_talking(self, data):
         print(f"[main_graph.handle_only_talking]: Triggered...")
         result = self.only_talk_graph.invoke(invoke_request=data['input'])
-        return {"output_only": f"{self._remove_thinking_tag(result)}"}
+        return {"output_only_talking": f"{self._remove_thinking_tag(result)}"}
 
     #===============================================
     # Private Methods
