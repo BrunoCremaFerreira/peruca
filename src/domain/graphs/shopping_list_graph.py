@@ -36,12 +36,21 @@ class ShoppingListGraph(Graph):
         response = chain.invoke({"input": data["input"].message})
         cleaned = self._remove_thinking_tag(response.content)
         try:
-            intents = eval(cleaned) if isinstance(cleaned, str) else []
-            if isinstance(intents, str):
-                intents = [intents]
-        except:
+            parsed = eval(cleaned) if isinstance(cleaned, str) else cleaned
+            intents = parsed.get("intents", ["not_recognized"])
+        except Exception:
+            parsed = {}
             intents = ["not_recognized"]
-        return {"intent": intents, "input": data["input"]}  
+
+        return {
+            "intent": intents,
+            "input": data["input"],
+            "output_add_item": parsed.get("add_item"),
+            "output_edit_item": parsed.get("edit_item"),
+            "output_delete_item": parsed.get("delete_item"),
+            "output_check_item": parsed.get("check_item"),
+            "output_uncheck_item": parsed.get("uncheck_item"),
+        }
 
 
     def _handle_final_response(self, data):
@@ -70,24 +79,29 @@ class ShoppingListGraph(Graph):
         return {"output": response}
     
     def _handle_add_item(self, data):
-        print(f"[shopping_list_graph.handle_add_item]: Triggered...")
-        return {"output_add_item": "Add Item Triggered"}
+        payload = data.get("output_add_item")
+        print(f"[shopping_list_graph.handle_add_item]: {payload}")
+        return {"output_add_item": f"Items Add: {payload}"}
+
+    def _handle_delete_item(self, data):
+        payload = data.get("output_delete_item")
+        print(f"[shopping_list_graph.handle_delete_item]: {payload}")
+        return {"output_delete_item": f"Items Removeds: {payload}"}
 
     def _handle_edit_item(self, data):
-        print(f"[shopping_list_graph.handle_edit_item]: : Triggered...")
-        return {"output_edit_item": "Edit Item Triggered"}
-    
-    def _handle_delete_item(self, data):
-        print(f"[shopping_list_graph.handle_delete_item]: Triggered...")
-        return {"output_delete_item": "Delete Item Triggered"}
+        payload = data.get("output_edit_item")
+        print(f"[shopping_list_graph.handle_edit_item]: {payload}")
+        return {"output_edit_item": f"Items Edited: {payload}"}
 
     def _handle_check_item(self, data):
-        print(f"[shopping_list_graph.handle_check_item]: Triggered...")
-        return {"output_check_item": "Check Item Triggered"}
-    
+        payload = data.get("output_check_item")
+        print(f"[shopping_list_graph.handle_check_item]: {payload}")
+        return {"output_check_item": f"Items Checked: {payload}"}
+
     def _handle_uncheck_item(self, data):
-        print(f"[shopping_list_graph.handle_uncheck_item]: Triggered...")
-        return {"output_ucheck_item": "Uncheck Item Triggered"}
+        payload = data.get("output_uncheck_item")
+        print(f"[shopping_list_graph.handle_uncheck_item]: {payload}")
+        return {"output_uncheck_item": f"Items Unchecked: {payload}"}
     
     def _handle_list_items(self, data):
         print(f"[shopping_list_graph.handle_list_items]: Triggered...")

@@ -46,6 +46,28 @@ Qual a temperatura no forno ideal para um bolo?
 
 ---
 
-Agora, com base na seguinte mensagem do usuário, retorne a lista de intenções no formato Python (ex: ["add_item", "delete_item"]):
+Depois de identificar as intenções, extraia os dados relevantes de acordo com o seguinte formato:
+
+    Para add_item, edit_item, delete_item: use o formato "item,quantidade" separados por |, se houver mais de um. Se a quantidade não for mencionada, assuma 1.
+
+        Ex: "leite,1|ovos,2"
+
+    Para check_item e uncheck_item: retorne apenas uma lista separada por vírgula, sem quantidades.
+
+        Ex: "leite, ovos, azeite"
+
+Retorne os dados como um dicionário JSON com a chave da intenção e os valores reconhecidos. Exemplo:
+
+(caractere abre chave)
+  "intents": ["add_item", "delete_item"],
+  "add_item": "água com gás,1",
+  "delete_item": "sabonetes,2"
+(caractere fecha chave)
+
+Se nenhuma informação relevante for encontrada, retorne:
+
+(caractere abre chave)
+  "intents": ["not_recognized"]
+(caractere fecha chave)
 
 Mensagem: {input}
