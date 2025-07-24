@@ -67,11 +67,7 @@ class ShoppingListGraph(Graph):
 
         if len(outputs) > 1:
             # Merging multiple cathegory responses into a friendly response
-            responses = '\n\n'.join([f"{i+1}. {s}" for i, s in enumerate(outputs)])
-            final_response_prompt = ChatPromptTemplate.from_template(self.load_prompt("shopping_list_final_response.md"))
-            final_reponse_chain = final_response_prompt | self.llm_chat
-            llm_response = final_reponse_chain.invoke({"input": data["input"].message, "responses": responses})
-            response = self._remove_thinking_tag(llm_response.content)
+            response = '\n\n'.join([f"{i+1}. {s}" for i, s in enumerate(outputs)])
         else:
             # Unique response
             response = outputs[0]
