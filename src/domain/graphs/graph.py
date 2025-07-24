@@ -16,6 +16,8 @@ class Graph(ABC):
         """
         pass
 
+    def _remove_thinking_tag(self, input_str: str) -> str:
+        return input_str.replace("<think>\n\n</think>\n\n", "").strip()
 
     def load_prompt(self, name: str) -> str:
         """
