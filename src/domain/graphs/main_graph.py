@@ -6,6 +6,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from domain.entities import GraphInvokeRequest
 from domain.graphs.graph import Graph
 from domain.graphs.only_talk_graph import OnlyTalkGraph
+from domain.graphs.shopping_list_graph import ShoppingListGraph
 
 class MainGraphState(TypedDict):
         input: str
@@ -18,9 +19,13 @@ class MainGraphState(TypedDict):
 
 class MainGraph(Graph):
 
-    def __init__(self, llm_chat: BaseChatModel, only_talk_graph: OnlyTalkGraph):
+    def __init__(self, 
+                 llm_chat: BaseChatModel, 
+                 only_talk_graph: OnlyTalkGraph, 
+                 shopping_list_graph: ShoppingListGraph):
         self.llm_chat = llm_chat
         self.only_talk_graph = only_talk_graph
+        self.shopping_list_graph = shopping_list_graph
         self.classification_prompt = ChatPromptTemplate.from_template(self.load_prompt("main_graph.md"))
     
     #===============================================
@@ -70,7 +75,8 @@ class MainGraph(Graph):
 
     def _handle_shopping_list(self, data):
         print(f"[main_graph.handle_shopping_list]: : Triggered...")
-        return {"output_shopping": "Item adicionado à lista de compras."}
+        result: str = self.shopping_list_graph.invoke(invoke_request=data['input'])
+        return {"output_shopping": result}
 
     def _handle_only_talking(self, data):
         print(f"[main_graph.handle_only_talking]: Triggered...")

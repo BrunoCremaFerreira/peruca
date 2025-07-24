@@ -3,6 +3,7 @@ from application.appservices.shopping_list_app_service import ShoppingListAppSer
 from application.appservices.user_app_service import UserAppService
 from domain.graphs.main_graph import MainGraph
 from domain.graphs.only_talk_graph import OnlyTalkGraph
+from domain.graphs.shopping_list_graph import ShoppingListGraph
 from domain.interfaces.repository import ContextRepository, ShoppingListRepository, UserRepository
 from domain.services.shopping_list_service import ShoppingListService
 from domain.services.user_service import UserService
@@ -28,8 +29,11 @@ def get_main_graph() -> MainGraph:
             temperature=settings.llm_main_graph_chat_temperature)
     
     only_talk_graph = get_only_talk_graph()
+    shopping_list_graph = get_shopping_list_graph()
     
-    return MainGraph(llm_chat=llm_chat, only_talk_graph=only_talk_graph)
+    return MainGraph(llm_chat=llm_chat, 
+                     only_talk_graph=only_talk_graph, 
+                     shopping_list_graph=shopping_list_graph)
 
 def get_only_talk_graph() -> OnlyTalkGraph:
     """
@@ -43,6 +47,19 @@ def get_only_talk_graph() -> OnlyTalkGraph:
             temperature=settings.llm_only_talk_graph_chat_temperature)
     
     return OnlyTalkGraph(llm_chat=llm_chat)
+
+def get_shopping_list_graph() -> ShoppingListGraph:
+    """
+    IOC for Shopping List Graph
+    """
+
+    settings = Settings()
+    
+    # Instancing LLM Provider
+    llm_chat = get_llm_chat(model=settings.llm_shopping_list_graph_chat_model,
+            temperature=settings.llm_shopping_list_graph_chat_temperature)
+    
+    return ShoppingListGraph(llm_chat=llm_chat)
 
 # ====================================
 # App Services
