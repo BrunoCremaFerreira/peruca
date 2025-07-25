@@ -1,10 +1,12 @@
-from typing import Optional, TypedDict
+from typing import List, Optional, TypedDict
 from langchain_core.runnables import RunnableLambda
 from langgraph.graph import StateGraph, END
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
+from domain.commands import ShoppingListItemAdd
 from domain.entities import GraphInvokeRequest
 from domain.graphs.graph import Graph
+from domain.services.shopping_list_service import ShoppingListService
 
 class ShoppingListGraphState(TypedDict):
         input: str
@@ -24,8 +26,9 @@ class ShoppingListGraph(Graph):
     Shopping List category graph
     """
 
-    def __init__(self, llm_chat: BaseChatModel):
+    def __init__(self, llm_chat: BaseChatModel, shopping_list_service: ShoppingListService):
         self.llm_chat = llm_chat
+        self.shopping_list_service = shopping_list_service
         self.classification_prompt = ChatPromptTemplate.from_template(self.load_prompt("shopping_list_graph.md"))
 
     #===============================================
@@ -77,7 +80,13 @@ class ShoppingListGraph(Graph):
     def _handle_add_item(self, data):
         payload = data.get("output_add_item")
         print(f"[shopping_list_graph.handle_add_item]: {payload}")
-        return {"output_add_item": f"Items Add: {payload}"}
+
+        items_to_add = self._parse_shopping_list(payload)
+
+        for item in items_to_add:
+            self.shopping_list_service.add(item)
+
+        return {"output_add_item": f"Items Add: {", ".join(item.name for item in items_to_add)}"}
 
     def _handle_delete_item(self, data):
         payload = data.get("output_delete_item")
@@ -150,6 +159,23 @@ class ShoppingListGraph(Graph):
         workflow.add_edge("final_response", END)
 
         return workflow.compile()
+    
+    #===============================================
+    # Items Parse
+    #===============================================
+    def _parse_shopping_list(self, input_str: str) -> List[ShoppingListItemAdd]:
+        items = []
+        if not input_str.strip():
+            return items
+        
+        for pair in input_str.split("|"):
+            try:
+                name, quantity = pair.split(",", 1)
+                item = ShoppingListItemAdd(name=name.strip(), quantity=float(quantity.strip()))
+                items.append(item)
+            except ValueError:
+                print(f"Warning: Item ignored: '{pair}'")
+        return items
 
     #===============================================
     # Public Methods

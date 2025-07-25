@@ -59,7 +59,9 @@ def get_shopping_list_graph() -> ShoppingListGraph:
     llm_chat = get_llm_chat(model=settings.llm_shopping_list_graph_chat_model,
             temperature=settings.llm_shopping_list_graph_chat_temperature)
     
-    return ShoppingListGraph(llm_chat=llm_chat)
+    shopping_list_service = get_shopping_list_service()
+    
+    return ShoppingListGraph(llm_chat=llm_chat, shopping_list_service=shopping_list_service)
 
 # ====================================
 # App Services

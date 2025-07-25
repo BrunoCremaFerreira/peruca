@@ -32,7 +32,7 @@ class SqliteBaseRepository(ABC):
         Connect to the database
         """
         print(f"[{self.__class__.__name__}]: Connecting to '{self.db_path}'...")
-        self.conn = sqlite3.connect(database=self.db_path)
+        self.conn = sqlite3.connect(database=self.db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
 
     def close(self):
