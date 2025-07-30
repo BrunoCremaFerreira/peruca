@@ -4,7 +4,7 @@ from langgraph.graph import StateGraph, END
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from domain.commands import ShoppingListItemAdd
-from domain.entities import GraphInvokeRequest
+from domain.entities import GraphInvokeRequest, ShoppingListItem
 from domain.graphs.graph import Graph
 from domain.services.shopping_list_service import ShoppingListService
 
@@ -121,7 +121,12 @@ class ShoppingListGraph(Graph):
     
     def _handle_list_items(self, data):
         print(f"[shopping_list_graph.handle_list_items]: Triggered...")
-        return {"output_list_items": "List Items Triggered"}
+        items : ShoppingListItem = self.shopping_list_service.get_all()
+
+        if not items:
+            return {"output_list_items": "The Shopping List is empty"}
+        
+        return {"output_list_items": items}
     
     def _handle_clear_items(self, data):
         print(f"[shopping_list_graph.handle_clear_items]: Triggered...")
