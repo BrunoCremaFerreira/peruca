@@ -98,7 +98,7 @@ class ShoppingListGraph(Graph):
 
         items_to_delete = [e.split(",", 1)[0] for e in payload.split("|")]
         for item_name in items_to_delete:
-            item = next((e for e in all_items if e.name == item_name), None)
+            item = next((e for e in all_items if e.name.lower() == item_name.lower()), None)
             if item:
                 self.shopping_list_service.delete(item.id)
 
