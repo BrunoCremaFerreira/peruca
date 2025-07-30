@@ -76,7 +76,7 @@ class MainGraph(Graph):
     def _handle_shopping_list(self, data):
         print(f"[main_graph.handle_shopping_list]: : Triggered...")
         result: str = self.shopping_list_graph.invoke(invoke_request=data['input'])
-        return {"output_shopping": result}
+        return {"output_shopping": result.get("output")}
 
     def _handle_only_talking(self, data):
         print(f"[main_graph.handle_only_talking]: Triggered...")
