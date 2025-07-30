@@ -54,7 +54,7 @@ class SqliteShoppingListRepository(SqliteBaseRepository, ShoppingListRepository)
         """
         List All Shopping List
         """
-        cursor = self.conn.execute("SELECT id, name, quantity, checked, when_created, when_updated, when_deleted  FROM shopping_list")
+        cursor = self.conn.execute("SELECT id, name, quantity, checked, when_created, when_updated, when_deleted FROM shopping_list")
         return [self._map_shopping_list_item(row) for row in cursor.fetchall()]
 
 
