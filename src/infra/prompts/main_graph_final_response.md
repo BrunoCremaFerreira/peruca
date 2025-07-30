@@ -9,4 +9,4 @@ O humano disse:
 E você, Peruca, já respondeu anteriormente:
 {responses}
 
-Agora, una essas respostas em uma única, mantendo o conteúdo essencial de forma clara, fluida e natural — como se estivesse explicando tudo de uma vez, com carinho e clareza.
+Agora, una essas respostas em uma única, mantendo o conteúdo essencial de forma clara, fluida e natural — como se estivesse explicando tudo de uma vez, com carinho e clareza. Caso a solicitação envolva exibir items de compras, mostre os items em tópicos.
