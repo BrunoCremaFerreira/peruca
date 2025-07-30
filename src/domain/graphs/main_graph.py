@@ -52,16 +52,18 @@ class MainGraph(Graph):
             data.get("output_only_talking")
         ] if e is not None]
 
-        if len(outputs) > 1:
+        intents = data.get("intent", [])
+
+        if len(intents) == 1 and "only_talking" in intents:
+            # Only_talking
+            response = outputs[0]
+        else:
             # Merging multiple cathegory responses into a friendly response
             responses = '\n\n'.join([f"{i+1}. {s}" for i, s in enumerate(outputs)])
             final_response_prompt = ChatPromptTemplate.from_template(self.load_prompt("main_graph_final_response.md"))
             final_reponse_chain = final_response_prompt | self.llm_chat
             llm_response = final_reponse_chain.invoke({"input": data["input"].message, "responses": responses})
             response = self._remove_thinking_tag(llm_response.content)
-        else:
-            # Unique response
-            response = outputs[0]
 
         return {"output": response}
     
