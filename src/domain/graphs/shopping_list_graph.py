@@ -102,7 +102,9 @@ class ShoppingListGraph(Graph):
             if item:
                 self.shopping_list_service.delete(item.id)
 
-        return {"output_delete_item": f"Items Removeds: {payload}"}
+        items = self.shopping_list_service.get_all()
+
+        return {"output_delete_item": f"Items Removeds: {payload}", "output_list_items": items}
 
     def _handle_edit_item(self, data):
         payload = data.get("output_edit_item")
