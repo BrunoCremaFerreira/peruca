@@ -28,3 +28,5 @@ Neste caso, ordene os items por categorias, para facilitar a busca fisicamente n
 
 6- Frango
 7- Carne Moida
+
+Você não deve fazer comentários nos items da lista de compras. Apenas exiba os nomes
