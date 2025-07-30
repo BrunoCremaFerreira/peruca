@@ -1,6 +1,7 @@
 import os
 from typing import List
 from unittest.mock import patch
+import uuid
 
 import pytest
 
@@ -69,3 +70,41 @@ def test_chat_shopping_list_add(message, expected_items):
     assert output
     for expected_item in expected_items:
         assert any(expected_item in item.name.lower() for item in shopping_list_items), f'"{expected_item}" was found in {shopping_list_items}'
+
+
+@pytest.mark.parametrize("initial_items, message, expected_removed", [
+    (["ovos", "leite"], "Ah, tira os ovos da lista e vê se apagou a luz da cozinha", ["ovos"]),
+    (["pão", "manteiga", "café"], "Por favor, remove manteiga e café da lista. Ah, e como tá o tempo?", ["manteiga", "café"]),
+    (["arroz", "feijão", "açúcar"], "Acho que não precisa mais de arroz nem feijão. Deixa só o açúcar", ["arroz", "feijão"]),
+    (["tomate", "pepino", "alface"], "Pode apagar tomate, alface e pepino da lista? E lembra de verificar o portão", ["tomate", "alface", "pepino"]),
+    (["sabão em pó", "amaciante"], "O sabão em pó, pode tirar da lista. E a máquina de lavar já terminou o ciclo?", ["sabão em pó"]),
+    (["banana", "laranja", "maçã"], "Não esquece de tirar maçã e banana. A laranja ainda deixa por enquanto", ["maçã", "banana"]),
+    (["óleo", "sal", "vinagre"], "Tira o sal e o vinagre, e por favor vê se o alarme tá ativado", ["sal", "vinagre"]),
+    (["queijo", "presunto", "pão de forma"], "Pode remover o presunto e o pão de forma. Deixa o queijo!", ["presunto", "pão de forma"]),
+    (["iogurte natural", "granola"], "Só tira o iogurte natural, mas mantém a granola que ainda tem pouca", ["iogurte natural"]),
+    (["cerveja", "carvão"], "Cerveja e carvão já comprei, pode apagar da lista. A churrasqueira tá ok?", ["cerveja", "carvão"]),
+])
+def test_chat_shopping_list_remove_with_noise(initial_items, message, expected_removed):
+    # Arrange
+    shopping_list_repository, llm_app_service, user_app_service = setup_app_service()
+    user = UserAdd(name="Bruno", external_id="1000", summary="")
+    user_app_service.add(user)
+
+    for item_name in initial_items:
+        item = ShoppingListItem(id=str(uuid.uuid4()), name=item_name, quantity=1)
+        shopping_list_repository.add(item)
+
+    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+
+    # Act
+    response = llm_app_service.chat(chat_request=chat_request)
+    intents = response.get("intents")
+    output = response.get("output")
+    shopping_list_items = shopping_list_repository.get_all()
+
+    # Assert
+    assert "shopping_list" in intents
+    assert output
+    for removed_item in expected_removed:
+        assert all(removed_item.lower() not in s.name.lower() for s in shopping_list_items), \
+            f'"{removed_item}" still available on {shopping_list_items}'

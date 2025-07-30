@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import List
 import uuid
 from application.appservices.view_models import ShoppingListCleanType
 from domain.commands import ShoppingListItemAdd, ShoppingListItemUpdate
@@ -29,11 +30,18 @@ class ShoppingListService:
 
         self.shopping_list_repository.add(item)
 
+    def get_all(self) -> List[ShoppingListItem]:
+        return self.shopping_list_repository.get_all()
+
     def update(self, item: ShoppingListItemUpdate):
         pass
 
     def delete(self, item_id: str):
-        pass
+
+        ShoppingListItemValidator() \
+            .validate_id(item_id)
+
+        self.shopping_list_repository.delete(item_id=item_id)
 
     def check(self, item_id: str):
         pass

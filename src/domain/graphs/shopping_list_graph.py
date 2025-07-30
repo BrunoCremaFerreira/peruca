@@ -78,10 +78,10 @@ class ShoppingListGraph(Graph):
         return {"output": response}
     
     def _handle_add_item(self, data):
-        payload = data.get("output_add_item")
+        payload: str = data.get("output_add_item")
         print(f"[shopping_list_graph.handle_add_item]: {payload}")
 
-        items_to_add = self._parse_shopping_list(payload)
+        items_to_add = self._parse_shopping_list_add(payload)
 
         for item in items_to_add:
             self.shopping_list_service.add(item)
@@ -89,8 +89,19 @@ class ShoppingListGraph(Graph):
         return {"output_add_item": f"Items Add: {", ".join(item.name for item in items_to_add)}"}
 
     def _handle_delete_item(self, data):
-        payload = data.get("output_delete_item")
+        payload: str = data.get("output_delete_item")
         print(f"[shopping_list_graph.handle_delete_item]: {payload}")
+
+        all_items = self.shopping_list_service.get_all()
+        if not all_items:
+            return {"output_delete_item": "The list has no items"}
+
+        items_to_delete = [e.split(",", 1)[0] for e in payload.split("|")]
+        for item_name in items_to_delete:
+            item = next((e for e in all_items if e.name == item_name), None)
+            if item:
+                self.shopping_list_service.delete(item.id)
+
         return {"output_delete_item": f"Items Removeds: {payload}"}
 
     def _handle_edit_item(self, data):
@@ -163,7 +174,7 @@ class ShoppingListGraph(Graph):
     #===============================================
     # Items Parse
     #===============================================
-    def _parse_shopping_list(self, input_str: str) -> List[ShoppingListItemAdd]:
+    def _parse_shopping_list_add(self, input_str: str) -> List[ShoppingListItemAdd]:
         items = []
         if not input_str.strip():
             return items
