@@ -1,6 +1,10 @@
 from domain.exceptions import ValidationError
 
 
+#=============================
+# Object Mapping
+#=============================
+
 def auto_map(source_obj, target_class, raise_not_found_exception = False):
     if not source_obj:
         if raise_not_found_exception:
@@ -12,6 +16,10 @@ def auto_map(source_obj, target_class, raise_not_found_exception = False):
         k: v for k, v in source_dict.items()
         if k in target_class.__init__.__code__.co_varnames
     })
+
+#=============================
+# String Manipulation
+#=============================
 
 def is_null_or_whitespace(s):
     return s is None or str(s).strip() == ''

@@ -15,12 +15,13 @@ DB_PATH = "/home/brn/tests/data/tests.db"
 @patch.dict(os.environ, {
     "CORS_ORIGIN": "http://localhost:3000",
     "LLM_PROVIDER_TYPE": "OLLAMA",
-    "LLM_PROVIDER_URL": "http://10.10.1.10:11434",
+    "LLM_PROVIDER_URL": "http://172.16.1.107:11434",
     "LLM_PROVIDER_API_KEY": "fake-api-key",
     "LLM_MAIN_GRAPH_CHAT_MODEL": "qwen3:14b",
     "LLM_MAIN_GRAPH_CHAT_TEMPERATURE": "0.5",
     "LLM_ONLY_TALK_GRAPH_CHAT_MODEL": "qwen3:14b",
     "LLM_ONLY_TALK_GRAPH_CHAT_TEMPERATURE": "0.5",
+    "NLP_SPACY_MODEL": "pt_core_news_sm",
     "CACHE_DB_CONNECTION_STRING": "redis://localhost:6379/0",
     "PERUCA_DB_CONNECTION_STRING": f"sqlite://{DB_PATH}",
 })
@@ -73,7 +74,7 @@ def test_chat_shopping_list_add(message, expected_items):
 
 
 @pytest.mark.parametrize("initial_items, message, expected_removed", [
-    (["ovos", "leite"], "Ah, tira os ovos da lista e vê se apagou a luz da cozinha", ["ovos"]),
+    (["ovos", "leite"], "Ah, tira o ovo da lista e vê se apagou a luz da cozinha", ["ovos"]),
     (["pão", "manteiga", "café"], "Por favor, remove manteiga e café da lista. Ah, e como tá o tempo?", ["manteiga", "café"]),
     (["arroz", "feijão", "açúcar"], "Acho que não precisa mais de arroz nem feijão. Deixa só o açúcar", ["arroz", "feijão"]),
     (["tomate", "pepino", "alface"], "Pode apagar tomate, alface e pepino da lista? E lembra de verificar o portão", ["tomate", "alface", "pepino"]),
@@ -108,3 +109,34 @@ def test_chat_shopping_list_remove_with_noise(initial_items, message, expected_r
     for removed_item in expected_removed:
         assert all(removed_item.lower() not in s.name.lower() for s in shopping_list_items), \
             f'"{removed_item}" still available on {shopping_list_items}'
+
+@pytest.mark.parametrize("initial_items, message, expected_listed", [
+    (["ovos", "leite"], "O que tem na lista mesmo? Ah, e liga o ventilador", ["ovos", "leite"]),
+    (["pão", "manteiga", "café"], "Me mostra a lista de compras, por favor. E me lembre de dar ração pro cachorro mais tarde", ["pão", "manteiga", "café"]),
+    (["arroz", "feijão", "açúcar"], "Quais itens já estão na lista? Preciso planejar o mercado", ["arroz", "feijão", "açúcar"]),
+    (["tomate", "alface"], "Vê aí o que a gente já colocou na lista. Ah, e a campainha tá funcionando?", ["tomate", "alface"]),
+    (["banana", "laranja", "maçã"], "Lista de compras? Tô indo pro mercado. E depois me lembra de checar o gás", ["banana", "laranja", "maçã"]),
+    (["sabão em pó", "amaciante"], "O que falta comprar? Ou melhor, o que já tem na lista? E como tá a previsão?", ["sabão em pó", "amaciante"]),
+])
+def test_chat_shopping_list_show(initial_items, message, expected_listed):
+    # Arrange
+    shopping_list_repository, llm_app_service, user_app_service = setup_app_service()
+    user = UserAdd(name="Bruno", external_id="1000", summary="")
+    user_app_service.add(user)
+
+    for item_name in initial_items:
+        item = ShoppingListItem(id=str(uuid.uuid4()), name=item_name, quantity=1)
+        shopping_list_repository.add(item)
+
+    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+
+    # Act
+    response = llm_app_service.chat(chat_request=chat_request)
+    intents = response.get("intents")
+    output = response.get("output")
+
+    # Assert
+    assert "shopping_list" in intents
+    assert output
+    for item in expected_listed:
+        assert item.lower() in output.lower(), f'"{item}" not found on response: {output}'

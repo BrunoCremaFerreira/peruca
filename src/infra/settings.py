@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # ===============================
     # LLM Models config
     # ===============================
-    
+
     llm_main_graph_chat_model: str = "qwen3:14b"
     llm_main_graph_chat_temperature: float = 0.5
 
@@ -32,6 +32,13 @@ class Settings(BaseSettings):
 
     llm_shopping_list_graph_chat_model: str = "qwen3:14b"
     llm_shopping_list_graph_chat_temperature: float = 0.5
+
+
+    # ===============================
+    # NLP Models config
+    # ===============================
+
+    nlp_spacy_model: str = "pt_core_news_sm"
 
     # ===============================
     # Databases Config
