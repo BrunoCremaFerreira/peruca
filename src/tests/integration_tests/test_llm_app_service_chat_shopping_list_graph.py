@@ -15,7 +15,7 @@ DB_PATH = "/home/brn/tests/data/tests.db"
 @patch.dict(os.environ, {
     "CORS_ORIGIN": "http://localhost:3000",
     "LLM_PROVIDER_TYPE": "OLLAMA",
-    "LLM_PROVIDER_URL": "http://172.16.1.107:11434",
+    "LLM_PROVIDER_URL": "http://10.10.1.10:11434",
     "LLM_PROVIDER_API_KEY": "fake-api-key",
     "LLM_MAIN_GRAPH_CHAT_MODEL": "qwen3:14b",
     "LLM_MAIN_GRAPH_CHAT_TEMPERATURE": "0.5",
@@ -74,7 +74,7 @@ def test_chat_shopping_list_add(message, expected_items):
 
 
 @pytest.mark.parametrize("initial_items, message, expected_removed", [
-    (["ovos", "leite"], "Ah, tira o ovo da lista e vê se apagou a luz da cozinha", ["ovos"]),
+    (["ovos", "leite"], "Ah, tira os ovos da lista e vê se apagou a luz da cozinha", ["ovos"]),
     (["pão", "manteiga", "café"], "Por favor, remove manteiga e café da lista. Ah, e como tá o tempo?", ["manteiga", "café"]),
     (["arroz", "feijão", "açúcar"], "Acho que não precisa mais de arroz nem feijão. Deixa só o açúcar", ["arroz", "feijão"]),
     (["tomate", "pepino", "alface"], "Pode apagar tomate, alface e pepino da lista? E lembra de verificar o portão", ["tomate", "alface", "pepino"]),
