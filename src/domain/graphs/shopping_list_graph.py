@@ -90,7 +90,7 @@ class ShoppingListGraph(Graph):
 
             return {"output_add_item": f"Items Add: {", ".join(item.name for item in items_to_add)}"}
         except ValidationError as validation_error:
-            return {"output_add_item": validation_error}
+            return {"output_add_item": validation_error.errors}
         except Exception as exception:
             print(f"ERROR: {exception}")
             return {"output_add_item": "An internal error was ocurred"}
