@@ -39,8 +39,8 @@ class ShoppingListAppService:
     def add(self, item_add: ShoppingListItemAdd) -> str:
         return self.shopping_list_service.add(item_add=item_add)
 
-    def update(self, item: ShoppingListItemUpdate):
-        return self.shopping_list_service.update(item=item)
+    def update_quantity(self, item: ShoppingListItemUpdate):
+        return self.shopping_list_service.update_quantity(item=item)
 
     def delete(self, item_id: str):
         return self.shopping_list_repository.delete(item_id=item_id)

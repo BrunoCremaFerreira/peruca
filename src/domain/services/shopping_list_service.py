@@ -19,6 +19,9 @@ class ShoppingListService:
         self.shopping_list_repository = shopping_list_repository
 
     def add(self, item_add: ShoppingListItemAdd):
+        """
+        Add a new Item on Shopping List
+        """
         
         ShoppingListItemValidator() \
             .validate_name(item_add.name) \
@@ -38,12 +41,36 @@ class ShoppingListService:
         self.shopping_list_repository.add(item)
 
     def get_all(self) -> List[ShoppingListItem]:
+        """
+        Get all Items from Shopping List
+        """
+
         return self.shopping_list_repository.get_all()
 
-    def update(self, item: ShoppingListItemUpdate):
-        pass
+    def update_quantity(self, item: ShoppingListItemUpdate):
+        """
+        Update a Shopping List Item
+        """
+        
+        ShoppingListItemValidator() \
+            .validate_id(item.id) \
+            .validate_quantity(item.quantity) \
+            .validate()
+        
+        db_item = self.shopping_list_repository \
+            .get_by_id(item_id=item.id)
+        
+        if not db_item:
+            raise ValidationError([f"The item with id '{item.id}' was not found in the shopping list"])
+        
+        db_item.quantity = item.quantity
+        self.shopping_list_repository \
+            .update(item=db_item)
 
     def delete(self, item_id: str):
+        """
+        Delete a Shopping List Item
+        """
 
         ShoppingListItemValidator() \
             .validate_id(item_id)
@@ -51,6 +78,10 @@ class ShoppingListService:
         self.shopping_list_repository.delete(item_id=item_id)
 
     def check(self, item_id: str):
+        """
+        Check an Item from Shopping List
+        """
+
         ShoppingListItemValidator() \
             .validate_id(item_id)
         
@@ -65,6 +96,10 @@ class ShoppingListService:
             .update(item=db_item)
 
     def uncheck(self, item_id: str):
+        """
+        Uncheck an Shopping List Item
+        """
+
         ShoppingListItemValidator() \
             .validate_id(item_id)
         

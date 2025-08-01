@@ -78,13 +78,13 @@ def shopping_list_add(request: ShoppingListItemAdd,
     return {"shopping_list_id": item_id}
 
 @router.put("/shopping-list", tags=["Shopping List"])
-def shopping_list_update(request: ShoppingListItemUpdate,
+def shopping_list_update_quantity(request: ShoppingListItemUpdate,
                 shopping_list_app_service: ShoppingListAppService = Depends(get_shopping_list_app_service)
                 ) -> None:
-    shopping_list_app_service.update(item=request)
+    shopping_list_app_service.update_quantity(item=request)
 
 @router.delete("/shopping-list/{id}", tags=["Shopping List"])
-def shopping_list_update(id: str,
+def shopping_list_delete(id: str,
                 shopping_list_app_service: ShoppingListAppService = Depends(get_shopping_list_app_service)
                 ) -> None:
     shopping_list_app_service.delete(item_id=id)
