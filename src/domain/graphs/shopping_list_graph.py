@@ -5,6 +5,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from domain.commands import ShoppingListItemAdd
 from domain.entities import GraphInvokeRequest, ShoppingListItem
+from domain.exceptions import ValidationError
 from domain.graphs.graph import Graph
 from domain.services.shopping_list_service import ShoppingListService
 
@@ -81,12 +82,18 @@ class ShoppingListGraph(Graph):
         payload: str = data.get("output_add_item")
         print(f"[shopping_list_graph.handle_add_item]: {payload}")
 
-        items_to_add = self._parse_shopping_list_add(payload)
+        try:
+            items_to_add = self._parse_shopping_list_add(payload)
 
-        for item in items_to_add:
-            self.shopping_list_service.add(item)
+            for item in items_to_add:
+                self.shopping_list_service.add(item)
 
-        return {"output_add_item": f"Items Add: {", ".join(item.name for item in items_to_add)}"}
+            return {"output_add_item": f"Items Add: {", ".join(item.name for item in items_to_add)}"}
+        except ValidationError as validation_error:
+            return {"output_add_item": validation_error}
+        except Exception as exception:
+            print(f"ERROR: {exception}")
+            return {"output_add_item": "An internal error was ocurred"}
 
     def _handle_delete_item(self, data):
         payload: str = data.get("output_delete_item")
