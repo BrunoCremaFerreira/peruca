@@ -99,6 +99,12 @@ class ShoppingListRepository(ABC):
         """
         pass
 
+    @abstractmethod
+    def clear(self):
+        """
+        Delete all Shopping List Item
+        """
+        pass
 class ContextRepository(ABC):
     """
     Interface for LLM Context operations.

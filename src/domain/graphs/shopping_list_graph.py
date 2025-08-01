@@ -132,7 +132,8 @@ class ShoppingListGraph(Graph):
     
     def _handle_clear_items(self, data):
         print(f"[shopping_list_graph.handle_clear_items]: Triggered...")
-        return {"output_clear_items": "Clear Items Triggered"}
+        self.shopping_list_service.clear()
+        return {"output_clear_items": "The Shopping List was cleared and all items was removed"}
     
     def _handle_not_recognized(self, data):
         print(f"[shopping_list_graph.handle_not_recognized]: Triggered...")

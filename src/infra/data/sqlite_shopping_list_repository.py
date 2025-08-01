@@ -84,6 +84,13 @@ class SqliteShoppingListRepository(SqliteBaseRepository, ShoppingListRepository)
         with self.conn:
             self.conn.execute("DELETE FROM shopping_list WHERE id = ?", (item_id,))
 
+    def clear(self):
+        """
+        Delete all Shopping List Items
+        """
+        with self.conn:
+            self.conn.execute("DELETE FROM shopping_list")
+
     def _map_shopping_list_item(self, row):
         return ShoppingListItem(
             id=row["id"],

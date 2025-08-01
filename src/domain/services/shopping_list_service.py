@@ -77,6 +77,13 @@ class ShoppingListService:
 
         self.shopping_list_repository.delete(item_id=item_id)
 
+    def clear(self): 
+        """
+        Remove all Shopping List Items
+        """
+
+        self.shopping_list_repository.clear()
+
     def check(self, item_id: str):
         """
         Check an Item from Shopping List
