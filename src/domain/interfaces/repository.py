@@ -72,6 +72,13 @@ class ShoppingListRepository(ABC):
         pass
 
     @abstractmethod
+    def get_by_name(self, item_name: str) -> Optional[ShoppingListItem]:
+        """
+        Get Shopping List Item By name
+        """
+        pass
+
+    @abstractmethod
     def get_all(self) -> List[ShoppingListItem]:
         """
         List All Shopping List
@@ -91,7 +98,6 @@ class ShoppingListRepository(ABC):
         Delete Shopping List Item
         """
         pass
-
 
 class ContextRepository(ABC):
     """

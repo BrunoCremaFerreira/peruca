@@ -50,6 +50,15 @@ class SqliteShoppingListRepository(SqliteBaseRepository, ShoppingListRepository)
         row = cursor.fetchone()
         return self._map_shopping_list_item(row) if row else None
     
+    def get_by_name(self, item_name: str) -> Optional[ShoppingListItem]:
+        """
+        Get Shopping List Item By Name
+        """
+        cursor = self.conn.execute(
+            "SELECT id, name, quantity, checked, when_created, when_updated, when_deleted FROM shopping_list WHERE LOWER(name) = ?", (item_name.lower(),))
+        row = cursor.fetchone()
+        return self._map_shopping_list_item(row) if row else None
+    
     def get_all(self) -> List[ShoppingListItem]:
         """
         List All Shopping List

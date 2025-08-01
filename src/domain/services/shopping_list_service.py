@@ -4,6 +4,7 @@ import uuid
 from application.appservices.view_models import ShoppingListCleanType
 from domain.commands import ShoppingListItemAdd, ShoppingListItemUpdate
 from domain.entities import ShoppingListItem
+from domain.exceptions import ValidationError
 from domain.interfaces.repository import ShoppingListRepository
 from domain.validations.shopping_list_item_validation import ShoppingListItemValidator
 from infra.utils import auto_map
@@ -23,6 +24,12 @@ class ShoppingListService:
             .validate_name(item_add.name) \
             .validate_quantity(item_add.quantity) \
             .validate()
+
+        db_item = self.shopping_list_repository \
+            .get_by_name(item_name=item_add.name)
+        
+        if db_item:
+            raise ValidationError([f"The item '{item_add.name}' is already in the shopping list"])
 
         item = auto_map(item_add, ShoppingListItem)
         item.id = str(uuid.uuid4())
@@ -44,7 +51,29 @@ class ShoppingListService:
         self.shopping_list_repository.delete(item_id=item_id)
 
     def check(self, item_id: str):
-        pass
+        ShoppingListItemValidator() \
+            .validate_id(item_id)
+        
+        db_item = self.shopping_list_repository \
+            .get_by_id(item_id=item_id)
+        
+        if not db_item:
+            raise ValidationError([f"The item with id '{item_id}' was not found in the shopping list"])
+        
+        db_item.checked = True
+        self.shopping_list_repository \
+            .update(item=db_item)
 
     def uncheck(self, item_id: str):
-        pass
+        ShoppingListItemValidator() \
+            .validate_id(item_id)
+        
+        db_item = self.shopping_list_repository \
+            .get_by_id(item_id=item_id)
+        
+        if not db_item:
+            raise ValidationError([f"The item with id '{item_id}' was not found in the shopping list"])
+        
+        db_item.checked = False
+        self.shopping_list_repository \
+            .update(item=db_item)
