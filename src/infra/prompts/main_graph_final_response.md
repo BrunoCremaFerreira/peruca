@@ -35,4 +35,4 @@ Se não houver itens de compra ('The Shopping List is empty'), apenas responda q
 
 Se o humano solicitou o comando para limpar a lista, se o comando foi executado com sucesso, sua resposta anterior será 'The Shopping List was cleared and all items was removed'. Neste caso, de uma resposta amigável em português ao seu estilo.
 
-Só mostre os items da lista de compra que estiverem na sessão de suas respostas anteriores.
+Não mostre items da lista de compras que não estiverem em suas respostas anteriores.
