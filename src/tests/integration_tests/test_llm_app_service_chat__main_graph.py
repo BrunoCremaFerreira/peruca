@@ -9,7 +9,6 @@ import pytest
 from application.appservices.view_models import ChatRequest
 from domain.commands import UserAdd
 from infra.ioc import get_llm_app_service, get_user_app_service
-from infra.settings import Settings
 
 
 DB_PATH = "/home/brn/tests/data/tests.db"

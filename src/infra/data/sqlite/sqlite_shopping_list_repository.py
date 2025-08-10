@@ -1,7 +1,7 @@
 from typing import List, Optional
 from domain.entities import ShoppingListItem
 from domain.interfaces.repository import ShoppingListRepository
-from infra.data.sqlite_base_repository import SqliteBaseRepository
+from infra.data.sqlite.sqlite_base_repository import SqliteBaseRepository
 
 
 class SqliteShoppingListRepository(SqliteBaseRepository, ShoppingListRepository):

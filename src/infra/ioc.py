@@ -7,11 +7,11 @@ from domain.graphs.shopping_list_graph import ShoppingListGraph
 from domain.interfaces.repository import ContextRepository, ShoppingListRepository, UserRepository
 from domain.services.shopping_list_service import ShoppingListService
 from domain.services.user_service import UserService
-from infra.data.context_repository_redis import RedisContextRepository
+from infra.data.sqlite.context_repository_redis import RedisContextRepository
 from langchain_community.chat_models import ChatOllama
 from langchain_core.language_models.chat_models import BaseChatModel
-from infra.data.sqlite_shopping_list_repository import SqliteShoppingListRepository
-from infra.data.sqlite_user_repository import SqliteUserRepository
+from infra.data.sqlite.sqlite_shopping_list_repository import SqliteShoppingListRepository
+from infra.data.sqlite.sqlite_user_repository import SqliteUserRepository
 from infra.settings import Settings
 
 # ====================================

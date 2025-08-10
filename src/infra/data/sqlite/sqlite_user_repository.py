@@ -3,7 +3,7 @@ import uuid
 
 from domain.entities import User
 from domain.interfaces.repository import UserRepository
-from infra.data.sqlite_base_repository import SqliteBaseRepository
+from infra.data.sqlite.sqlite_base_repository import SqliteBaseRepository
 
 class SqliteUserRepository(SqliteBaseRepository, UserRepository):
     """

@@ -166,3 +166,10 @@ class SmartHomeLightRepository(ABC):
         Turn on light
         """
         pass
+
+    @abstractmethod
+    async def turn_off(self, entity_id: str)-> dict:
+        """
+        Turn off light
+        """
+        pass
