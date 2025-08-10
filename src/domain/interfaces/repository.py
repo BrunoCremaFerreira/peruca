@@ -1,9 +1,12 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from domain.entities import ShoppingListItem, User
+from domain.commands import LightTurnOn
+from domain.entities import ShoppingListItem, SmartHomeLight, User
 
-
+#=====================================
+# Data Repository
+#=====================================
 class UserRepository(ABC):
     """
     User Repository
@@ -105,6 +108,10 @@ class ShoppingListRepository(ABC):
         Delete all Shopping List Item
         """
         pass
+
+#=====================================
+# Temp Data Repository
+#=====================================
 class ContextRepository(ABC):
     """
     Interface for LLM Context operations.
@@ -135,5 +142,27 @@ class ContextRepository(ABC):
     async def delete_key(self, key: str) -> bool:
         """
         Deletes a key from the cache.
+        """
+        pass
+
+#=====================================
+# Smart Home Integration Repository
+#=====================================
+class SmartHomeLightRepository(ABC):
+    """
+    Interface for Smart Home Lights integration
+    """
+
+    @abstractmethod
+    async def get_state(self, entity_id: str)-> SmartHomeLight:
+        """
+        Get entity current state.
+        """
+        pass
+
+    @abstractmethod
+    async def turn_on(self, turn_on_command: LightTurnOn)-> dict:
+        """
+        Turn on light
         """
         pass
