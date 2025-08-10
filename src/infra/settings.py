@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     nlp_spacy_model: str = "pt_core_news_sm"
 
     # ===============================
+    # Home Assistant Config
+    # ===============================
+    home_assistant_url: str = "http://localhost:8123"
+    home_assistant_token: str = ""
+
+    # ===============================
     # Databases Config
     # ===============================
 

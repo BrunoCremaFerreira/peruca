@@ -4,9 +4,10 @@ from application.appservices.user_app_service import UserAppService
 from domain.graphs.main_graph import MainGraph
 from domain.graphs.only_talk_graph import OnlyTalkGraph
 from domain.graphs.shopping_list_graph import ShoppingListGraph
-from domain.interfaces.repository import ContextRepository, ShoppingListRepository, UserRepository
+from domain.interfaces.repository import ContextRepository, ShoppingListRepository, SmartHomeLightRepository, UserRepository
 from domain.services.shopping_list_service import ShoppingListService
 from domain.services.user_service import UserService
+from infra.data.external.smart_home.home_assistant.home_assistant_smart_home_light_repository import HomeAssistantSmartHomeLightRepository
 from infra.data.sqlite.context_repository_redis import RedisContextRepository
 from langchain_community.chat_models import ChatOllama
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -117,7 +118,7 @@ def get_shopping_list_service() -> ShoppingListRepository:
     return ShoppingListService(shopping_list_repository=get_shopping_list_repository())
 
 # ====================================
-# Repositories
+# Data Repositories
 # ====================================
 
 
@@ -146,6 +147,18 @@ def get_shopping_list_repository() -> ShoppingListRepository:
 
     settings = Settings()
     return SqliteShoppingListRepository(db_path=settings.peruca_db_connection_string)
+
+# ====================================
+# Smart Home Repositories
+# ====================================
+def get_smart_home_light_repository() -> SmartHomeLightRepository:
+    """
+    Smart Home Light Repository
+    """
+
+    settings = Settings()
+    return HomeAssistantSmartHomeLightRepository(base_url=settings.home_assistant_url, 
+                                                 token=settings.home_assistant_token)
 
 # ====================================
 # LLM Classes
