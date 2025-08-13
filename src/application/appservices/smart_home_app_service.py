@@ -13,6 +13,18 @@ class SmartHomeAppService:
         self.smart_home_light_repository = smart_home_light_repository
         self.smart_home_service = smart_home_service
 
+
+    # =====================================
+    # Queries
+    # =====================================
+
+
+
+
+    # =====================================
+    # Commands
+    # =====================================
+
     def update_entity_aliases(self) -> None:
         """
         Update all entities aliases
