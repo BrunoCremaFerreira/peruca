@@ -1,9 +1,9 @@
 from application.appservices.llm_app_service import LlmAppService
 from application.appservices.shopping_list_app_service import ShoppingListAppService
 from application.appservices.user_app_service import UserAppService
-from domain.graphs.main_graph import MainGraph
-from domain.graphs.only_talk_graph import OnlyTalkGraph
-from domain.graphs.shopping_list_graph import ShoppingListGraph
+from application.graphs.main_graph import MainGraph
+from application.graphs.only_talk_graph import OnlyTalkGraph
+from application.graphs.shopping_list_graph import ShoppingListGraph
 from domain.interfaces.repository import ContextRepository, ShoppingListRepository, SmartHomeLightRepository, UserRepository
 from domain.services.shopping_list_service import ShoppingListService
 from domain.services.user_service import UserService

@@ -1,5 +1,5 @@
+from application.graphs.graph import Graph
 from domain.entities import GraphInvokeRequest
-from domain.graphs.graph import Graph
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory

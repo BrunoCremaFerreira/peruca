@@ -3,10 +3,10 @@ from langgraph.graph import StateGraph, END
 from langchain_core.prompts import ChatPromptTemplate
 from typing import TypedDict, Optional
 from langchain_core.language_models.chat_models import BaseChatModel
+from application.graphs.graph import Graph
+from application.graphs.only_talk_graph import OnlyTalkGraph
+from application.graphs.shopping_list_graph import ShoppingListGraph
 from domain.entities import GraphInvokeRequest
-from domain.graphs.graph import Graph
-from domain.graphs.only_talk_graph import OnlyTalkGraph
-from domain.graphs.shopping_list_graph import ShoppingListGraph
 
 class MainGraphState(TypedDict):
         input: str

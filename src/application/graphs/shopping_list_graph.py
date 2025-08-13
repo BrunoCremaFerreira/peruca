@@ -3,10 +3,10 @@ from langchain_core.runnables import RunnableLambda
 from langgraph.graph import StateGraph, END
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
+from application.graphs.graph import Graph
 from domain.commands import ShoppingListItemAdd
 from domain.entities import GraphInvokeRequest, ShoppingListItem
 from domain.exceptions import ValidationError
-from domain.graphs.graph import Graph
 from domain.services.shopping_list_service import ShoppingListService
 
 class ShoppingListGraphState(TypedDict):
