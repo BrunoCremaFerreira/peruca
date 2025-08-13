@@ -33,6 +33,14 @@ class ShoppingListItem(BaseEntity):
     checked: bool = False
 
 # ====================================
+# Smart Home Entity Alias
+# ====================================
+@dataclass
+class SmartHomeEntityAlias(BaseEntity):
+    entity_id: str = ""
+    alias: str = ""
+
+# ====================================
 # Graph Related Classes
 # ====================================
 

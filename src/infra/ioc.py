@@ -5,8 +5,9 @@ from application.appservices.user_app_service import UserAppService
 from application.graphs.main_graph import MainGraph
 from application.graphs.only_talk_graph import OnlyTalkGraph
 from application.graphs.shopping_list_graph import ShoppingListGraph
-from domain.interfaces.repository import ContextRepository, ShoppingListRepository, SmartHomeLightRepository, UserRepository
+from domain.interfaces.repository import ContextRepository, ShoppingListRepository, SmartHomeEntityAliasRepository, SmartHomeLightRepository, UserRepository
 from domain.services.shopping_list_service import ShoppingListService
+from domain.services.smart_home_service import SmartHomeService
 from domain.services.user_service import UserService
 from infra.data.external.smart_home.home_assistant.home_assistant_smart_home_light_repository import HomeAssistantSmartHomeLightRepository
 from infra.data.sqlite.context_repository_redis import RedisContextRepository
@@ -107,7 +108,8 @@ def get_smart_home_app_service() -> SmartHomeAppService:
     """
 
     return SmartHomeAppService(
-        smart_home_light_repository=get_smart_home_light_repository()
+        smart_home_light_repository=get_smart_home_light_repository(),
+        smart_home_service=get_smart_home_service()
     )
 
 # ====================================
@@ -126,6 +128,14 @@ def get_shopping_list_service() -> ShoppingListRepository:
     """
 
     return ShoppingListService(shopping_list_repository=get_shopping_list_repository())
+
+def get_smart_home_service() -> SmartHomeService:
+    """
+    IOC for Smart Home Service
+    """
+
+    return SmartHomeService(smart_home_entity_alias_repository = get_smart_home_entity_alias_repository(),
+                            smart_home_light_repository=get_smart_home_light_repository())
 
 # ====================================
 # Data Repositories
@@ -157,6 +167,13 @@ def get_shopping_list_repository() -> ShoppingListRepository:
 
     settings = Settings()
     return SqliteShoppingListRepository(db_path=settings.peruca_db_connection_string)
+
+def get_smart_home_entity_alias_repository() -> SmartHomeEntityAliasRepository:
+    """
+    Smart Home Entity Alias Repository
+    """
+    settings = Settings()
+    return SmartHomeEntityAliasRepository(db_path=settings.peruca_db_connection_string)
 
 # ====================================
 # Smart Home Repositories

@@ -1,4 +1,5 @@
 from domain.interfaces.repository import SmartHomeLightRepository
+from domain.services.smart_home_service import SmartHomeService
 
 
 class SmartHomeAppService:
@@ -6,11 +7,15 @@ class SmartHomeAppService:
     Smart Home App Service
     """
 
-    def __init__(self, smart_home_light_repository: SmartHomeLightRepository):
+    def __init__(self, 
+                 smart_home_light_repository: SmartHomeLightRepository,
+                 smart_home_service: SmartHomeService):
         self.smart_home_light_repository = smart_home_light_repository
+        self.smart_home_service = smart_home_service
 
     def update_entity_aliases(self) -> None:
         """
         Update all entities aliases
         """
-        pass
+
+        self.smart_home_service.update_entity_aliases()

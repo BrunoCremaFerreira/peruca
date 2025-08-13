@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 
 from domain.commands import LightTurnOn
-from domain.entities import ShoppingListItem, SmartHomeLight, User
+from domain.entities import ShoppingListItem, SmartHomeEntityAlias, SmartHomeLight, User
 
 #=====================================
 # Data Repository
@@ -171,5 +171,41 @@ class SmartHomeLightRepository(ABC):
     async def turn_off(self, entity_id: str)-> dict:
         """
         Turn off light
+        """
+        pass
+
+#=====================================
+# Smart Home Etity Data Repository
+#=====================================
+class SmartHomeEntityAliasRepository(ABC):
+    """
+    Interface for Smart Home Entity  Data Repository
+    """
+
+    @abstractmethod
+    def add(self, entity_alias: SmartHomeEntityAlias):
+        """
+        Add Smart Home Entity Alias
+        """
+        pass
+
+    @abstractmethod
+    def get_by_id(self, entity_id: str) -> Optional[SmartHomeEntityAlias]:
+        """
+        Get Smart Home Entity Alias by Entity Id
+        """
+        pass
+
+    @abstractmethod
+    def get_by_alias(self, alias: str) -> Optional[SmartHomeEntityAlias]:
+        """
+        Get Smart Home Entity Alias
+        """
+        pass
+
+    @abstractmethod
+    def delete_all(self) -> None:
+        """
+        Remove all SmartHomeEntityAlias
         """
         pass
