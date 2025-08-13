@@ -190,7 +190,7 @@ class SmartHomeEntityAliasRepository(ABC):
         pass
 
     @abstractmethod
-    def get_by_id(self, entity_id: str) -> Optional[SmartHomeEntityAlias]:
+    def get_by_entity_id(self, entity_id: str) -> Optional[SmartHomeEntityAlias]:
         """
         Get Smart Home Entity Alias by Entity Id
         """
