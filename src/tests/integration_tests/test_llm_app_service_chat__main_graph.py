@@ -15,7 +15,7 @@ DB_PATH = "/home/brn/tests/data/tests.db"
 @patch.dict(os.environ, {
     "CORS_ORIGIN": "http://localhost:3000",
     "LLM_PROVIDER_TYPE": "OLLAMA",
-    "LLM_PROVIDER_URL": "http://172.16.1.107:11434",
+    "LLM_PROVIDER_URL": "http://unix.rtx-server:11434",
     "LLM_PROVIDER_API_KEY": "fake-api-key",
     "LLM_MAIN_GRAPH_CHAT_MODEL": "qwen3:14b",
     "LLM_MAIN_GRAPH_CHAT_TEMPERATURE": "0.5",

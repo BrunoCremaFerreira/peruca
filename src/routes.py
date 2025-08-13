@@ -2,10 +2,11 @@ from typing import List
 from fastapi import APIRouter, Depends
 from application.appservices.llm_app_service import LlmAppService
 from application.appservices.shopping_list_app_service import ShoppingListAppService
+from application.appservices.smart_home_app_service import SmartHomeAppService
 from application.appservices.user_app_service import UserAppService
 from application.appservices.view_models import ChatRequest, ChatResponse, ShoppingListCleanType, ShoppingListItemResponse,UserResponse
 from domain.commands import ShoppingListItemAdd, ShoppingListItemUpdate, UserAdd, UserUpdate
-from infra.ioc import get_llm_app_service, get_shopping_list_app_service, get_user_app_service
+from infra.ioc import get_llm_app_service, get_shopping_list_app_service, get_smart_home_app_service, get_user_app_service
 
 router = APIRouter()
 
@@ -106,3 +107,13 @@ def shopping_list_ckeck(id: str,
              shopping_list_app_service: ShoppingListAppService = Depends(get_shopping_list_app_service)
              ) -> None:
     shopping_list_app_service.uncheck(item_id=id)
+
+# =====================================
+# Smart Home Routes
+# =====================================
+
+@router.put("/smart-home/backend/update-aliases", tags=["Smart Home"])
+def smart_home_back_end_update_aliases(
+    smart_home_app_service: SmartHomeAppService = Depends(get_smart_home_app_service)
+    ) -> None:
+    smart_home_app_service.update_entity_aliases()

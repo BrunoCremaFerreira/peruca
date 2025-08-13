@@ -1,5 +1,6 @@
 from application.appservices.llm_app_service import LlmAppService
 from application.appservices.shopping_list_app_service import ShoppingListAppService
+from application.appservices.smart_home_app_service import SmartHomeAppService
 from application.appservices.user_app_service import UserAppService
 from application.graphs.main_graph import MainGraph
 from application.graphs.only_talk_graph import OnlyTalkGraph
@@ -98,6 +99,15 @@ def get_shopping_list_app_service() -> ShoppingListAppService:
     return ShoppingListAppService(
         shopping_list_repository=get_shopping_list_repository(),
         shopping_list_service=get_shopping_list_service()
+    )
+
+def get_smart_home_app_service() -> SmartHomeAppService:
+    """
+    IOC for SmartHomeAppService
+    """
+
+    return SmartHomeAppService(
+        smart_home_light_repository=get_smart_home_light_repository()
     )
 
 # ====================================
