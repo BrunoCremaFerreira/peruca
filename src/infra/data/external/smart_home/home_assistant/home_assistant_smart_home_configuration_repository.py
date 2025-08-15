@@ -28,17 +28,26 @@ class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationReposi
 
     async def _authenticate(self):
         """Authenticate with the provided Long-Lived Access Token."""
+        # Step 1: Wait for 'auth_required' message
+        initial_msg = await self._ws.recv()
+        initial_data = json.loads(initial_msg)
+        if initial_data.get("type") != "auth_required":
+            raise Exception(f"Expected 'auth_required', got: {initial_data}")
+
+        # Step 2: Send authentication token
         auth_message = {
             "type": "auth",
             "access_token": self.token,
         }
         await self._ws.send(json.dumps(auth_message))
-        response = await self._ws.recv()
-        resp = json.loads(response)
-        if resp.get("type") == "auth_invalid":
-            raise Exception(f"Authentication failed: {resp.get('message')}")
-        elif resp.get("type") != "auth_ok":
-            raise Exception(f"Unexpected authentication response: {resp}")
+
+        # Step 3: Wait for authentication response
+        auth_result_msg = await self._ws.recv()
+        auth_result = json.loads(auth_result_msg)
+        if auth_result.get("type") == "auth_invalid":
+            raise Exception(f"Authentication failed: {auth_result.get('message')}")
+        elif auth_result.get("type") != "auth_ok":
+            raise Exception(f"Unexpected authentication response: {auth_result}")
 
     async def _send(self, message: dict) -> Any:
         """
@@ -66,7 +75,7 @@ class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationReposi
 
         # Request all entity states
         response = await self._send({
-            "type": "get_states"
+            "type": "config/entity_registry/list"
         })
 
         if "result" not in response:
@@ -74,7 +83,7 @@ class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationReposi
 
         exposed_entity_ids = []
         for entity in response["result"]:
-            options = entity.get("attributes", {}).get("options", {})
+            options = entity.get("options", {})
             conversation = options.get("conversation", {})
             should_expose = conversation.get("should_expose", False)
             if should_expose:
