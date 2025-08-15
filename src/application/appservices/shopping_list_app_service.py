@@ -2,7 +2,7 @@ from typing import List, Optional
 from application.appservices.view_models import ShoppingListCleanType, ShoppingListItemResponse
 from domain.commands import ShoppingListItemAdd, ShoppingListItemUpdate
 from domain.exceptions import EmptyParamValidationError
-from domain.interfaces.repository import ShoppingListRepository
+from domain.interfaces.data_repository import ShoppingListRepository
 from domain.services.shopping_list_service import ShoppingListService
 from infra.utils import auto_map, is_null_or_whitespace
 

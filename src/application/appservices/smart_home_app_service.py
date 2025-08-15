@@ -1,4 +1,4 @@
-from domain.interfaces.repository import SmartHomeLightRepository
+from domain.interfaces.smart_home_repository import SmartHomeLightRepository
 from domain.services.smart_home_service import SmartHomeService
 
 

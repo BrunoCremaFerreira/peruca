@@ -1,4 +1,4 @@
-from domain.interfaces.repository import ContextRepository
+from domain.interfaces.data_repository import ContextRepository
 from redis import Redis, from_url  # type: ignore
 
 

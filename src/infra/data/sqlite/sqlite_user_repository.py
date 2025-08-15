@@ -2,7 +2,7 @@ from typing import Optional, List
 import uuid
 
 from domain.entities import User
-from domain.interfaces.repository import UserRepository
+from domain.interfaces.data_repository import UserRepository
 from infra.data.sqlite.sqlite_base_repository import SqliteBaseRepository
 
 class SqliteUserRepository(SqliteBaseRepository, UserRepository):

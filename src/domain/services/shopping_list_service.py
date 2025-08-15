@@ -1,11 +1,10 @@
 from datetime import datetime, timezone
 from typing import List
 import uuid
-from application.appservices.view_models import ShoppingListCleanType
 from domain.commands import ShoppingListItemAdd, ShoppingListItemUpdate
 from domain.entities import ShoppingListItem
 from domain.exceptions import ValidationError
-from domain.interfaces.repository import ShoppingListRepository
+from domain.interfaces.data_repository import ShoppingListRepository
 from domain.validations.shopping_list_item_validation import ShoppingListItemValidator
 from infra.utils import auto_map
 

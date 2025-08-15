@@ -5,7 +5,8 @@ from application.appservices.user_app_service import UserAppService
 from application.graphs.main_graph import MainGraph
 from application.graphs.only_talk_graph import OnlyTalkGraph
 from application.graphs.shopping_list_graph import ShoppingListGraph
-from domain.interfaces.repository import ContextRepository, ShoppingListRepository, SmartHomeEntityAliasRepository, SmartHomeLightRepository, UserRepository
+from domain.interfaces.data_repository import ContextRepository, ShoppingListRepository, SmartHomeEntityAliasRepository, UserRepository
+from domain.interfaces.smart_home_repository import SmartHomeLightRepository
 from domain.services.shopping_list_service import ShoppingListService
 from domain.services.smart_home_service import SmartHomeService
 from domain.services.user_service import UserService

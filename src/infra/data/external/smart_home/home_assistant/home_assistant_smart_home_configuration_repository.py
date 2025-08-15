@@ -1,6 +1,5 @@
 from typing import List
-from domain.interfaces.repository import SmartHomeConfigurationRepository
-
+from domain.interfaces.smart_home_repository import SmartHomeConfigurationRepository
 
 class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationRepository):
     """

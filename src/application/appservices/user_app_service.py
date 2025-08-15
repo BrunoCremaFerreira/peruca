@@ -3,7 +3,7 @@ from application.appservices.view_models import UserResponse
 from domain.commands import UserAdd, UserUpdate
 from domain.entities import User
 from domain.exceptions import EmptyParamValidationError
-from domain.interfaces.repository import UserRepository
+from domain.interfaces.data_repository import UserRepository
 from domain.services.user_service import UserService
 from infra.utils import auto_map, is_null_or_whitespace
 

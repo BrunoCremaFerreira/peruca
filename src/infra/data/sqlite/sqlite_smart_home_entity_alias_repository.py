@@ -1,6 +1,6 @@
 from typing import List, Optional
 from domain.entities import SmartHomeEntityAlias
-from domain.interfaces.repository import SmartHomeEntityAliasRepository
+from domain.interfaces.data_repository import SmartHomeEntityAliasRepository
 from infra.data.sqlite.sqlite_base_repository import SqliteBaseRepository
 
 

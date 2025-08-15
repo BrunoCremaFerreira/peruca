@@ -2,7 +2,7 @@ from dataclasses import asdict
 import aiohttp
 from domain.commands import LightTurnOn
 from domain.entities import SmartHomeLight
-from domain.interfaces.repository import SmartHomeLightRepository
+from domain.interfaces.smart_home_repository import SmartHomeLightRepository
 
 
 class HomeAssistantSmartHomeLightRepository(SmartHomeLightRepository):

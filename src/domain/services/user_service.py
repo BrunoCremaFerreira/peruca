@@ -3,7 +3,7 @@ import uuid
 from domain.commands import UserAdd, UserUpdate
 from domain.entities import User
 from domain.exceptions import ValidationError
-from domain.interfaces.repository import UserRepository
+from domain.interfaces.data_repository import UserRepository
 from domain.validations.user_validation import UserValidator
 from infra.utils import auto_map
 

@@ -2,7 +2,7 @@ from application.appservices.view_models import ChatRequest
 from application.graphs.main_graph import MainGraph
 from domain.entities import GraphInvokeRequest, User
 from domain.exceptions import EmptyParamValidationError, NofFoundValidationError
-from domain.interfaces.repository import ContextRepository, UserRepository
+from domain.interfaces.data_repository import ContextRepository, UserRepository
 from infra.utils import is_null_or_whitespace
 
 class LlmAppService:

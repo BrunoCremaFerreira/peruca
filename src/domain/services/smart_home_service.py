@@ -1,4 +1,5 @@
-from domain.interfaces.repository import SmartHomeEntityAliasRepository, SmartHomeLightRepository
+from domain.interfaces.data_repository import SmartHomeEntityAliasRepository
+from domain.interfaces.smart_home_repository import SmartHomeLightRepository
 
 
 class SmartHomeService:
