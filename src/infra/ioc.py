@@ -10,6 +10,7 @@ from domain.interfaces.smart_home_repository import SmartHomeLightRepository
 from domain.services.shopping_list_service import ShoppingListService
 from domain.services.smart_home_service import SmartHomeService
 from domain.services.user_service import UserService
+from infra.data.external.smart_home.home_assistant.home_assistant_smart_home_configuration_repository import HomeAssistantSmartHomeConfigurationRepository
 from infra.data.external.smart_home.home_assistant.home_assistant_smart_home_light_repository import HomeAssistantSmartHomeLightRepository
 from infra.data.sqlite.context_repository_redis import RedisContextRepository
 from langchain_community.chat_models import ChatOllama
@@ -187,6 +188,15 @@ def get_smart_home_light_repository() -> SmartHomeLightRepository:
     settings = Settings()
     return HomeAssistantSmartHomeLightRepository(base_url=settings.home_assistant_url, 
                                                  token=settings.home_assistant_token)
+
+def get_home_assistant_smart_home_configuration_repository() -> HomeAssistantSmartHomeConfigurationRepository:
+    """
+    Smart Configurations Repository
+    """
+
+    settings = Settings()
+    return HomeAssistantSmartHomeConfigurationRepository(websocket_url=settings.home_assistant_url,
+                                                         token=settings.home_assistant_token)
 
 # ====================================
 # LLM Classes
