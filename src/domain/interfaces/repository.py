@@ -174,6 +174,18 @@ class SmartHomeLightRepository(ABC):
         """
         pass
 
+class SmartHomeConfigurationRepository(ABC):
+    """
+    Interface for Smart Home Configuration Integration
+    """
+
+    @abstractmethod
+    async def get_all_entities(self)-> List[object]:
+        """
+        Get all Smart Home Entities
+        """
+        pass
+
 #=====================================
 # Smart Home Etity Data Repository
 #=====================================
