@@ -37,8 +37,8 @@ class SmartHomeConfigurationRepository(ABC):
     """
 
     @abstractmethod
-    async def get_all_entities(self)-> List[object]:
+    async def get_all_exposed_entities_ids(self)-> List[str]:
         """
-        Get all Smart Home Entities
+        Get all Smart Home Entities Ids
         """
         pass
