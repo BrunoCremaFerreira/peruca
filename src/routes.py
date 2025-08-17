@@ -116,7 +116,7 @@ def shopping_list_ckeck(id: str,
 def smart_home_back_end_get_all_entity_aliases(
     smart_home_app_service: SmartHomeAppService = Depends(get_smart_home_app_service)
     ) -> None:
-    smart_home_app_service.get_all_entity_aliases()
+    return smart_home_app_service.get_all_entity_aliases()
 
 @router.put("/smart-home/backend/update-aliases", tags=["Smart Home"])
 async def smart_home_back_end_update_aliases(
