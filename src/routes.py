@@ -6,6 +6,7 @@ from application.appservices.smart_home_app_service import SmartHomeAppService
 from application.appservices.user_app_service import UserAppService
 from application.appservices.view_models import ChatRequest, ChatResponse, ShoppingListCleanType, ShoppingListItemResponse,UserResponse
 from domain.commands import ShoppingListItemAdd, ShoppingListItemUpdate, UserAdd, UserUpdate
+from domain.entities import SmartHomeEntityAlias
 from infra.ioc import get_llm_app_service, get_shopping_list_app_service, get_smart_home_app_service, get_user_app_service
 
 router = APIRouter()
@@ -115,7 +116,7 @@ def shopping_list_ckeck(id: str,
 @router.get("/smart-home/backend/entity/aliases", tags=["Smart Home"])
 def smart_home_back_end_get_all_entity_aliases(
     smart_home_app_service: SmartHomeAppService = Depends(get_smart_home_app_service)
-    ) -> None:
+    ) -> List[SmartHomeEntityAlias]:
     return smart_home_app_service.get_all_entity_aliases()
 
 @router.put("/smart-home/backend/update-aliases", tags=["Smart Home"])
