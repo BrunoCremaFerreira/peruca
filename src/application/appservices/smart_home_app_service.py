@@ -24,7 +24,7 @@ class SmartHomeAppService:
     # =====================================
 
     def get_all_entity_aliases(self) -> List[SmartHomeEntityAlias]:
-        self.smart_home_entity_alias_repository.get_all()
+        return self.smart_home_entity_alias_repository.get_all()
 
     # =====================================
     # Commands
