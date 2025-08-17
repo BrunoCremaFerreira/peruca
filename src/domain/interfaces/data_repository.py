@@ -175,6 +175,13 @@ class SmartHomeEntityAliasRepository(ABC):
         pass
 
     @abstractmethod
+    def get_all(self) -> List[SmartHomeEntityAlias]:
+        """
+        Get All Smart Home Entity Alias
+        """
+        pass
+
+    @abstractmethod
     def delete_all(self) -> None:
         """
         Remove all SmartHomeEntityAlias

@@ -32,7 +32,7 @@ class SqliteSmartHomeEntityAliasRepository(SqliteBaseRepository, SmartHomeEntity
         """
         with self.conn:
             self.conn.execute(
-                "INSERT INTO smart_home_entity_alias (id, external_id, alias, when_created) VALUES (?, ?, ?, ?)",
+                "INSERT INTO smart_home_entity_alias (id, entity_id, alias, when_created) VALUES (?, ?, ?, ?)",
                 (entity_alias.id, entity_alias.entity_id, entity_alias.alias, entity_alias.when_created)
             )
 
@@ -73,12 +73,25 @@ class SqliteSmartHomeEntityAliasRepository(SqliteBaseRepository, SmartHomeEntity
             WHERE 
                 alias like ?
             """, (f"%{alias}%",))
-        rows = cursor.fetchall
+        
+        return [self._map_smart_home_entity_alias(row) for row in cursor.fetchall()]
 
-        if not rows:
-            return {}
-
-        return [self._map_smart_home_entity_alias(row) for row in rows]
+    def get_all(self) -> List[SmartHomeEntityAlias]:
+        """
+        Get All Smart Home Entity Alias
+        """
+        cursor = self.conn.execute(
+            """SELECT 
+                id, 
+                entity_id, 
+                alias,
+                when_created, 
+                when_updated, 
+                when_deleted 
+            FROM 
+                smart_home_entity_alias
+            """)
+        return [self._map_smart_home_entity_alias(row) for row in cursor.fetchall()]
 
     def delete_all(self) -> None:
         """

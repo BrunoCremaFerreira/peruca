@@ -27,7 +27,15 @@ class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationReposi
 
     async def _connect(self):
         """Establish a WebSocket connection and authenticate."""
-        self._ws = await websockets.connect(self.websocket_url)
+        ws_url = self.websocket_url \
+            .replace("https", "ws") \
+            .replace("http", "ws")
+        
+        if not ws_url.startswith("ws://"):
+            ws_url = f"ws://{ws_url}"
+
+        ws_url = f"{ws_url.rstrip("/")}/api/websocket"
+        self._ws = await websockets.connect(ws_url)
         await self._authenticate()
 
     async def _authenticate(self):
