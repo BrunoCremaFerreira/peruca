@@ -16,6 +16,7 @@ from infra.data.sqlite.context_repository_redis import RedisContextRepository
 from langchain_community.chat_models import ChatOllama
 from langchain_core.language_models.chat_models import BaseChatModel
 from infra.data.sqlite.sqlite_shopping_list_repository import SqliteShoppingListRepository
+from infra.data.sqlite.sqlite_smart_home_entity_alias_repository import SqliteSmartHomeEntityAliasRepository
 from infra.data.sqlite.sqlite_user_repository import SqliteUserRepository
 from infra.settings import Settings
 
@@ -176,7 +177,7 @@ def get_smart_home_entity_alias_repository() -> SmartHomeEntityAliasRepository:
     Smart Home Entity Alias Repository
     """
     settings = Settings()
-    return SmartHomeEntityAliasRepository(db_path=settings.peruca_db_connection_string)
+    return SqliteSmartHomeEntityAliasRepository(db_path=settings.peruca_db_connection_string)
 
 # ====================================
 # Smart Home Repositories
