@@ -11,6 +11,10 @@ class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationReposi
     Implementation of SmartHomeConfigurationRepository using Home Assistant WebSocket API.
     """
 
+    #=======================
+    # Private Methods
+    #=======================
+
     def __init__(self, websocket_url: str, token: str):
         """
         :param websocket_url: Home Assistant WebSocket URL (e.g., ws://localhost:8123/api/websocket)
@@ -66,10 +70,15 @@ class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationReposi
             if resp.get("id") == message_id:
                 return resp
 
+    #=======================
+    # Public Methods
+    #=======================
+
     async def get_all_exposed_entities_ids(self) -> List[str]:
         """
         Return all entity IDs where attributes.options.conversation.should_expose == True.
         """
+
         if self._ws is None:
             await self._connect()
 
@@ -90,6 +99,25 @@ class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationReposi
                 exposed_entity_ids.append(entity["entity_id"])
 
         return exposed_entity_ids
+    
+    async def get_aliases_by_entity_id(self, entity_id: str) -> List[str]:
+        """
+        Get entity aliases
+        """
+
+        if self._ws is None:
+            await self._connect()
+
+        # Request all entity states
+        response = await self._send({
+            "type": "config/entity_registry/get",
+            "entity_id": entity_id
+        })
+
+        if "result" not in response:
+            raise Exception(f"Error while fetching states: {response}")
+        
+        return response.get("result", {}).get("aliases", [])
 
     async def close(self):
         """Close the WebSocket connection."""

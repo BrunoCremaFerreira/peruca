@@ -42,3 +42,10 @@ class SmartHomeConfigurationRepository(ABC):
         Get all Smart Home Entities Ids
         """
         pass
+
+    @abstractmethod
+    async def get_aliases_by_entity_id(self, entity_id: str) -> List[str]:
+        """
+        Get entity aliases
+        """
+        pass
