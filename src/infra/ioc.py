@@ -137,6 +137,7 @@ def get_smart_home_service() -> SmartHomeService:
     """
 
     return SmartHomeService(smart_home_entity_alias_repository = get_smart_home_entity_alias_repository(),
+                            smart_home_configuration_repository=get_home_assistant_smart_home_configuration_repository(), 
                             smart_home_light_repository=get_smart_home_light_repository())
 
 # ====================================
