@@ -3,6 +3,7 @@ from application.graphs.graph import Graph
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.language_models.chat_models import BaseChatModel
 
+from domain.entities import GraphInvokeRequest
 from domain.services.smart_home_service import SmartHomeService
 
 
@@ -29,3 +30,9 @@ class SmartHomeLightsGraph(Graph):
     #===============================================
     # Public Methods
     #===============================================
+
+    def invoke(self, invoke_request: GraphInvokeRequest) -> dict:
+        """
+        Execute LLM processing
+        """
+        pass

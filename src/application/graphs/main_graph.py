@@ -6,6 +6,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from application.graphs.graph import Graph
 from application.graphs.only_talk_graph import OnlyTalkGraph
 from application.graphs.shopping_list_graph import ShoppingListGraph
+from application.graphs.smart_home_lights_graph import SmartHomeLightsGraph
 from domain.entities import GraphInvokeRequest
 
 class MainGraphState(TypedDict):
@@ -22,10 +23,12 @@ class MainGraph(Graph):
     def __init__(self, 
                  llm_chat: BaseChatModel, 
                  only_talk_graph: OnlyTalkGraph, 
-                 shopping_list_graph: ShoppingListGraph):
+                 shopping_list_graph: ShoppingListGraph,
+                 smart_home_lights_graph: SmartHomeLightsGraph):
         self.llm_chat = llm_chat
         self.only_talk_graph = only_talk_graph
         self.shopping_list_graph = shopping_list_graph
+        self.smart_home_lights_graph = smart_home_lights_graph
         self.classification_prompt = ChatPromptTemplate.from_template(self.load_prompt("main_graph.md"))
     
     #===============================================
@@ -69,7 +72,8 @@ class MainGraph(Graph):
     
     def _handle_smart_home_lights(self, data):
         print(f"[main_graph.handle_smart_home_lights]: Triggered...")
-        return {"output_lights": "Luz ajustada com sucesso."}
+        result: str = self.smart_home_lights_graph.invoke(invoke_request=data['input'])
+        return {"output_lights": result.get("output")}
 
     def _handle_smart_home_security_cams(self, data):
         print(f"[main_graph.handle_smart_home_security_cams]: Triggered...")

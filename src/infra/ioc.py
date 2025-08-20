@@ -5,6 +5,7 @@ from application.appservices.user_app_service import UserAppService
 from application.graphs.main_graph import MainGraph
 from application.graphs.only_talk_graph import OnlyTalkGraph
 from application.graphs.shopping_list_graph import ShoppingListGraph
+from application.graphs.smart_home_lights_graph import SmartHomeLightsGraph
 from domain.interfaces.data_repository import ContextRepository, ShoppingListRepository, SmartHomeEntityAliasRepository, UserRepository
 from domain.interfaces.smart_home_repository import SmartHomeLightRepository
 from domain.services.shopping_list_service import ShoppingListService
@@ -36,10 +37,12 @@ def get_main_graph() -> MainGraph:
     
     only_talk_graph = get_only_talk_graph()
     shopping_list_graph = get_shopping_list_graph()
+    smart_home_lights_graph = get_smart_home_lights_graph()
     
     return MainGraph(llm_chat=llm_chat, 
                      only_talk_graph=only_talk_graph, 
-                     shopping_list_graph=shopping_list_graph)
+                     shopping_list_graph=shopping_list_graph,
+                     smart_home_lights_graph=smart_home_lights_graph)
 
 def get_only_talk_graph() -> OnlyTalkGraph:
     """
@@ -68,6 +71,21 @@ def get_shopping_list_graph() -> ShoppingListGraph:
     shopping_list_service = get_shopping_list_service()
     
     return ShoppingListGraph(llm_chat=llm_chat, shopping_list_service=shopping_list_service)
+
+def get_smart_home_lights_graph() -> SmartHomeLightsGraph:
+    """
+    IOC for Smart Home Lights Graph
+    """
+
+    settings = Settings()
+    
+    # Instancing LLM Provider
+    llm_chat = get_llm_chat(model=settings.llm_smart_home_lights_graph_chat_model,
+            temperature=settings.llm_smart_home_lights_graph_chat_temperature)
+    
+    smart_home_service = get_smart_home_service()
+    
+    return SmartHomeLightsGraph(llm_chat=llm_chat, smart_home_service=smart_home_service)
 
 # ====================================
 # App Services
