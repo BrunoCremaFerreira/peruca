@@ -1,4 +1,5 @@
 
+import json
 from typing import List, Optional, TypedDict
 from application.graphs.graph import Graph
 from langchain_core.prompts import ChatPromptTemplate
@@ -33,8 +34,30 @@ class SmartHomeLightsGraph(Graph):
     # Graph Nodes
     #===============================================
 
-    def _classify_intent(self, data):
-         pass
+    def _classify_intent(self, state):
+         """
+         Classify the user's intent based on the input text.
+         """
+         print(f"[SmartHomeLightsGraph._classify_intent]: input={state['input']}")
+
+         # Build the chain using the classification prompt and the LLM
+         chain = self.classification_prompt | self.llm_chat
+         response = chain.invoke({"input": state["input"]})
+
+         # Extract raw text from the model's response
+         raw_output = response.content if hasattr(response, "content") else str(response)
+         print(f"[SmartHomeLightsGraph._classify_intent]: raw_output={raw_output}")
+
+         try:
+              # Parse JSON response
+              parsed_output = json.loads(raw_output)
+              intent = parsed_output.get("intent", ["not_recognized"])
+         except Exception as e:
+              # Fallback in case of parsing errors
+              print(f"[SmartHomeLightsGraph._classify_intent][ERROR]: {e}")
+              intent = ["not_recognized"]
+
+         return {"intent": intent}
     
     def _handle_final_response(self, data):
          pass
