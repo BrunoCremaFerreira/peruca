@@ -18,7 +18,7 @@ Sua tarefa é **classificar o comando do usuário** e extrair os dispositivos/al
 Responda SEMPRE em JSON válido no formato:
 
 (caractere abre chave)
-  "intent": ["turn_on", "turn_off", "change_color"],
+  "intents": ["turn_on", "turn_off", "change_color"],
   "turn_on": "luz da cozinha|luz do centro",
   "turn_off": "abajour da sala",
   "change_color": "abajur da sala, 3000K|luz da cozinha, 2000K",

@@ -34,59 +34,67 @@ class SmartHomeLightsGraph(Graph):
     # Graph Nodes
     #===============================================
 
-    def _classify_intent(self, state):
+    def _classify_intent(self, data):
         """
         Classify the user's intent based on the input text.
         """
-        print(f"[SmartHomeLightsGraph._classify_intent]: input={state['input']}")
+        print(f"[SmartHomeLightsGraph._classify_intent]: input={data['input']}")
 
         chain = self.classification_prompt | self.llm_chat
-        response = chain.invoke({"input": state["input"]})
+        response = chain.invoke({"input": data["input"]})
         cleaned = self._remove_thinking_tag(response.content)
 
         print(f"[SmartHomeLightsGraph._classify_intent]: raw_output={cleaned}")
 
         try:
-            parsed_output = json.loads(cleaned)
-            intent = parsed_output.get("intent", ["not_recognized"])
+            parsed = eval(cleaned) if isinstance(cleaned, str) else cleaned
+            intents = parsed.get("intents", ["not_recognized"])
         except Exception as e:
             print(f"[SmartHomeLightsGraph._classify_intent][ERROR]: {e}")
-            parsed_output = {"intent": ["not_recognized"], "not_recognized": "erro de parsing"}
-            intent = ["not_recognized"]
+            parsed = {}
+            intents = ["not_recognized"]
 
-        # Retornamos TUDO o que o modelo mandou
-        return parsed_output
+        return {
+            "intent": intents,
+            "input": data["input"],
+            "output_turn_on": parsed.get("turn_on"),
+            "output_turn_off": parsed.get("turn_off"),
+            "output_change_color": parsed.get("change_color"),
+            "output_change_bright": parsed.get("change_bright"),
+            "output_change_mode": parsed.get("change_mode"),
+            "output_not_recognized": parsed.get("not_recognized"),
+        }
 
     def _handle_turn_on(self, data):
-        devices = data.get("turn_on", "")
+        devices = data.get("output_turn_on", "")
         if devices:
             print(f"[SmartHomeLightsGraph._handle_turn_on]: {devices}")
             return {"output_turn_on": devices}
         return {}
 
     def _handle_turn_off(self, data):
-        devices = data.get("turn_off", "")
+        devices = data.get("output_turn_off", "")
         if devices:
             print(f"[SmartHomeLightsGraph._handle_turn_off]: {devices}")
             return {"output_turn_off": devices}
         return {}
 
     def _handle_change_color(self, data):
-        devices = data.get("change_color", "")
+        devices = data.get("output_change_color", "")
         if devices:
             print(f"[SmartHomeLightsGraph._handle_change_color]: {devices}")
             return {"output_change_color": devices}
         return {}
 
     def _handle_change_bright(self, data):
-        devices = data.get("change_bright", "")
+        devices = data.get("output_change_bright", "")
         if devices:
             print(f"[SmartHomeLightsGraph._handle_change_bright]: {devices}")
             return {"output_change_bright": devices}
         return {}
 
     def _handle_change_mode(self, data):
-        devices = data.get("change_mode", "")
+        devices = data.get("output_change_mode", "")
         if devices:
             print(f"[SmartHomeLightsGraph._handle_change_mode]: {devices}")
             return {"output_change_mode": devices}
