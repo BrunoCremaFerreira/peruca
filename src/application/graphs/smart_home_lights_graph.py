@@ -6,7 +6,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.language_models.chat_models import BaseChatModel
 from langgraph.graph import StateGraph, END
 from langchain_core.runnables import RunnableLambda
-from domain.entities import GraphInvokeRequest
+from domain.entities import GraphInvokeRequest, SmartHomeEntityAlias
+from domain.interfaces.data_repository import SmartHomeEntityAliasRepository
 from domain.services.smart_home_service import SmartHomeService
 
 class SmartHomeLightsGraphState(TypedDict):
@@ -25,9 +26,13 @@ class SmartHomeLightsGraph(Graph):
     Smart Home Lights Graph
     """
 
-    def __init__(self, llm_chat: BaseChatModel, smart_home_service: SmartHomeService):
+    def __init__(self, 
+                 llm_chat: BaseChatModel, 
+                 smart_home_service: SmartHomeService, 
+                 smart_home_entity_alias_repository: SmartHomeEntityAliasRepository):
         self.llm_chat = llm_chat
         self.smart_home_service = smart_home_service
+        self.smart_home_entity_alias_repository = smart_home_entity_alias_repository
         self.classification_prompt = ChatPromptTemplate.from_template(self.load_prompt("smart_home_lights_graph.md"))
 
     #===============================================
@@ -49,10 +54,18 @@ class SmartHomeLightsGraph(Graph):
         try:
             parsed = eval(cleaned) if isinstance(cleaned, str) else cleaned
             intents = parsed.get("intents", ["not_recognized"])
+
+            # Getting all entity_id x alias for lights devices
+            entity_alias_list: List[SmartHomeEntityAlias] = \
+                self.smart_home_entity_alias_repository.get_all()
+            entity_alias_dict = \
+                {item['entity_id']: item['alias'] for item in entity_alias_list}
+            
         except Exception as e:
             print(f"[SmartHomeLightsGraph._classify_intent][ERROR]: {e}")
             parsed = {}
             intents = ["not_recognized"]
+            entity_alias_dict = {}
 
         return {
             "intent": intents,
@@ -63,6 +76,7 @@ class SmartHomeLightsGraph(Graph):
             "output_change_bright": parsed.get("change_bright"),
             "output_change_mode": parsed.get("change_mode"),
             "output_not_recognized": parsed.get("not_recognized"),
+            "available_entities": entity_alias_dict
         }
 
     def _handle_turn_on(self, data):

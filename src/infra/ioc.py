@@ -84,8 +84,11 @@ def get_smart_home_lights_graph() -> SmartHomeLightsGraph:
             temperature=settings.llm_smart_home_lights_graph_chat_temperature)
     
     smart_home_service = get_smart_home_service()
+    smart_home_entity_alias_repository = get_smart_home_entity_alias_repository()
     
-    return SmartHomeLightsGraph(llm_chat=llm_chat, smart_home_service=smart_home_service)
+    return SmartHomeLightsGraph(llm_chat=llm_chat, 
+                                smart_home_service=smart_home_service, 
+                                smart_home_entity_alias_repository = smart_home_entity_alias_repository)
 
 # ====================================
 # App Services
