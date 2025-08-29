@@ -175,7 +175,7 @@ class SmartHomeEntityAliasRepository(ABC):
         pass
 
     @abstractmethod
-    def get_all(self) -> List[SmartHomeEntityAlias]:
+    def get_all(self, entity_id_starts_with: str = "") -> List[SmartHomeEntityAlias]:
         """
         Get All Smart Home Entity Alias
         """

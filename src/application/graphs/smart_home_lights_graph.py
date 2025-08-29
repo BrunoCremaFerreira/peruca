@@ -19,6 +19,7 @@ class SmartHomeLightsGraphState(TypedDict):
         output_change_bright: Optional[str]
         output_change_mode: Optional[str]
         output_not_recognized: Optional[str]
+        available_entities: Optional[dict]
         output: Optional[str]
 
 class SmartHomeLightsGraph(Graph):
@@ -57,9 +58,10 @@ class SmartHomeLightsGraph(Graph):
 
             # Getting all entity_id x alias for lights devices
             entity_alias_list: List[SmartHomeEntityAlias] = \
-                self.smart_home_entity_alias_repository.get_all()
+                self.smart_home_entity_alias_repository \
+                    .get_all(entity_id_starts_with="light.")
             entity_alias_dict = \
-                {item['entity_id']: item['alias'] for item in entity_alias_list}
+                {item.alias: item.entity_id for item in entity_alias_list}
             
         except Exception as e:
             print(f"[SmartHomeLightsGraph._classify_intent][ERROR]: {e}")
@@ -81,10 +83,11 @@ class SmartHomeLightsGraph(Graph):
 
     def _handle_turn_on(self, data):
         devices = data.get("output_turn_on", "")
-        if devices:
-            print(f"[SmartHomeLightsGraph._handle_turn_on]: {devices}")
-            return {"output_turn_on": devices}
-        return {}
+        if not devices:
+            return {}
+        
+        print(f"[SmartHomeLightsGraph._handle_turn_on]: {devices}")
+        return {"output_turn_on": devices}
 
     def _handle_turn_off(self, data):
         devices = data.get("output_turn_off", "")

@@ -76,12 +76,13 @@ class SqliteSmartHomeEntityAliasRepository(SqliteBaseRepository, SmartHomeEntity
         
         return [self._map_smart_home_entity_alias(row) for row in cursor.fetchall()]
 
-    def get_all(self) -> List[SmartHomeEntityAlias]:
+    def get_all(self, entity_id_starts_with: str = "") -> List[SmartHomeEntityAlias]:
         """
-        Get All Smart Home Entity Alias
+        Retrieve all SmartHomeEntityAlias records from the database.
         """
-        cursor = self.conn.execute(
-            """SELECT 
+        
+        base_query = """
+            SELECT 
                 id, 
                 entity_id, 
                 alias,
@@ -90,8 +91,18 @@ class SqliteSmartHomeEntityAliasRepository(SqliteBaseRepository, SmartHomeEntity
                 when_deleted 
             FROM 
                 smart_home_entity_alias
-            """)
-        return [self._map_smart_home_entity_alias(row) for row in cursor.fetchall()]
+        """
+
+        params: Optional[tuple] = None
+        if entity_id_starts_with:
+            base_query += " WHERE entity_id LIKE ?"
+            params = (f"{entity_id_starts_with}%",)
+
+        with self.conn as conn:
+            cursor = conn.execute(base_query, params or ())
+            rows = cursor.fetchall()
+
+        return [self._map_smart_home_entity_alias(row) for row in rows]
 
     def delete_all(self) -> None:
         """
