@@ -91,10 +91,14 @@ class SmartHomeLightsGraph(Graph):
 
     def _handle_turn_off(self, data):
         devices = data.get("output_turn_off", "")
-        if devices:
-            print(f"[SmartHomeLightsGraph._handle_turn_off]: {devices}")
-            return {"output_turn_off": devices}
-        return {}
+        if not devices:
+            return {}
+        
+        entity_ids = self. \
+            _find_entity_ids(entity_alias_delimited_str=devices, 
+                             available_entities=data.get("available_entities", {}))
+        print(f"[SmartHomeLightsGraph._handle_turn_off]: {devices}")
+        return {"output_turn_off": devices}
 
     def _handle_change_color(self, data):
         devices = data.get("output_change_color", "")
@@ -169,6 +173,16 @@ class SmartHomeLightsGraph(Graph):
         workflow.add_edge("final_response", END)
 
         return workflow.compile()
+
+    def _find_entity_ids(self, entity_alias_delimited_str: str, available_entities):
+        parser_template = ChatPromptTemplate.from_template(
+            self.load_prompt("smart_home_lights_graph_id_parser_by_alias.md"))
+        
+        chain = parser_template | self.llm_chat
+        response = chain.invoke({
+            "input": entity_alias_delimited_str, 
+            "available_entities": str(available_entities)})
+        return self._remove_thinking_tag(response.content)
 
     #===============================================
     # Public Methods
