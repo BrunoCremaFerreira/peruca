@@ -6,6 +6,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.language_models.chat_models import BaseChatModel
 from langgraph.graph import StateGraph, END
 from langchain_core.runnables import RunnableLambda
+from domain.commands import LightTurnOn
 from domain.entities import GraphInvokeRequest, SmartHomeEntityAlias
 from domain.interfaces.data_repository import SmartHomeEntityAliasRepository
 from domain.services.smart_home_service import SmartHomeService
@@ -83,21 +84,37 @@ class SmartHomeLightsGraph(Graph):
 
     def _handle_turn_on(self, data):
         devices = data.get("output_turn_on", "")
+        print(f"[SmartHomeLightsGraph._handle_turn_on]: {devices}")
+
         if not devices:
             return {}
         
-        print(f"[SmartHomeLightsGraph._handle_turn_on]: {devices}")
+        entity_id = self. \
+            _find_entity_ids(entity_alias_delimited_str=devices, 
+                             available_entities=data.get("available_entities", {}))
+        
+        if not entity_id:
+            return {"output_turn_on": "Device not found"}
+
+        turn_on_command = LightTurnOn(entity_id=entity_id)
+        self.smart_home_service.light_turn_on(turn_on_command=turn_on_command)
         return {"output_turn_on": devices}
 
     def _handle_turn_off(self, data):
         devices = data.get("output_turn_off", "")
+        print(f"[SmartHomeLightsGraph._handle_turn_off]: {devices}")
+
         if not devices:
             return {}
         
-        entity_ids = self. \
+        entity_id = self. \
             _find_entity_ids(entity_alias_delimited_str=devices, 
                              available_entities=data.get("available_entities", {}))
-        print(f"[SmartHomeLightsGraph._handle_turn_off]: {devices}")
+        
+        if not entity_id:
+            return {"output_turn_on": "Device not found"}
+        
+        self.smart_home_service.light_turn_off(entity_id=entity_id)
         return {"output_turn_off": devices}
 
     def _handle_change_color(self, data):

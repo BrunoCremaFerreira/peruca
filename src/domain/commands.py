@@ -42,7 +42,7 @@ class LightTurnOn:
     Represents the parameters accepted by smart home `light.turn_on` service.
 
     Attributes:
-        entity_id (Optional[str]):
+        entity_id str:
             The entity ID or a comma-separated list of entity IDs to turn on
             (e.g., "light.living_room", "light.kitchen").
         brightness (Optional[int]):
@@ -71,7 +71,7 @@ class LightTurnOn:
             Name of a light profile saved in Home Assistant.
     """
 
-    entity_id: Optional[str] = None
+    entity_id: str
     brightness: Optional[int] = None
     brightness_pct: Optional[int] = None
     color_name: Optional[str] = None
