@@ -40,3 +40,10 @@ light.0xa4c1381d04f68249|None|light.light_kitchen_maincookingarea
 
 Tarefa final:  
 Com base na string de entrada e na lista de dispositivos fornecida, retorne apenas a string final com os IDs delimitados por "|", sem explicações adicionais, texto extra ou comentários.
+
+
+Responda apenas com a string de IDs no formato:
+
+<ID>|<ID>|<ID>
+
+Sem explicações, sem comentários, sem texto extra.

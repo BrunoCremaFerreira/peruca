@@ -195,10 +195,12 @@ class SmartHomeLightsGraph(Graph):
         parser_template = ChatPromptTemplate.from_template(
             self.load_prompt("smart_home_lights_graph_id_parser_by_alias.md"))
         
-        chain = parser_template | self.llm_chat
-        response = chain.invoke({
-            "input": entity_alias_delimited_str, 
-            "available_entities": str(available_entities)})
+        prompt = parser_template.format(
+            input=entity_alias_delimited_str,
+            available_entities=str(available_entities)
+        )
+
+        response = self.llm_chat.invoke(prompt)
         return self._remove_thinking_tag(response.content)
 
     #===============================================
