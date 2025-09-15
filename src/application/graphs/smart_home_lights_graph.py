@@ -1,5 +1,6 @@
 
 import json
+import asyncio
 from typing import List, Optional, TypedDict
 from application.graphs.graph import Graph
 from langchain_core.prompts import ChatPromptTemplate
@@ -97,7 +98,7 @@ class SmartHomeLightsGraph(Graph):
             return {"output_turn_on": "Device not found"}
 
         turn_on_command = LightTurnOn(entity_id=entity_id)
-        self.smart_home_service.light_turn_on(turn_on_command=turn_on_command)
+        asyncio.run(self.smart_home_service.light_turn_on(turn_on_command=turn_on_command))
         return {"output_turn_on": devices}
 
     def _handle_turn_off(self, data):
@@ -114,7 +115,7 @@ class SmartHomeLightsGraph(Graph):
         if not entity_id:
             return {"output_turn_on": "Device not found"}
         
-        self.smart_home_service.light_turn_off(entity_id=entity_id)
+        asyncio.run(self.smart_home_service.light_turn_off(entity_id=entity_id))
         return {"output_turn_off": devices}
 
     def _handle_change_color(self, data):

@@ -56,8 +56,8 @@ class SmartHomeService:
             print(f"[smart_home_service]: Adding alias for entity '{item.entity_id}' => '{item.alias}'")
             self.smart_home_entity_alias_repository.add(entity_alias=item)
 
-    def light_turn_on(self, turn_on_command: LightTurnOn)-> dict:
-        self.smart_home_light_repository.turn_on(turn_on_command=turn_on_command)
+    async def light_turn_on(self, turn_on_command: LightTurnOn)-> dict:
+        await self.smart_home_light_repository.turn_on(turn_on_command=turn_on_command)
 
-    def light_turn_off(self, entity_id: str)-> dict:
-        self.smart_home_light_repository.turn_off(entity_id=entity_id)
+    async def light_turn_off(self, entity_id: str):
+        await self.smart_home_light_repository.turn_off(entity_id=entity_id)

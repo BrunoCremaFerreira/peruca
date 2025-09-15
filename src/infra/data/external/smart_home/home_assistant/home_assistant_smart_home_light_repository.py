@@ -85,10 +85,13 @@ class HomeAssistantSmartHomeLightRepository(SmartHomeLightRepository):
         Returns:
             Dictionary with Home Assistant response.
         """
-        url = f"{self.base_url}/api/services/light/turn_off"
+        url = f"http://{self.base_url}/api/services/light/turn_off"
         payload = {"entity_id": entity_id}
 
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=self.headers, json=payload) as resp:
                 resp.raise_for_status()
-                return await resp.json()
+                try:
+                    return await resp.json()
+                except aiohttp.ContentTypeError:
+                    return {"status": resp.status, "message": "Request successful"}
