@@ -67,7 +67,7 @@ class HomeAssistantSmartHomeLightRepository(SmartHomeLightRepository):
         Returns:
             Dictionary with Home Assistant response.
         """
-        url = f"{self.base_url}/api/services/light/turn_on"
+        url = f"http://{self.base_url}/api/services/light/turn_on"
         payload = {k: v for k, v in asdict(turn_on_command).items() if v is not None}
 
         async with aiohttp.ClientSession() as session:

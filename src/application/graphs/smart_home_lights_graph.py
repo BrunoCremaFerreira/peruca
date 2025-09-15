@@ -90,15 +90,20 @@ class SmartHomeLightsGraph(Graph):
         if not devices:
             return {}
         
-        entity_id = self. \
+        entity_ids_str = self. \
             _find_entity_ids(entity_alias_delimited_str=devices, 
                              available_entities=data.get("available_entities", {}))
         
-        if not entity_id:
+        if not entity_ids_str:
             return {"output_turn_on": "Device not found"}
+        
+        entity_ids = entity_ids_str.split('|')
+        entity_ids = [item.strip() for item in entity_ids if item.strip()]
 
-        turn_on_command = LightTurnOn(entity_id=entity_id)
-        asyncio.run(self.smart_home_service.light_turn_on(turn_on_command=turn_on_command))
+        for entity_id in entity_ids:
+            turn_on_command = LightTurnOn(entity_id=entity_id)
+            asyncio.run(self.smart_home_service.light_turn_on(turn_on_command=turn_on_command))
+
         return {"output_turn_on": devices}
 
     def _handle_turn_off(self, data):
@@ -108,14 +113,19 @@ class SmartHomeLightsGraph(Graph):
         if not devices:
             return {}
         
-        entity_id = self. \
+        entity_ids_str = self. \
             _find_entity_ids(entity_alias_delimited_str=devices, 
                              available_entities=data.get("available_entities", {}))
         
-        if not entity_id:
+        if not entity_ids_str:
             return {"output_turn_on": "Device not found"}
         
-        asyncio.run(self.smart_home_service.light_turn_off(entity_id=entity_id))
+        entity_ids = entity_ids_str.split('|')
+        entity_ids = [item.strip() for item in entity_ids if item.strip()]
+
+        for entity_id in entity_ids:
+            asyncio.run(self.smart_home_service.light_turn_off(entity_id=entity_id))
+
         return {"output_turn_off": devices}
 
     def _handle_change_color(self, data):
