@@ -1,7 +1,5 @@
 
-import json
 import asyncio
-import concurrent.futures
 from typing import List, Optional, TypedDict
 from application.graphs.graph import Graph
 from langchain_core.prompts import ChatPromptTemplate
@@ -213,16 +211,25 @@ class SmartHomeLightsGraph(Graph):
             available_entities=str(available_entities)
         )
 
-        # Force timeout
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(self.llm_chat.invoke, prompt)
+        async def _invoke_with_timeout():
             try:
-                response = future.result(timeout=15)  # 15 secconds timeout
-            except concurrent.futures.TimeoutError:
+                response = await asyncio.wait_for(
+                    self.llm_chat.ainvoke(prompt),
+                    timeout=15
+                )
+                return self._remove_thinking_tag(response.content).strip()
+            except asyncio.TimeoutError:
                 print("[_find_entity_ids][ERROR]: Timeout")
                 return "None"
 
-        return self._remove_thinking_tag(response.content)
+        result = asyncio.run(_invoke_with_timeout())
+
+        if not all(part == "None" or part.startswith("light.") for part in result.split("|")):
+            print(f"[_find_entity_ids][WARN]: Invalid response format -> {result}")
+            return "None"
+
+        return result
+
 
 
     #===============================================
