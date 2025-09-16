@@ -1,6 +1,7 @@
 
 import json
 import asyncio
+import concurrent.futures
 from typing import List, Optional, TypedDict
 from application.graphs.graph import Graph
 from langchain_core.prompts import ChatPromptTemplate
@@ -204,15 +205,25 @@ class SmartHomeLightsGraph(Graph):
 
     def _find_entity_ids(self, entity_alias_delimited_str: str, available_entities):
         parser_template = ChatPromptTemplate.from_template(
-            self.load_prompt("smart_home_lights_graph_id_parser_by_alias.md"))
+            self.load_prompt("smart_home_lights_graph_id_parser_by_alias.md")
+        )
         
         prompt = parser_template.format(
             input=entity_alias_delimited_str,
             available_entities=str(available_entities)
         )
 
-        response = self.llm_chat.invoke(prompt)
+        # Force timeout
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(self.llm_chat.invoke, prompt)
+            try:
+                response = future.result(timeout=15)  # 15 secconds timeout
+            except concurrent.futures.TimeoutError:
+                print("[_find_entity_ids][ERROR]: Timeout")
+                return "None"
+
         return self._remove_thinking_tag(response.content)
+
 
     #===============================================
     # Public Methods
