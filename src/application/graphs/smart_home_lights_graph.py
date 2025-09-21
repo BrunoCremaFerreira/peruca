@@ -100,8 +100,9 @@ class SmartHomeLightsGraph(Graph):
         entity_ids = [item.strip() for item in entity_ids if item.strip()]
 
         for entity_id in entity_ids:
-            turn_on_command = LightTurnOn(entity_id=entity_id)
-            asyncio.run(self.smart_home_service.light_turn_on(turn_on_command=turn_on_command))
+            if entity_id.upper() != "NONE":
+                turn_on_command = LightTurnOn(entity_id=entity_id)
+                asyncio.run(self.smart_home_service.light_turn_on(turn_on_command=turn_on_command))
 
         return {"output_turn_on": devices}
 
@@ -123,7 +124,8 @@ class SmartHomeLightsGraph(Graph):
         entity_ids = [item.strip() for item in entity_ids if item.strip()]
 
         for entity_id in entity_ids:
-            asyncio.run(self.smart_home_service.light_turn_off(entity_id=entity_id))
+            if entity_id.upper() != "NONE":
+                asyncio.run(self.smart_home_service.light_turn_off(entity_id=entity_id))
 
         return {"output_turn_off": devices}
 
