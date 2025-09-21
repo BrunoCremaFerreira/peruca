@@ -89,20 +89,16 @@ class SmartHomeLightsGraph(Graph):
         if not devices:
             return {}
         
-        entity_ids_str = self. \
+        entity_ids: List[str] = self. \
             _find_entity_ids(entity_alias_delimited_str=devices, 
                              available_entities=data.get("available_entities", {}))
         
-        if not entity_ids_str:
+        if not entity_ids:
             return {"output_turn_on": "Device not found"}
         
-        entity_ids = entity_ids_str.split('|')
-        entity_ids = [item.strip() for item in entity_ids if item.strip()]
-
         for entity_id in entity_ids:
-            if entity_id.upper() != "NONE":
-                turn_on_command = LightTurnOn(entity_id=entity_id)
-                asyncio.run(self.smart_home_service.light_turn_on(turn_on_command=turn_on_command))
+            turn_on_command = LightTurnOn(entity_id=entity_id)
+            asyncio.run(self.smart_home_service.light_turn_on(turn_on_command=turn_on_command))
 
         return {"output_turn_on": devices}
 
@@ -113,19 +109,15 @@ class SmartHomeLightsGraph(Graph):
         if not devices:
             return {}
         
-        entity_ids_str = self. \
+        entity_ids: List[str] = self. \
             _find_entity_ids(entity_alias_delimited_str=devices, 
                              available_entities=data.get("available_entities", {}))
         
-        if not entity_ids_str:
+        if not entity_ids:
             return {"output_turn_on": "Device not found"}
         
-        entity_ids = entity_ids_str.split('|')
-        entity_ids = [item.strip() for item in entity_ids if item.strip()]
-
         for entity_id in entity_ids:
-            if entity_id.upper() != "NONE":
-                asyncio.run(self.smart_home_service.light_turn_off(entity_id=entity_id))
+            asyncio.run(self.smart_home_service.light_turn_off(entity_id=entity_id))
 
         return {"output_turn_off": devices}
 
@@ -203,7 +195,7 @@ class SmartHomeLightsGraph(Graph):
 
         return workflow.compile()
 
-    def _find_entity_ids(self, entity_alias_delimited_str: str, available_entities):
+    def _find_entity_ids(self, entity_alias_delimited_str: str, available_entities) -> List[str]:
         parser_template = ChatPromptTemplate.from_template(
             self.load_prompt("smart_home_lights_graph_id_parser_by_alias.md")
         )
@@ -224,13 +216,12 @@ class SmartHomeLightsGraph(Graph):
                 print("[_find_entity_ids][ERROR]: Timeout")
                 return "None"
 
-        result = asyncio.run(_invoke_with_timeout())
+        entity_ids_delimited_str = asyncio.run(_invoke_with_timeout())
 
-        if not all(part == "None" or part.startswith("light.") for part in result.split("|")):
-            print(f"[_find_entity_ids][WARN]: Invalid response format -> {result}")
-            return "None"
+        entity_ids = entity_ids_delimited_str.split('|')
+        entity_ids = [e for e in entity_ids if e.upper() != "NONE" and e.strip() != ""]
 
-        return result
+        return entity_ids
 
 
 
