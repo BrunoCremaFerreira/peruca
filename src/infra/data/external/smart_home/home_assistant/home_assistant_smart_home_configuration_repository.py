@@ -1,5 +1,6 @@
 import asyncio
 import json
+import ssl
 from typing import List, Any
 import websockets
 
@@ -28,14 +29,24 @@ class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationReposi
     async def _connect(self):
         """Establish a WebSocket connection and authenticate."""
         ws_url = self.websocket_url \
-            .replace("https", "ws") \
+            .replace("https", "wss") \
             .replace("http", "ws")
         
-        if not ws_url.startswith("ws://"):
+        use_ssl = ws_url.startswith("wss://")
+        if not ws_url.startswith("ws://") and not use_ssl:
             ws_url = f"ws://{ws_url}"
 
         ws_url = f"{ws_url.rstrip("/")}/api/websocket"
-        self._ws = await websockets.connect(ws_url)
+
+        if use_ssl:
+            # TODO: Warning: host checking is temporarily disabled.
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            self._ws = await websockets.connect(ws_url, ssl=ssl_context)
+        else
+            self._ws = await websockets.connect(ws_url)
+
         await self._authenticate()
 
     async def _authenticate(self):
