@@ -4,7 +4,7 @@ from typing import List, Optional, TypedDict
 from application.graphs.graph import Graph
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.language_models.chat_models import BaseChatModel
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, START, END
 from langchain_core.runnables import RunnableLambda
 from domain.commands import LightTurnOn
 from domain.entities import GraphInvokeRequest, SmartHomeEntityAlias
@@ -174,7 +174,7 @@ class SmartHomeLightsGraph(Graph):
         workflow.add_node("change_mode", RunnableLambda(self._handle_change_mode))
         workflow.add_node("not_recognized", RunnableLambda(self._handle_not_recognized))
         workflow.add_node("final_response", RunnableLambda(self._handle_final_response))
-        workflow.set_entry_point("classify")
+        workflow.add_edge(START, "classify")
 
         def intent_router(state):
             return state.get("intent", [])

@@ -1,6 +1,6 @@
 from typing import List, Optional, TypedDict
 from langchain_core.runnables import RunnableLambda
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, START, END
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from application.graphs.graph import Graph
@@ -163,7 +163,7 @@ class ShoppingListGraph(Graph):
         workflow.add_node("clear_items", RunnableLambda(self._handle_clear_items))
         workflow.add_node("not_recognized", RunnableLambda(self._handle_not_recognized))
         workflow.add_node("final_response", RunnableLambda(self._handle_final_response))
-        workflow.set_entry_point("classify")
+        workflow.add_edge(START, "classify")
 
         def intent_router(state):
             return state.get("intent", [])

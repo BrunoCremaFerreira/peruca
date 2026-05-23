@@ -2,7 +2,7 @@ import asyncio
 import json
 import ssl
 from typing import List, Any
-import websockets
+from websockets.asyncio.client import connect as websockets_connect
 
 from typing import List
 from domain.interfaces.smart_home_repository import SmartHomeConfigurationRepository
@@ -43,9 +43,9 @@ class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationReposi
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
-            self._ws = await websockets.connect(ws_url, ssl=ssl_context)
+            self._ws = await websockets_connect(ws_url, ssl=ssl_context)
         else:
-            self._ws = await websockets.connect(ws_url)
+            self._ws = await websockets_connect(ws_url)
 
         await self._authenticate()
 

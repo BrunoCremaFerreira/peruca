@@ -1,5 +1,5 @@
 from langchain_core.runnables import RunnableLambda
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, START, END
 from langchain_core.prompts import ChatPromptTemplate
 from typing import TypedDict, Optional
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -103,7 +103,7 @@ class MainGraph(Graph):
         workflow.add_node("only_talking", RunnableLambda(self._handle_only_talking))
 
         workflow.add_node("final_response", RunnableLambda(self._handle_final_response))
-        workflow.set_entry_point("classify")
+        workflow.add_edge(START, "classify")
 
         def intent_router(state):
             return state.get("intent", [])
