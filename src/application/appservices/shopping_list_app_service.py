@@ -59,4 +59,4 @@ class ShoppingListAppService:
         return self.shopping_list_service.check(item_id=item_id)
 
     def uncheck(self, item_id: str):
-        return self.uncheck(item_id=item_id)
+        return self.shopping_list_service.uncheck(item_id=item_id)

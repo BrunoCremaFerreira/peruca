@@ -20,5 +20,5 @@ class BaseValidation:
         try:
             val = uuid.UUID(value, version=4)
             return str(val) == value.lower()
-        except ValueError:
+        except (ValueError, TypeError):
             return False
