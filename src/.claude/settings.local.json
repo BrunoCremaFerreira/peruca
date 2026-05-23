@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 app.py)",
+      "Bash(curl -s http://localhost:8000/)",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(curl -s -X POST http://localhost:8000/api/conversations)",
+      "Bash(kill %1)",
+      "Bash(curl -s http://localhost:8000/docs)",
+      "Bash(curl -s http://localhost:8000/openapi.json)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(m.upper\\(\\), p\\) for p,v in d.get\\('paths',{}\\).items\\(\\) for m in v]\")",
+      "Bash(curl -s -X POST http://localhost:8000/llm/chat -H 'Content-Type: application/json' -d '{\"message\": \"hello\", \"user_id\": \"test123\"}')",
+      "Bash(curl -s http://localhost:8000/user)",
+      "Bash(curl -s http://localhost:8000/shopping-list)",
+      "Bash(wait)"
+    ]
+  }
+}

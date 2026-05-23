@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/home/brn/projects/peruca/src/.venv/bin/python -m pytest tests/unit_tests/ -v)"
+    ]
+  }
+}

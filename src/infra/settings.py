@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
 
 
@@ -55,5 +57,5 @@ class Settings(BaseSettings):
 
     cache_db_connection_string: str = ""
     peruca_db_connection_string: str = (
-        "sqlite:///peruca.db"
+        f"sqlite://{Path(__file__).parent.parent / 'peruca.db'}"
     )
