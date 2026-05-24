@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Language Rule
+
+**All code must be written in English.** This applies without exception to:
+- Variable names, function names, class names, and all identifiers
+- Inline comments (`# ...`)
+- Docstrings and method summaries
+- Commit messages, PR descriptions, and documentation files
+
+The **only** exception is `infra/prompts/` — prompt files may be written in any language required by the use case (currently Portuguese).
+
 ## Mandatory Agent Usage
 
 All analysis and implementation tasks **must** use the specialized agents defined in `.claude/agents/`:
