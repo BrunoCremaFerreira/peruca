@@ -1,57 +1,32 @@
 """
-UserAppService Unit Test - Main Graph Classification Tests
+LlmAppService Integration Tests - Main Graph Classification Tests
 """
 
-import os
-from unittest.mock import patch
 import pytest
 
 from application.appservices.view_models import ChatRequest
-from domain.commands import UserAdd
-from infra.ioc import get_llm_app_service, get_user_app_service
 
 
-DB_PATH = "/home/brn/tests/data/tests.db"
-@patch.dict(os.environ, {
-    "CORS_ORIGIN": "http://localhost:3000",
-    "LLM_PROVIDER_TYPE": "OLLAMA",
-    "LLM_PROVIDER_URL": "http://unix.rtx-server:11434",
-    "LLM_PROVIDER_API_KEY": "fake-api-key",
-    "LLM_MAIN_GRAPH_CHAT_MODEL": "qwen3:14b",
-    "LLM_MAIN_GRAPH_CHAT_TEMPERATURE": "0.5",
-    "LLM_ONLY_TALK_GRAPH_CHAT_MODEL": "qwen3:14b",
-    "LLM_ONLY_TALK_GRAPH_CHAT_TEMPERATURE": "0.5",
-    "NLP_SPACY_MODEL": "pt_core_news_sm",
-    "CACHE_DB_CONNECTION_STRING": "redis://localhost:6379/0",
-    "PERUCA_DB_CONNECTION_STRING": f"sqlite://{DB_PATH}",
-})
+pytestmark = pytest.mark.integration
 
-def setup_app_service():
-    if os.path.exists(DB_PATH):
-        os.remove(DB_PATH)
-    return get_llm_app_service(), get_user_app_service()
 
 #======================================================
 # OnlyTalking Classification Only
 #======================================================
-def test_chat_only_talking_greetings():
+def test_chat_only_talking_greetings(llm_app_service, integration_user):
     # Arrange
-    llm_app_service, user_app_service = setup_app_service()
-    user = UserAdd(name="Bruno", external_id="1000", summary="")
-    user_app_service.add(user)
     message = "Olá Peruca!"
-
-    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+    chat_request = ChatRequest(external_user_id=integration_user.external_id, message=message)
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
     intents = response.get("intents")
     output = response.get("output")
-    assert  intents == ["only_talking"]
+    assert intents == ["only_talking"]
     assert output
 
 @pytest.mark.parametrize("message", [
-    "A luz do sol hoje tá tão bonita que nem preciso acender nada.", 
+    "A luz do sol hoje tá tão bonita que nem preciso acender nada.",
     "Estava pensando em trocar as lâmpadas da sala por umas mais econômicas.",
     "Você sabia que as luzes de LED duram muito mais do que as incandescentes?",
     "Ontem eu deixei a luz da cozinha acesa a noite toda sem querer.",
@@ -72,18 +47,15 @@ def test_chat_only_talking_greetings():
     "Minha avó dizia que luz forte espanta os maus espíritos.",
     "Estava lembrando de quando faltou luz e a gente teve que jantar à luz de velas."
 ])
-def test_chat_only_talking_not_home_lights(message):
+def test_chat_only_talking_not_home_lights(message, llm_app_service, integration_user):
     # Arrange
-    llm_app_service, user_app_service = setup_app_service()
-    user = UserAdd(name="Bruno", external_id="1000", summary="")
-    user_app_service.add(user)
-    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+    chat_request = ChatRequest(external_user_id=integration_user.external_id, message=message)
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
     intents = response.get("intents")
     output = response.get("output")
-    assert  intents == ["only_talking"]
+    assert intents == ["only_talking"]
     assert output
 
 @pytest.mark.parametrize("message", [
@@ -108,18 +80,15 @@ def test_chat_only_talking_not_home_lights(message):
     "É incrível como a gente acumula coisas inúteis na despensa.",
     "Às vezes penso em como seria viver sem precisar fazer compras."
 ])
-def test_chat_only_talking_not_shopping_list(message):
+def test_chat_only_talking_not_shopping_list(message, llm_app_service, integration_user):
     # Arrange
-    llm_app_service, user_app_service = setup_app_service()
-    user = UserAdd(name="Bruno", external_id="1000", summary="")
-    user_app_service.add(user)
-    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+    chat_request = ChatRequest(external_user_id=integration_user.external_id, message=message)
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
     intents = response.get("intents")
     output = response.get("output")
-    assert  intents == ["only_talking"]
+    assert intents == ["only_talking"]
     assert output
 
 @pytest.mark.parametrize("message", [
@@ -144,18 +113,15 @@ def test_chat_only_talking_not_shopping_list(message):
     "Parece que hoje tudo é filmado, até espirro em público.",
     "Se as câmeras pudessem falar, contariam cada história inacreditável..."
 ])
-def test_chat_only_talking_not_smart_home_security_cams(message):
+def test_chat_only_talking_not_smart_home_security_cams(message, llm_app_service, integration_user):
     # Arrange
-    llm_app_service, user_app_service = setup_app_service()
-    user = UserAdd(name="Bruno", external_id="1000", summary="")
-    user_app_service.add(user)
-    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+    chat_request = ChatRequest(external_user_id=integration_user.external_id, message=message)
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
     intents = response.get("intents")
     output = response.get("output")
-    assert  intents == ["only_talking"]
+    assert intents == ["only_talking"]
     assert output
 
 #======================================================
@@ -184,18 +150,15 @@ def test_chat_only_talking_not_smart_home_security_cams(message):
     "Mude a iluminação do escritório para modo leitura.",
     "Acenda a luz do jardim por 10 minutos."
 ])
-def test_chat_smart_home_lights_only(message):
+def test_chat_smart_home_lights_only(message, llm_app_service, integration_user):
     # Arrange
-    llm_app_service, user_app_service = setup_app_service()
-    user = UserAdd(name="Bruno", external_id="1000", summary="")
-    user_app_service.add(user)
-    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+    chat_request = ChatRequest(external_user_id=integration_user.external_id, message=message)
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
     intents = response.get("intents")
     output = response.get("output")
-    assert  intents == ["smart_home_lights"]
+    assert intents == ["smart_home_lights"]
     assert output
 
 #======================================================
@@ -224,18 +187,15 @@ def test_chat_smart_home_lights_only(message):
     "Quero ver o que as câmeras estão captando agora.",
     "A câmera detectou algum movimento esta noite?"
 ])
-def test_chat_smart_home_security_cams_only(message):
+def test_chat_smart_home_security_cams_only(message, llm_app_service, integration_user):
     # Arrange
-    llm_app_service, user_app_service = setup_app_service()
-    user = UserAdd(name="Bruno", external_id="1000", summary="")
-    user_app_service.add(user)
-    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+    chat_request = ChatRequest(external_user_id=integration_user.external_id, message=message)
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
     intents = response.get("intents")
     output = response.get("output")
-    assert  intents == ["smart_home_security_cams"]
+    assert intents == ["smart_home_security_cams"]
     assert output
 
 #======================================================
@@ -264,18 +224,15 @@ def test_chat_smart_home_security_cams_only(message):
     "Coloca chocolate e biscoito na lista pra mim.",
     "Tira o açúcar da lista, já comprei."
 ])
-def test_chat_shopping_list_only(message):
+def test_chat_shopping_list_only(message, llm_app_service, integration_user):
     # Arrange
-    llm_app_service, user_app_service = setup_app_service()
-    user = UserAdd(name="Bruno", external_id="1000", summary="")
-    user_app_service.add(user)
-    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+    chat_request = ChatRequest(external_user_id=integration_user.external_id, message=message)
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
     intents = response.get("intents")
     output = response.get("output")
-    assert  intents == ["shopping_list"]
+    assert intents == ["shopping_list"]
     assert output
 
 #======================================================
@@ -304,12 +261,9 @@ def test_chat_shopping_list_only(message):
     "Diminui a luz do ambiente e acrescenta suco de laranja na lista.",
     "Adiciona água com gás na lista e muda a luz da sala para o modo relax."
 ])
-def test_chat_shopping_list_and_smart_home_lights(message):
+def test_chat_shopping_list_and_smart_home_lights(message, llm_app_service, integration_user):
     # Arrange
-    llm_app_service, user_app_service = setup_app_service()
-    user = UserAdd(name="Bruno", external_id="1000", summary="")
-    user_app_service.add(user)
-    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+    chat_request = ChatRequest(external_user_id=integration_user.external_id, message=message)
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
@@ -347,12 +301,9 @@ def test_chat_shopping_list_and_smart_home_lights(message):
     "Lembrei que o vizinho recomendou aquele sabão, põe ele na lista também.",
     "Sabe aquele cheiro de bolo no forno? Me inspirou — coloca fermento na lista."
 ])
-def test_chat_shopping_list_and_only_talking_bu_shopping_list_required(message):
+def test_chat_shopping_list_and_only_talking_but_shopping_list_required(message, llm_app_service, integration_user):
     # Arrange
-    llm_app_service, user_app_service = setup_app_service()
-    user = UserAdd(name="Bruno", external_id="1000", summary="")
-    user_app_service.add(user)
-    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+    chat_request = ChatRequest(external_user_id=integration_user.external_id, message=message)
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert
@@ -389,12 +340,9 @@ def test_chat_shopping_list_and_only_talking_bu_shopping_list_required(message):
     "Desligue a luz da garagem e verifique se a câmera captou algo ontem à noite.",
     "Acenda as luzes do hall de entrada e mostre a visão da câmera nesse local."
 ])
-def test_chat_smart_home_security_cams_and_smart_home_lights(message):
+def test_chat_smart_home_security_cams_and_smart_home_lights(message, llm_app_service, integration_user):
     # Arrange
-    llm_app_service, user_app_service = setup_app_service()
-    user = UserAdd(name="Bruno", external_id="1000", summary="")
-    user_app_service.add(user)
-    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+    chat_request = ChatRequest(external_user_id=integration_user.external_id, message=message)
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     # Assert

@@ -1,35 +1,20 @@
-import os
-from typing import List
-from unittest.mock import patch
 import uuid
+from typing import List
 
 import pytest
 
 from application.appservices.view_models import ChatRequest
-from domain.commands import UserAdd
 from domain.entities import ShoppingListItem
-from infra.ioc import get_llm_app_service, get_shopping_list_repository, get_user_app_service
+from infra.ioc import get_shopping_list_repository
 
 
-DB_PATH = "/home/brn/tests/data/tests.db"
-@patch.dict(os.environ, {
-    "CORS_ORIGIN": "http://localhost:3000",
-    "LLM_PROVIDER_TYPE": "OLLAMA",
-    "LLM_PROVIDER_URL": "http://unix.rtx-server:11434",
-    "LLM_PROVIDER_API_KEY": "fake-api-key",
-    "LLM_MAIN_GRAPH_CHAT_MODEL": "qwen3:14b",
-    "LLM_MAIN_GRAPH_CHAT_TEMPERATURE": "0.5",
-    "LLM_ONLY_TALK_GRAPH_CHAT_MODEL": "qwen3:14b",
-    "LLM_ONLY_TALK_GRAPH_CHAT_TEMPERATURE": "0.5",
-    "NLP_SPACY_MODEL": "pt_core_news_sm",
-    "CACHE_DB_CONNECTION_STRING": "redis://localhost:6379/0",
-    "PERUCA_DB_CONNECTION_STRING": f"sqlite://{DB_PATH}",
-})
+pytestmark = pytest.mark.integration
 
-def setup_app_service():
-    if os.path.exists(DB_PATH):
-        os.remove(DB_PATH)
-    return get_shopping_list_repository(), get_llm_app_service(), get_user_app_service()
+
+@pytest.fixture
+def shopping_list_repo_for_integration(integration_db_path):
+    return get_shopping_list_repository()
+
 
 @pytest.mark.parametrize("message, expected_items", [
     ("Adicione ovos e ligue a luz da sala", ["ovos"]),
@@ -53,18 +38,15 @@ def setup_app_service():
     ("Bota na lista fraldas e lenços umedecidos", ["fraldas", "lenços umedecidos"]),
     ("Lembra de comprar cerveja e carvão pro fim de semana", ["cerveja", "carvão"]),
 ])
-def test_chat_shopping_list_add(message, expected_items):
+def test_chat_shopping_list_add(message, expected_items, shopping_list_repo_for_integration, llm_app_service, integration_user):
     # Arrange
-    shopping_list_repository, llm_app_service, user_app_service = setup_app_service()
-    user = UserAdd(name="Bruno", external_id="1000", summary="")
-    user_app_service.add(user)
-    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+    chat_request = ChatRequest(external_user_id=integration_user.external_id, message=message)
 
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     intents = response.get("intents")
     output = response.get("output")
-    shopping_list_items: List[ShoppingListItem] = shopping_list_repository.get_all()
+    shopping_list_items: List[ShoppingListItem] = shopping_list_repo_for_integration.get_all()
 
     # Assert
     assert "shopping_list" in intents
@@ -85,23 +67,19 @@ def test_chat_shopping_list_add(message, expected_items):
     (["iogurte natural", "granola"], "Só tira o iogurte natural, mas mantém a granola que ainda tem pouca", ["iogurte natural"]),
     (["cerveja", "carvão"], "Cerveja e carvão já comprei, pode apagar da lista. A churrasqueira tá ok?", ["cerveja", "carvão"]),
 ])
-def test_chat_shopping_list_remove_with_noise(initial_items, message, expected_removed):
+def test_chat_shopping_list_remove_with_noise(initial_items, message, expected_removed, shopping_list_repo_for_integration, llm_app_service, integration_user):
     # Arrange
-    shopping_list_repository, llm_app_service, user_app_service = setup_app_service()
-    user = UserAdd(name="Bruno", external_id="1000", summary="")
-    user_app_service.add(user)
-
     for item_name in initial_items:
         item = ShoppingListItem(id=str(uuid.uuid4()), name=item_name, quantity=1)
-        shopping_list_repository.add(item)
+        shopping_list_repo_for_integration.add(item)
 
-    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+    chat_request = ChatRequest(external_user_id=integration_user.external_id, message=message)
 
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
     intents = response.get("intents")
     output = response.get("output")
-    shopping_list_items = shopping_list_repository.get_all()
+    shopping_list_items = shopping_list_repo_for_integration.get_all()
 
     # Assert
     assert "shopping_list" in intents
@@ -118,17 +96,13 @@ def test_chat_shopping_list_remove_with_noise(initial_items, message, expected_r
     (["banana", "laranja", "maçã"], "Lista de compras? Tô indo pro mercado. E depois me lembra de checar o gás", ["banana", "laranja", "maçã"]),
     (["sabão em pó", "amaciante"], "O que falta comprar? Ou melhor, o que já tem na lista? E como tá a previsão?", ["sabão em pó", "amaciante"]),
 ])
-def test_chat_shopping_list_show(initial_items, message, expected_listed):
+def test_chat_shopping_list_show(initial_items, message, expected_listed, shopping_list_repo_for_integration, llm_app_service, integration_user):
     # Arrange
-    shopping_list_repository, llm_app_service, user_app_service = setup_app_service()
-    user = UserAdd(name="Bruno", external_id="1000", summary="")
-    user_app_service.add(user)
-
     for item_name in initial_items:
         item = ShoppingListItem(id=str(uuid.uuid4()), name=item_name, quantity=1)
-        shopping_list_repository.add(item)
+        shopping_list_repo_for_integration.add(item)
 
-    chat_request = ChatRequest(external_user_id=user.external_id, message=message)
+    chat_request = ChatRequest(external_user_id=integration_user.external_id, message=message)
 
     # Act
     response = llm_app_service.chat(chat_request=chat_request)
