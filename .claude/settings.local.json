@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(/home/brn/projects/peruca/src/.venv/bin/python -m pytest tests/unit_tests/ -v)"
+      "Bash(pyenv versions *)",
+      "Bash(mkdir -p /home/brn/tests/data)",
+      "Read(//home/brn/tests/data/**)",
+      "Bash(python -m pytest tests/** -v)",
     ]
   }
 }
