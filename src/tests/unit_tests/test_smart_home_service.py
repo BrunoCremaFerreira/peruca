@@ -143,6 +143,62 @@ class TestSmartHomeServiceUpdateEntityAliases:
         assert "add" in call_order
 
 
+# ===========================================================================
+# Bug 5 — update_entity_aliases never closes the WebSocket connection
+# ===========================================================================
+
+class TestSmartHomeServiceUpdateEntityAliasesClosesWebSocket:
+
+    def test_update_entity_aliases__after_success__closes_websocket_connection(self):
+        """
+        Bug: update_entity_aliases() calls get_all_exposed_entities_ids() and
+        get_aliases_by_entity_id() but never calls close() on the configuration
+        repository. The WebSocket connection is left open indefinitely.
+        After the fix, close() must be called exactly once after a successful run.
+        """
+        # Arrange
+        service, _, config_repo, _ = _make_service(
+            exposed_ids=["light.sala"],
+            aliases_map={"light.sala": ["Sala"]},
+        )
+        # Act
+        asyncio.get_event_loop().run_until_complete(service.update_entity_aliases())
+        # Assert
+        config_repo.close.assert_awaited_once()
+
+    def test_update_entity_aliases__after_error_in_get_aliases__closes_websocket_connection(self):
+        """
+        Bug: when every get_aliases_by_entity_id() raises an exception the bare
+        'except: continue' swallows the errors but close() is still never called.
+        After the fix, close() must be called exactly once regardless of per-entity
+        errors during the alias-fetching loop.
+        """
+        # Arrange
+        light_repo = AsyncMock()
+        config_repo = AsyncMock()
+        alias_repo = MagicMock()
+
+        config_repo.get_all_exposed_entities_ids.return_value = [
+            "light.bad_one",
+            "light.bad_two",
+        ]
+
+        async def _always_raise(entity_id):
+            raise RuntimeError("WebSocket timeout")
+
+        config_repo.get_aliases_by_entity_id.side_effect = _always_raise
+
+        service = SmartHomeService(
+            smart_home_light_repository=light_repo,
+            smart_home_configuration_repository=config_repo,
+            smart_home_entity_alias_repository=alias_repo,
+        )
+        # Act — must not propagate the exception
+        asyncio.get_event_loop().run_until_complete(service.update_entity_aliases())
+        # Assert
+        config_repo.close.assert_awaited_once()
+
+
 class TestSmartHomeServiceLightTurnOn:
 
     def test_light_turn_on_delegates_to_repository(self):

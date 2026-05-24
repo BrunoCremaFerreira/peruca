@@ -23,38 +23,40 @@ class SmartHomeService:
         """
         Update all entities aliases
         """
-        
-        # Get all entity ids exposed to Virtual Asistant
-        exposed_entities_ids = \
-            await self.smart_home_configuration_repository.get_all_exposed_entities_ids()
-        
-        entity_alias_to_add: List[SmartHomeEntityAlias] = []
+        try:
+            # Get all entity ids exposed to Virtual Asistant
+            exposed_entities_ids = \
+                await self.smart_home_configuration_repository.get_all_exposed_entities_ids()
 
-        # For each entity, get all aliases attached to it
-        for entity_id in exposed_entities_ids:
-            try:
-                aliases = await self.smart_home_configuration_repository \
-                    .get_aliases_by_entity_id(entity_id=entity_id)
-                
-                if not aliases:
+            entity_alias_to_add: List[SmartHomeEntityAlias] = []
+
+            # For each entity, get all aliases attached to it
+            for entity_id in exposed_entities_ids:
+                try:
+                    aliases = await self.smart_home_configuration_repository \
+                        .get_aliases_by_entity_id(entity_id=entity_id)
+
+                    if not aliases:
+                        continue
+
+                    for alias in aliases:
+                        entity_alias_item = SmartHomeEntityAlias(
+                            id=str(uuid.uuid4()),
+                            entity_id=entity_id,
+                            alias=alias)
+                        entity_alias_to_add.append(entity_alias_item)
+                except:
+                    # Ignore entity if exception was raised
                     continue
 
-                for alias in aliases:
-                    entity_alias_item = SmartHomeEntityAlias(
-                        id=str(uuid.uuid4()), 
-                        entity_id=entity_id, 
-                        alias=alias)
-                    entity_alias_to_add.append(entity_alias_item)
-            except:
-                # Ignore entity if exception was raised
-                continue
-        
-        # Updating all Entity x Aliases on the database
-        print(f"[smart_home_service]: Removing all Entity X Alias")
-        self.smart_home_entity_alias_repository.delete_all()
-        for item in entity_alias_to_add:
-            print(f"[smart_home_service]: Adding alias for entity '{item.entity_id}' => '{item.alias}'")
-            self.smart_home_entity_alias_repository.add(entity_alias=item)
+            # Updating all Entity x Aliases on the database
+            print(f"[smart_home_service]: Removing all Entity X Alias")
+            self.smart_home_entity_alias_repository.delete_all()
+            for item in entity_alias_to_add:
+                print(f"[smart_home_service]: Adding alias for entity '{item.entity_id}' => '{item.alias}'")
+                self.smart_home_entity_alias_repository.add(entity_alias=item)
+        finally:
+            await self.smart_home_configuration_repository.close()
 
     async def light_turn_on(self, turn_on_command: LightTurnOn)-> dict:
         await self.smart_home_light_repository.turn_on(turn_on_command=turn_on_command)

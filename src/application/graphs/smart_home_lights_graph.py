@@ -1,5 +1,6 @@
 
 import asyncio
+import json
 from typing import List, Optional, TypedDict
 from application.graphs.graph import Graph
 from langchain_core.prompts import ChatPromptTemplate
@@ -54,7 +55,10 @@ class SmartHomeLightsGraph(Graph):
         print(f"[SmartHomeLightsGraph._classify_intent]: raw_output={cleaned}")
 
         try:
-            parsed = eval(cleaned) if isinstance(cleaned, str) else cleaned
+            try:
+                parsed = json.loads(cleaned) if isinstance(cleaned, str) else cleaned
+            except (json.JSONDecodeError, ValueError):
+                parsed = {}
             intents = parsed.get("intents", ["not_recognized"])
 
             # Getting all entity_id x alias for lights devices

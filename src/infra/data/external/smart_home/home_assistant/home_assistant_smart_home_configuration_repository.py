@@ -3,6 +3,7 @@ import json
 import ssl
 from typing import List, Any
 from websockets.asyncio.client import connect as websockets_connect
+from websockets.exceptions import ConnectionClosed
 
 from typing import List
 from domain.interfaces.smart_home_repository import SmartHomeConfigurationRepository
@@ -75,10 +76,22 @@ class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationReposi
     async def _send(self, message: dict) -> Any:
         """
         Send a message to the WebSocket and wait for the response with the same message ID.
+        On ConnectionClosed, resets the connection, reconnects, and retries once.
         """
         message_id = self._message_id
-        message["id"] = message_id
         self._message_id += 1
+        try:
+            return await self._send_once(message, message_id)
+        except ConnectionClosed:
+            self._ws = None
+            await self._connect()
+            return await self._send_once(message, message_id)
+
+    async def _send_once(self, message: dict, message_id: int) -> Any:
+        """
+        Send a message with the given message_id and wait for the matching response.
+        """
+        message["id"] = message_id
 
         await self._ws.send(json.dumps(message))
 

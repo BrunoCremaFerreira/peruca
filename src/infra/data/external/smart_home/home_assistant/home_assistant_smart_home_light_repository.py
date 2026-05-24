@@ -41,9 +41,10 @@ class HomeAssistantSmartHomeLightRepository(SmartHomeLightRepository):
 
         attributes = data.get("attributes", {})
         return SmartHomeLight(
+            entity_id=entity_id,
             brightness=attributes.get("brightness"),
             color_mode=attributes.get("color_mode"),
-            color_temp_kelvin=attributes.get("color_temp"),
+            color_temp_kelvin=attributes.get("color_temp_kelvin"),
             effect=attributes.get("effect"),
             effect_list=attributes.get("effect_list", []),
             hs_color=attributes.get("hs_color"),
@@ -67,7 +68,7 @@ class HomeAssistantSmartHomeLightRepository(SmartHomeLightRepository):
         Returns:
             Dictionary with Home Assistant response.
         """
-        url = f"http://{self.base_url}/api/services/light/turn_on"
+        url = f"{self.base_url}/api/services/light/turn_on"
         payload = {k: v for k, v in asdict(turn_on_command).items() if v is not None}
 
         async with aiohttp.ClientSession() as session:
@@ -85,7 +86,7 @@ class HomeAssistantSmartHomeLightRepository(SmartHomeLightRepository):
         Returns:
             Dictionary with Home Assistant response.
         """
-        url = f"http://{self.base_url}/api/services/light/turn_off"
+        url = f"{self.base_url}/api/services/light/turn_off"
         payload = {"entity_id": entity_id}
 
         async with aiohttp.ClientSession() as session:
