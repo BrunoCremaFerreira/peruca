@@ -4,7 +4,7 @@
       "Bash(pyenv versions *)",
       "Bash(mkdir -p /home/brn/tests/data)",
       "Read(//home/brn/tests/data/**)",
-      "Bash(python -m pytest tests/** -v)",
+      "Bash(python -m pytest tests/** -v)"
     ]
   }
 }
