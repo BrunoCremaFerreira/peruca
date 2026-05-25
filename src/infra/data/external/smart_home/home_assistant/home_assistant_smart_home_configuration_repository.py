@@ -44,9 +44,9 @@ class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationReposi
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
-            self._ws = await websockets_connect(ws_url, ssl=ssl_context)
+            self._ws = await websockets_connect(ws_url, ssl=ssl_context, max_size=None)
         else:
-            self._ws = await websockets_connect(ws_url)
+            self._ws = await websockets_connect(ws_url, max_size=None)
 
         await self._authenticate()
 
