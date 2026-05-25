@@ -88,7 +88,7 @@ class ShoppingListGraph(Graph):
             for item in items_to_add:
                 self.shopping_list_service.add(item)
 
-            return {"output_add_item": f"Items Add: {", ".join(item.name for item in items_to_add)}"}
+            return {"output_add_item": f"Adicionado: {', '.join(item.name for item in items_to_add)}"}
         except ValidationError as validation_error:
             return {"output_add_item": validation_error.errors}
         except Exception as exception:
@@ -101,7 +101,7 @@ class ShoppingListGraph(Graph):
 
         all_items = self.shopping_list_service.get_all()
         if not all_items:
-            return {"output_delete_item": "The list has no items"}
+            return {"output_delete_item": "A lista esta vazia"}
 
         items_to_delete = [e.split(",", 1)[0] for e in payload.split("|")]
         for item_name in items_to_delete:
@@ -111,7 +111,7 @@ class ShoppingListGraph(Graph):
 
         items = self.shopping_list_service.get_all()
 
-        return {"output_delete_item": f"Items Removeds: {payload}", "output_list_items": items}
+        return {"output_delete_item": f"Removido: {payload}", "output_list_items": items}
 
     def _handle_edit_item(self, data):
         payload = data.get("output_edit_item")
@@ -140,7 +140,7 @@ class ShoppingListGraph(Graph):
     def _handle_clear_items(self, data):
         print(f"[shopping_list_graph.handle_clear_items]: Triggered...")
         self.shopping_list_service.clear()
-        return {"output_clear_items": "The Shopping List was cleared and all items was removed"}
+        return {"output_clear_items": "Lista de compras limpa, todos os itens foram removidos"}
     
     def _handle_not_recognized(self, data):
         print(f"[shopping_list_graph.handle_not_recognized]: Triggered...")

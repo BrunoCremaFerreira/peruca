@@ -98,8 +98,8 @@ class SmartHomeLightsGraph(Graph):
                              available_entities=data.get("available_entities", {}))
         
         if not entity_ids:
-            return {"output_turn_on": "Device not found"}
-        
+            return {"output_turn_on": "Dispositivo nao encontrado"}
+
         for entity_id in entity_ids:
             turn_on_command = LightTurnOn(entity_id=entity_id)
             asyncio.run(self.smart_home_service.light_turn_on(turn_on_command=turn_on_command))
@@ -118,8 +118,8 @@ class SmartHomeLightsGraph(Graph):
                              available_entities=data.get("available_entities", {}))
         
         if not entity_ids:
-            return {"output_turn_on": "Device not found"}
-        
+            return {"output_turn_off": "Dispositivo nao encontrado"}
+
         for entity_id in entity_ids:
             asyncio.run(self.smart_home_service.light_turn_off(entity_id=entity_id))
 
@@ -148,20 +148,24 @@ class SmartHomeLightsGraph(Graph):
 
     def _handle_final_response(self, data):
         print(f"[SmartHomeLightsGraph._handle_final_response]: Aggregating response...")
-        return {
-            "output": {
-                "turn_on": data.get("output_turn_on", ""),
-                "turn_off": data.get("output_turn_off", ""),
-                "change_color": data.get("output_change_color", ""),
-                "change_bright": data.get("output_change_bright", ""),
-                "change_mode": data.get("output_change_mode", ""),
-                "not_recognized": data.get("output_not_recognized", "")
-            }
-        }
+        parts = []
+        if data.get("output_turn_on"):
+            parts.append(f"Ligado: {data['output_turn_on']}")
+        if data.get("output_turn_off"):
+            parts.append(f"Desligado: {data['output_turn_off']}")
+        if data.get("output_change_color"):
+            parts.append(f"Cor alterada: {data['output_change_color']}")
+        if data.get("output_change_bright"):
+            parts.append(f"Brilho alterado: {data['output_change_bright']}")
+        if data.get("output_change_mode"):
+            parts.append(f"Modo alterado: {data['output_change_mode']}")
+        if data.get("output_not_recognized"):
+            parts.append("Dispositivo nao reconhecido")
+        return {"output": ". ".join(parts) if parts else "Nenhuma acao executada"}
 
     def _handle_not_recognized(self, data):
         print(f"[SmartHomeLightsGraph.handle_not_recognized]: Triggered...")
-        return {"output_not_recognized": "Not Recognized Triggered"}
+        return {"output_not_recognized": "Dispositivo nao reconhecido"}
 
     #===============================================
     # Private Methods

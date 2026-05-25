@@ -1,4 +1,4 @@
-/no_thinking
+/no_think
 # Smart Home Lights Graph - Intent Classification
 
 Você é um assistente especializado em **controle de luzes inteligentes**.  
