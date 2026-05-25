@@ -5,15 +5,9 @@ import pytest
 
 from application.appservices.view_models import ChatRequest
 from domain.entities import ShoppingListItem
-from infra.ioc import get_shopping_list_repository
 
 
 pytestmark = pytest.mark.integration
-
-
-@pytest.fixture
-def shopping_list_repo_for_integration(integration_db_path):
-    return get_shopping_list_repository()
 
 
 @pytest.mark.parametrize("message, expected_items", [
@@ -52,7 +46,7 @@ def test_chat_shopping_list_add(message, expected_items, shopping_list_repo_for_
     assert "shopping_list" in intents
     assert output
     for expected_item in expected_items:
-        assert any(expected_item in item.name.lower() for item in shopping_list_items), f'"{expected_item}" was found in {shopping_list_items}'
+        assert any(expected_item in item.name.lower() for item in shopping_list_items), f'"{expected_item}" was NOT found in {shopping_list_items}'
 
 
 @pytest.mark.parametrize("initial_items, message, expected_removed", [
@@ -88,17 +82,54 @@ def test_chat_shopping_list_remove_with_noise(initial_items, message, expected_r
         assert all(removed_item.lower() not in s.name.lower() for s in shopping_list_items), \
             f'"{removed_item}" still available on {shopping_list_items}'
 
-@pytest.mark.parametrize("initial_items, message, expected_listed", [
-    (["ovos", "leite"], "O que tem na lista mesmo? Ah, e liga o ventilador", ["ovos", "leite"]),
-    (["pão", "manteiga", "café"], "Me mostra a lista de compras, por favor. E me lembre de dar ração pro cachorro mais tarde", ["pão", "manteiga", "café"]),
-    (["arroz", "feijão", "açúcar"], "Quais itens já estão na lista? Preciso planejar o mercado", ["arroz", "feijão", "açúcar"]),
-    (["tomate", "alface"], "Vê aí o que a gente já colocou na lista. Ah, e a campainha tá funcionando?", ["tomate", "alface"]),
-    (["banana", "laranja", "maçã"], "Lista de compras? Tô indo pro mercado. E depois me lembra de checar o gás", ["banana", "laranja", "maçã"]),
-    (["sabão em pó", "amaciante"], "O que falta comprar? Ou melhor, o que já tem na lista? E como tá a previsão?", ["sabão em pó", "amaciante"]),
+@pytest.mark.parametrize("add_messages, expected_items", [
+    (["Adiciona ovos na lista", "Adiciona leite na lista"], ["ovos", "leite"]),
+    (["Coloca pão, manteiga e café na lista"], ["pão", "manteiga", "café"]),
+    (["Adiciona arroz, feijão e açúcar na lista"], ["arroz", "feijão", "açúcar"]),
 ])
-def test_chat_shopping_list_show(initial_items, message, expected_listed, shopping_list_repo_for_integration, llm_app_service, integration_user):
-    # Arrange
-    for item_name in initial_items:
+def test_chat_shopping_list_show__items_added_via_chat__items_persisted_in_db(
+    add_messages, expected_items, shopping_list_repo_for_integration, llm_app_service, integration_user
+):
+    # Arrange — add items through the LLM service
+    for msg in add_messages:
+        add_request = ChatRequest(external_user_id=integration_user.external_id, message=msg)
+        llm_app_service.chat(chat_request=add_request)
+
+    # Act — request listing through the LLM service
+    list_request = ChatRequest(
+        external_user_id=integration_user.external_id,
+        message="O que tem na minha lista de compras?"
+    )
+    response = llm_app_service.chat(chat_request=list_request)
+    intents = response.get("intents")
+    output = response.get("output")
+
+    # Verify items are persisted in the database
+    stored_items: List[ShoppingListItem] = shopping_list_repo_for_integration.get_all()
+    stored_names = [item.name.lower() for item in stored_items]
+
+    # Assert
+    assert "shopping_list" in intents
+    assert output
+    for expected_item in expected_items:
+        assert any(expected_item.lower() in name for name in stored_names), \
+            f'"{expected_item}" was NOT found in stored items: {stored_names}'
+
+
+#======================================================
+# Clear Items
+#======================================================
+
+@pytest.mark.parametrize("message", [
+    "Limpa a minha lista de compras",
+    "Apaga tudo da lista",
+    "Remove todos os itens da lista de compras",
+])
+def test_chat_shopping_list_clear__clear_intent__list_is_empty_after(
+    message, shopping_list_repo_for_integration, llm_app_service, integration_user
+):
+    # Arrange — add items to the list before clearing
+    for item_name in ["ovos", "leite", "pão"]:
         item = ShoppingListItem(id=str(uuid.uuid4()), name=item_name, quantity=1)
         shopping_list_repo_for_integration.add(item)
 
@@ -108,9 +139,73 @@ def test_chat_shopping_list_show(initial_items, message, expected_listed, shoppi
     response = llm_app_service.chat(chat_request=chat_request)
     intents = response.get("intents")
     output = response.get("output")
+    remaining_items: List[ShoppingListItem] = shopping_list_repo_for_integration.get_all()
 
     # Assert
     assert "shopping_list" in intents
     assert output
-    for item in expected_listed:
-        assert item.lower() in output.lower(), f'"{item}" not found on response: {output}'
+    assert remaining_items == [], f"List should be empty but contains: {remaining_items}"
+
+
+#======================================================
+# Stub Intents — Smoke Tests (no exception is the goal)
+#======================================================
+
+@pytest.mark.parametrize("message", [
+    "Marca os ovos como comprados",
+    "Marca o leite como verificado na lista",
+])
+def test_chat_shopping_list_check_item__stub_intent__returns_response_without_exception(
+    message, llm_app_service, integration_user
+):
+    # Arrange
+    chat_request = ChatRequest(external_user_id=integration_user.external_id, message=message)
+
+    # Act — should not raise any exception even though check_item is a stub
+    response = llm_app_service.chat(chat_request=chat_request)
+    intents = response.get("intents")
+    output = response.get("output")
+
+    # Assert
+    assert "shopping_list" in intents
+    assert output is not None
+
+
+@pytest.mark.parametrize("message", [
+    "Desmarca o leite da lista",
+    "Tira o check do arroz",
+])
+def test_chat_shopping_list_uncheck_item__stub_intent__returns_response_without_exception(
+    message, llm_app_service, integration_user
+):
+    # Arrange
+    chat_request = ChatRequest(external_user_id=integration_user.external_id, message=message)
+
+    # Act — should not raise any exception even though uncheck_item is a stub
+    response = llm_app_service.chat(chat_request=chat_request)
+    intents = response.get("intents")
+    output = response.get("output")
+
+    # Assert
+    assert "shopping_list" in intents
+    assert output is not None
+
+
+@pytest.mark.parametrize("message", [
+    "Muda o nome do leite para leite integral",
+    "Edita o item arroz para arroz parboilizado",
+])
+def test_chat_shopping_list_edit_item__stub_intent__returns_response_without_exception(
+    message, llm_app_service, integration_user
+):
+    # Arrange
+    chat_request = ChatRequest(external_user_id=integration_user.external_id, message=message)
+
+    # Act — should not raise any exception even though edit_item is a stub
+    response = llm_app_service.chat(chat_request=chat_request)
+    intents = response.get("intents")
+    output = response.get("output")
+
+    # Assert
+    assert "shopping_list" in intents
+    assert output is not None

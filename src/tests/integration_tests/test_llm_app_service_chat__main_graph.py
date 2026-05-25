@@ -5,6 +5,7 @@ LlmAppService Integration Tests - Main Graph Classification Tests
 import pytest
 
 from application.appservices.view_models import ChatRequest
+from domain.exceptions import EmptyParamValidationError, NofFoundValidationError
 
 
 pytestmark = pytest.mark.integration
@@ -13,7 +14,7 @@ pytestmark = pytest.mark.integration
 #======================================================
 # OnlyTalking Classification Only
 #======================================================
-def test_chat_only_talking_greetings(llm_app_service, integration_user):
+def test_llm_app_service_chat__only_talk_intent__returns_greeting_response(llm_app_service, integration_user):
     # Arrange
     message = "Olá Peruca!"
     chat_request = ChatRequest(external_user_id=integration_user.external_id, message=message)
@@ -150,7 +151,7 @@ def test_chat_only_talking_not_smart_home_security_cams(message, llm_app_service
     "Mude a iluminação do escritório para modo leitura.",
     "Acenda a luz do jardim por 10 minutos."
 ])
-def test_chat_smart_home_lights_only(message, llm_app_service, integration_user):
+def test_llm_app_service_chat__smart_home_lights_intent__routes_to_smart_home_lights(message, llm_app_service, integration_user):
     # Arrange
     chat_request = ChatRequest(external_user_id=integration_user.external_id, message=message)
     # Act
@@ -353,3 +354,109 @@ def test_chat_smart_home_security_cams_and_smart_home_lights(message, llm_app_se
     assert "only_talking" not in intents
     assert "shopping_list" not in intents
     assert output
+
+
+#======================================================
+# LlmAppService.chat — Error Paths (no Ollama required)
+#======================================================
+
+class TestLlmAppServiceChatErrors:
+
+    def test_llm_app_service_chat__unknown_external_user_id__raises_not_found_error(
+        self, llm_app_service
+    ):
+        # Arrange — use an external_id that was never inserted into the DB
+        chat_request = ChatRequest(
+            external_user_id="non-existent-user-99999",
+            message="Olá!"
+        )
+
+        # Act & Assert — LlmAppService.chat calls user_repository.get_by_external_id
+        # and raises NofFoundValidationError when user is not found
+        with pytest.raises(NofFoundValidationError):
+            llm_app_service.chat(chat_request=chat_request)
+
+    def test_llm_app_service_chat__empty_external_user_id__raises_empty_param_error(
+        self, llm_app_service
+    ):
+        # Arrange
+        chat_request = ChatRequest(external_user_id="", message="Olá!")
+
+        # Act & Assert — LlmAppService.chat checks is_null_or_whitespace on external_user_id
+        # and raises EmptyParamValidationError before any DB or LLM call
+        with pytest.raises(EmptyParamValidationError):
+            llm_app_service.chat(chat_request=chat_request)
+
+    def test_llm_app_service_chat__whitespace_only_external_user_id__raises_empty_param_error(
+        self, llm_app_service
+    ):
+        # Arrange
+        chat_request = ChatRequest(external_user_id="   ", message="Olá!")
+
+        # Act & Assert
+        with pytest.raises(EmptyParamValidationError):
+            llm_app_service.chat(chat_request=chat_request)
+
+
+#======================================================
+# OnlyTalkGraph — Conversation History Tests
+#======================================================
+
+class TestOnlyTalkGraphHistory:
+
+    def test_llm_app_service_chat__two_consecutive_messages_same_user__second_response_is_contextual(
+        self, llm_app_service, integration_user
+    ):
+        # Arrange — first message introduces a topic
+        first_request = ChatRequest(
+            external_user_id=integration_user.external_id,
+            message="Meu nome é Bruno e adoro pizza."
+        )
+        second_request = ChatRequest(
+            external_user_id=integration_user.external_id,
+            message="O que eu disse que gosto de comer?"
+        )
+
+        # Act
+        first_response = llm_app_service.chat(chat_request=first_request)
+        second_response = llm_app_service.chat(chat_request=second_request)
+
+        first_output = first_response.get("output")
+        second_output = second_response.get("output")
+
+        # Assert — both calls succeed and produce output
+        assert first_output, "First response must not be empty"
+        assert second_output, "Second response must not be empty"
+
+        # The second response should reference "pizza" because the history was retained
+        assert "pizza" in second_output.lower(), \
+            f"Expected second response to recall 'pizza' from history, got: {second_output}"
+
+    def test_llm_app_service_chat__two_different_users__histories_are_isolated(
+        self, user_app_service, llm_app_service
+    ):
+        from domain.commands import UserAdd
+
+        # Arrange — create a second distinct user
+        second_user_cmd = UserAdd(name="Maria", external_id="2000", summary="")
+        user_app_service.add(second_user_cmd)
+
+        user_a_request_1 = ChatRequest(
+            external_user_id="1000",
+            message="Meu prato favorito é lasanha."
+        )
+        user_b_request_1 = ChatRequest(
+            external_user_id="2000",
+            message="Qual é o meu prato favorito?"
+        )
+
+        # Act — user A sends a message, then user B asks about their own preference
+        llm_app_service.chat(chat_request=user_a_request_1)
+        user_b_response = llm_app_service.chat(chat_request=user_b_request_1)
+
+        user_b_output = user_b_response.get("output")
+
+        # Assert — user B's response should not mention "lasanha" (user A's topic)
+        assert user_b_output, "User B response must not be empty"
+        assert "lasanha" not in user_b_output.lower(), \
+            f"User B response should not contain user A's history topic 'lasanha', got: {user_b_output}"

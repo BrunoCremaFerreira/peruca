@@ -4,7 +4,14 @@
       "Bash(pyenv versions *)",
       "Bash(mkdir -p /home/brn/tests/data)",
       "Read(//home/brn/tests/data/**)",
-      "Bash(python -m pytest tests/** -v)"
+      "Bash(python -m pytest tests/** -v)",
+      "Bash(python -m pytest tests/integration_tests/ --collect-only -q)",
+      "Bash(python3 -m pytest tests/integration_tests/ --collect-only -q)",
+      "Bash(.venv/bin/python -m pytest tests/integration_tests/ --collect-only -q)",
+      "Bash(python -m pytest tests/integration_tests/ --collect-only)",
+      "Bash(python3 -m pytest tests/integration_tests/ --collect-only)",
+      "Bash(.venv/bin/pytest tests/integration_tests/ --collect-only)",
+      "Bash(.venv/bin/pytest tests/unit_tests/ --collect-only)"
     ]
   }
 }

@@ -3,7 +3,7 @@ from unittest.mock import patch
 import pytest
 
 from domain.commands import UserAdd
-from infra.ioc import get_llm_app_service, get_user_app_service
+from infra.ioc import get_llm_app_service, get_shopping_list_repository, get_user_app_service
 
 
 DB_PATH = "/home/brn/tests/data/tests.db"
@@ -17,6 +17,8 @@ INTEGRATION_ENV = {
     "LLM_MAIN_GRAPH_CHAT_TEMPERATURE": "0.5",
     "LLM_ONLY_TALK_GRAPH_CHAT_MODEL": "qwen3:14b",
     "LLM_ONLY_TALK_GRAPH_CHAT_TEMPERATURE": "0.5",
+    "LLM_SHOPPING_LIST_GRAPH_CHAT_MODEL": "qwen3:14b",
+    "LLM_SHOPPING_LIST_GRAPH_CHAT_TEMPERATURE": "0.5",
     "LLM_SMART_HOME_LIGHTS_GRAPH_CHAT_MODEL": "qwen3:14b",
     "LLM_SMART_HOME_LIGHTS_GRAPH_CHAT_TEMPERATURE": "0.5",
     "NLP_SPACY_MODEL": "pt_core_news_sm",
@@ -48,12 +50,17 @@ def user_app_service(integration_db_path):
 
 
 @pytest.fixture
-def llm_app_service(integration_db_path):
-    return get_llm_app_service()
-
-
-@pytest.fixture
 def integration_user(user_app_service):
     user_cmd = UserAdd(name="Bruno", external_id="1000", summary="")
     user_app_service.add(user_cmd)
     return user_cmd
+
+
+@pytest.fixture
+def llm_app_service(integration_user, integration_db_path):
+    return get_llm_app_service()
+
+
+@pytest.fixture
+def shopping_list_repo_for_integration(integration_db_path):
+    return get_shopping_list_repository()
