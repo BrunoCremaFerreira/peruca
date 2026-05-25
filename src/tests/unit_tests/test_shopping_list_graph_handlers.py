@@ -214,3 +214,221 @@ class TestHandleClearItemsOutputLanguage:
         assert "The Shopping List was cleared" not in output, (
             "English message must be replaced with a Portuguese equivalent"
         )
+
+
+# ---------------------------------------------------------------------------
+# Mudanca 4 — _handle_check_item lookup by name, calls service.check(), Portuguese output
+# ---------------------------------------------------------------------------
+
+class TestHandleCheckItemOutput:
+
+    def test_handle_check_item__single_item_name__calls_service_get_all(self):
+        # Arrange
+        graph = _make_graph()
+        graph.shopping_list_service.get_all = MagicMock(return_value=[])
+        state = {"output_check_item": "leite"}
+        # Act
+        graph._handle_check_item(state)
+        # Assert
+        graph.shopping_list_service.get_all.assert_called_once()
+
+    def test_handle_check_item__item_found_by_name__calls_service_check_with_item_id(self):
+        # Arrange
+        graph = _make_graph()
+        item = _sample_item(name="leite")
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item])
+        graph.shopping_list_service.check = MagicMock()
+        state = {"output_check_item": "leite"}
+        # Act
+        graph._handle_check_item(state)
+        # Assert
+        graph.shopping_list_service.check.assert_called_once_with(item.id)
+
+    def test_handle_check_item__item_found__output_contains_marcado(self):
+        # Arrange
+        graph = _make_graph()
+        item = _sample_item(name="leite")
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item])
+        graph.shopping_list_service.check = MagicMock()
+        state = {"output_check_item": "leite"}
+        # Act
+        result = graph._handle_check_item(state)
+        # Assert
+        output = result.get("output_check_item", "")
+        assert "Marcado" in output, (
+            f"Expected 'Marcado' in output, got: {output!r}"
+        )
+
+    def test_handle_check_item__item_found__output_contains_item_name(self):
+        # Arrange
+        graph = _make_graph()
+        item = _sample_item(name="leite")
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item])
+        graph.shopping_list_service.check = MagicMock()
+        state = {"output_check_item": "leite"}
+        # Act
+        result = graph._handle_check_item(state)
+        # Assert
+        output = result.get("output_check_item", "")
+        assert "leite" in output.lower()
+
+    def test_handle_check_item__item_not_found_in_list__output_is_in_portuguese(self):
+        # Arrange — empty list, item cannot be matched
+        graph = _make_graph()
+        graph.shopping_list_service.get_all = MagicMock(return_value=[])
+        graph.shopping_list_service.check = MagicMock()
+        state = {"output_check_item": "leite"}
+        # Act
+        result = graph._handle_check_item(state)
+        # Assert — output must be in Portuguese, not English
+        output = result.get("output_check_item", "")
+        portuguese_keywords = ["lista", "vazia", "encontrado", "não", "nenhum", "item"]
+        assert any(kw in output.lower() for kw in portuguese_keywords), (
+            f"Expected a Portuguese fallback message, got: {output!r}"
+        )
+
+    def test_handle_check_item__does_not_return_english_prefix(self):
+        # Arrange
+        graph = _make_graph()
+        item = _sample_item(name="leite")
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item])
+        graph.shopping_list_service.check = MagicMock()
+        state = {"output_check_item": "leite"}
+        # Act
+        result = graph._handle_check_item(state)
+        # Assert — regression: stub returned "Items Checked: ..."
+        output = result.get("output_check_item", "")
+        assert "Items Checked" not in output, (
+            "English prefix 'Items Checked' must be replaced with Portuguese"
+        )
+
+    def test_handle_check_item__multiple_items__calls_check_for_each(self):
+        # Arrange
+        graph = _make_graph()
+        item_leite = _sample_item(name="leite")
+        item_ovos = ShoppingListItem(id="ovos-id", name="ovos", quantity=1.0, checked=False)
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item_leite, item_ovos])
+        graph.shopping_list_service.check = MagicMock()
+        state = {"output_check_item": "leite|ovos"}
+        # Act
+        graph._handle_check_item(state)
+        # Assert — check must be called once for each item in the payload
+        assert graph.shopping_list_service.check.call_count == 2
+        graph.shopping_list_service.check.assert_any_call(item_leite.id)
+        graph.shopping_list_service.check.assert_any_call(item_ovos.id)
+
+    def test_handle_check_item__case_insensitive_match(self):
+        # Arrange — payload in uppercase, list item in lowercase
+        graph = _make_graph()
+        item = _sample_item(name="leite")
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item])
+        graph.shopping_list_service.check = MagicMock()
+        state = {"output_check_item": "LEITE"}
+        # Act
+        graph._handle_check_item(state)
+        # Assert — match must be case-insensitive
+        graph.shopping_list_service.check.assert_called_once_with(item.id)
+
+
+# ---------------------------------------------------------------------------
+# Mudanca 5 — _handle_uncheck_item lookup by name, calls service.uncheck(), Portuguese output
+# ---------------------------------------------------------------------------
+
+class TestHandleUncheckItemOutput:
+
+    def test_handle_uncheck_item__item_found_by_name__calls_service_uncheck_with_item_id(self):
+        # Arrange
+        graph = _make_graph()
+        item = _sample_item(name="leite")
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item])
+        graph.shopping_list_service.uncheck = MagicMock()
+        state = {"output_uncheck_item": "leite"}
+        # Act
+        graph._handle_uncheck_item(state)
+        # Assert
+        graph.shopping_list_service.uncheck.assert_called_once_with(item.id)
+
+    def test_handle_uncheck_item__item_found__output_contains_desmarcado(self):
+        # Arrange
+        graph = _make_graph()
+        item = _sample_item(name="leite")
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item])
+        graph.shopping_list_service.uncheck = MagicMock()
+        state = {"output_uncheck_item": "leite"}
+        # Act
+        result = graph._handle_uncheck_item(state)
+        # Assert
+        output = result.get("output_uncheck_item", "")
+        assert "Desmarcado" in output, (
+            f"Expected 'Desmarcado' in output, got: {output!r}"
+        )
+
+    def test_handle_uncheck_item__item_found__output_contains_item_name(self):
+        # Arrange
+        graph = _make_graph()
+        item = _sample_item(name="leite")
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item])
+        graph.shopping_list_service.uncheck = MagicMock()
+        state = {"output_uncheck_item": "leite"}
+        # Act
+        result = graph._handle_uncheck_item(state)
+        # Assert
+        output = result.get("output_uncheck_item", "")
+        assert "leite" in output.lower()
+
+    def test_handle_uncheck_item__item_not_found_in_list__output_is_in_portuguese(self):
+        # Arrange — empty list, item cannot be matched
+        graph = _make_graph()
+        graph.shopping_list_service.get_all = MagicMock(return_value=[])
+        graph.shopping_list_service.uncheck = MagicMock()
+        state = {"output_uncheck_item": "leite"}
+        # Act
+        result = graph._handle_uncheck_item(state)
+        # Assert — output must be in Portuguese, not English
+        output = result.get("output_uncheck_item", "")
+        portuguese_keywords = ["lista", "vazia", "encontrado", "não", "nenhum", "item"]
+        assert any(kw in output.lower() for kw in portuguese_keywords), (
+            f"Expected a Portuguese fallback message, got: {output!r}"
+        )
+
+    def test_handle_uncheck_item__does_not_return_english_prefix(self):
+        # Arrange
+        graph = _make_graph()
+        item = _sample_item(name="leite")
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item])
+        graph.shopping_list_service.uncheck = MagicMock()
+        state = {"output_uncheck_item": "leite"}
+        # Act
+        result = graph._handle_uncheck_item(state)
+        # Assert — regression: stub returned "Items Unchecked: ..."
+        output = result.get("output_uncheck_item", "")
+        assert "Items Unchecked" not in output, (
+            "English prefix 'Items Unchecked' must be replaced with Portuguese"
+        )
+
+    def test_handle_uncheck_item__multiple_items__calls_uncheck_for_each(self):
+        # Arrange
+        graph = _make_graph()
+        item_leite = _sample_item(name="leite")
+        item_ovos = ShoppingListItem(id="ovos-id", name="ovos", quantity=1.0, checked=True)
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item_leite, item_ovos])
+        graph.shopping_list_service.uncheck = MagicMock()
+        state = {"output_uncheck_item": "leite|ovos"}
+        # Act
+        graph._handle_uncheck_item(state)
+        # Assert — uncheck must be called once for each item in the payload
+        assert graph.shopping_list_service.uncheck.call_count == 2
+        graph.shopping_list_service.uncheck.assert_any_call(item_leite.id)
+        graph.shopping_list_service.uncheck.assert_any_call(item_ovos.id)
+
+    def test_handle_uncheck_item__case_insensitive_match(self):
+        # Arrange — payload in uppercase, list item in lowercase
+        graph = _make_graph()
+        item = _sample_item(name="leite")
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item])
+        graph.shopping_list_service.uncheck = MagicMock()
+        state = {"output_uncheck_item": "LEITE"}
+        # Act
+        graph._handle_uncheck_item(state)
+        # Assert — match must be case-insensitive
+        graph.shopping_list_service.uncheck.assert_called_once_with(item.id)

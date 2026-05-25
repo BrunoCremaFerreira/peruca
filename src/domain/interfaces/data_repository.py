@@ -109,6 +109,20 @@ class ShoppingListRepository(ABC):
         """
         pass
 
+    @abstractmethod
+    def check(self, item_id: str) -> None:
+        """
+        Mark a Shopping List Item as checked
+        """
+        pass
+
+    @abstractmethod
+    def uncheck(self, item_id: str) -> None:
+        """
+        Mark a Shopping List Item as unchecked
+        """
+        pass
+
 #=====================================
 # Temp Data Repository
 #=====================================

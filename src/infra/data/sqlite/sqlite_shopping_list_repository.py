@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import List, Optional
 from domain.entities import ShoppingListItem
 from domain.interfaces.data_repository import ShoppingListRepository
@@ -75,6 +76,26 @@ class SqliteShoppingListRepository(SqliteBaseRepository, ShoppingListRepository)
             self.conn.execute(
                 "UPDATE shopping_list SET name = ?, quantity = ?, when_created = ? WHERE id = ?",
                 (item.name, item.quantity, item.when_created, item.id)
+            )
+
+    def check(self, item_id: str) -> None:
+        """
+        Mark a Shopping List Item as checked
+        """
+        with self.conn:
+            self.conn.execute(
+                "UPDATE shopping_list SET checked = 1, when_updated = ? WHERE id = ?",
+                (datetime.now(timezone.utc), item_id)
+            )
+
+    def uncheck(self, item_id: str) -> None:
+        """
+        Mark a Shopping List Item as unchecked
+        """
+        with self.conn:
+            self.conn.execute(
+                "UPDATE shopping_list SET checked = 0, when_updated = ? WHERE id = ?",
+                (datetime.now(timezone.utc), item_id)
             )
 
     def delete(self, item_id: str):

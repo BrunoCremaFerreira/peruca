@@ -119,14 +119,60 @@ class ShoppingListGraph(Graph):
         return {"output_edit_item": f"Items Edited: {payload}"}
 
     def _handle_check_item(self, data):
-        payload = data.get("output_check_item")
+        payload: str = data.get("output_check_item")
         print(f"[shopping_list_graph.handle_check_item]: {payload}")
-        return {"output_check_item": f"Items Checked: {payload}"}
+
+        all_items = self.shopping_list_service.get_all()
+        if not all_items:
+            return {"output_check_item": "Nenhum item encontrado para marcar"}
+
+        names_to_check = [name.strip() for name in payload.split("|")]
+        checked_names = []
+        not_found_names = []
+
+        for name in names_to_check:
+            item = next((e for e in all_items if e.name.lower() == name.lower()), None)
+            if item:
+                self.shopping_list_service.check(item.id)
+                checked_names.append(item.name)
+            else:
+                not_found_names.append(name)
+
+        parts = []
+        if checked_names:
+            parts.append(f"Marcado como comprado: {', '.join(checked_names)}")
+        if not_found_names:
+            parts.append(f"Itens não encontrados na lista: {', '.join(not_found_names)}")
+
+        return {"output_check_item": "; ".join(parts) if parts else "Nenhum item encontrado para marcar"}
 
     def _handle_uncheck_item(self, data):
-        payload = data.get("output_uncheck_item")
+        payload: str = data.get("output_uncheck_item")
         print(f"[shopping_list_graph.handle_uncheck_item]: {payload}")
-        return {"output_uncheck_item": f"Items Unchecked: {payload}"}
+
+        all_items = self.shopping_list_service.get_all()
+        if not all_items:
+            return {"output_uncheck_item": "Nenhum item encontrado para desmarcar"}
+
+        names_to_uncheck = [name.strip() for name in payload.split("|")]
+        unchecked_names = []
+        not_found_names = []
+
+        for name in names_to_uncheck:
+            item = next((e for e in all_items if e.name.lower() == name.lower()), None)
+            if item:
+                self.shopping_list_service.uncheck(item.id)
+                unchecked_names.append(item.name)
+            else:
+                not_found_names.append(name)
+
+        parts = []
+        if unchecked_names:
+            parts.append(f"Desmarcado: {', '.join(unchecked_names)}")
+        if not_found_names:
+            parts.append(f"Itens não encontrados na lista: {', '.join(not_found_names)}")
+
+        return {"output_uncheck_item": "; ".join(parts) if parts else "Nenhum item encontrado para desmarcar"}
     
     def _handle_list_items(self, data):
         print(f"[shopping_list_graph.handle_list_items]: Triggered...")

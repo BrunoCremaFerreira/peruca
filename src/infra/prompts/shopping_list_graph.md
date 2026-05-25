@@ -44,6 +44,16 @@ Qual a temperatura no forno ideal para um bolo?
 **Resposta:**  
 ["not_recognized"]
 
+**Usuário:**  
+Já comprei o leite.  
+**Resposta:**  
+["check_item"]
+
+**Usuário:**  
+Pode tirar os ovos da lista.  
+**Resposta:**  
+["delete_item"]
+
 ---
 
 Depois de identificar as intenções, extraia os dados relevantes de acordo com o seguinte formato:
@@ -52,16 +62,36 @@ Depois de identificar as intenções, extraia os dados relevantes de acordo com 
 
         Ex: "leite,1|ovos,2"
 
-    Para check_item e uncheck_item: retorne apenas uma lista separada por vírgula, sem quantidades.
+    Para check_item e uncheck_item: retorne apenas os nomes dos itens separados por |, sem quantidades.
 
-        Ex: "leite, ovos, azeite"
+        Ex: "leite|ovos|azeite"
 
 Retorne os dados como um dicionário JSON com a chave da intenção e os valores reconhecidos. Exemplo:
 
 (caractere abre chave)
   "intents": ["add_item", "delete_item"],
   "add_item": "água com gás,1",
-  "delete_item": "sabonetes,2"
+  "edit_item": "",
+  "delete_item": "sabonetes,2",
+  "check_item": "",
+  "uncheck_item": "",
+  "list_items": "",
+  "clear_items": "",
+  "not_recognized": ""
+(caractere fecha chave)
+
+Exemplo com check_item e uncheck_item:
+
+(caractere abre chave)
+  "intents": ["check_item", "uncheck_item"],
+  "add_item": "",
+  "edit_item": "",
+  "delete_item": "",
+  "check_item": "leite|ovos",
+  "uncheck_item": "azeite",
+  "list_items": "",
+  "clear_items": "",
+  "not_recognized": ""
 (caractere fecha chave)
 
 Se nenhuma informação relevante for encontrada, retorne:

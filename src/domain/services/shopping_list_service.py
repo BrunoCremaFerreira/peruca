@@ -89,14 +89,15 @@ class ShoppingListService:
         """
 
         ShoppingListItemValidator() \
-            .validate_id(item_id)
-        
+            .validate_id(item_id) \
+            .validate()
+
         db_item = self.shopping_list_repository \
             .get_by_id(item_id=item_id)
-        
+
         if not db_item:
             raise ValidationError([f"The item with id '{item_id}' was not found in the shopping list"])
-        
+
         db_item.checked = True
         self.shopping_list_repository \
             .update(item=db_item)
@@ -107,7 +108,8 @@ class ShoppingListService:
         """
 
         ShoppingListItemValidator() \
-            .validate_id(item_id)
+            .validate_id(item_id) \
+            .validate()
         
         db_item = self.shopping_list_repository \
             .get_by_id(item_id=item_id)

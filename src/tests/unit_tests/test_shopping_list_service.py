@@ -155,6 +155,27 @@ class TestShoppingListServiceCheck:
             service.check(str(uuid.uuid4()))
         assert "was not found" in str(exc.value.errors)
 
+    def test_check__already_checked_item__calls_update_again(self, shopping_list_repo_mock):
+        # Arrange — item already has checked=True; service must still call update
+        item = _sample_item(name="Tomato", checked=True)
+        shopping_list_repo_mock.get_by_id.return_value = item
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        # Act
+        service.check(item.id)
+        # Assert — update is called regardless of prior state
+        shopping_list_repo_mock.update.assert_called_once()
+        assert item.checked is True
+
+    def test_check__invalid_id_empty_string__raises_validation_error(self, shopping_list_repo_mock):
+        # Arrange
+        # This test documents the bug: check() calls validate_id() but omits
+        # the final .validate() call, so ValidationError is never raised.
+        # The test is expected to FAIL until the bug is fixed.
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        # Act / Assert
+        with pytest.raises(ValidationError):
+            service.check("")
+
 
 class TestShoppingListServiceUncheck:
 
@@ -177,6 +198,27 @@ class TestShoppingListServiceUncheck:
         with pytest.raises(ValidationError) as exc:
             service.uncheck(str(uuid.uuid4()))
         assert "was not found" in str(exc.value.errors)
+
+    def test_uncheck__already_unchecked_item__calls_update_again(self, shopping_list_repo_mock):
+        # Arrange — item already has checked=False; service must still call update
+        item = _sample_item(name="Onion", checked=False)
+        shopping_list_repo_mock.get_by_id.return_value = item
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        # Act
+        service.uncheck(item.id)
+        # Assert — update is called regardless of prior state
+        shopping_list_repo_mock.update.assert_called_once()
+        assert item.checked is False
+
+    def test_uncheck__invalid_id_empty_string__raises_validation_error(self, shopping_list_repo_mock):
+        # Arrange
+        # This test documents the bug: uncheck() calls validate_id() but omits
+        # the final .validate() call, so ValidationError is never raised.
+        # The test is expected to FAIL until the bug is fixed.
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        # Act / Assert
+        with pytest.raises(ValidationError):
+            service.uncheck("")
 
 
 class TestShoppingListServiceDelete:
