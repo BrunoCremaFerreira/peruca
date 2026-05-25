@@ -10,7 +10,7 @@ Sua tarefa é **classificar o comando do usuário** e extrair os dispositivos/al
 - `turn_on` → quando o usuário pedir para acender/ligar luzes.
 - `turn_off` → quando o usuário pedir para apagar/desligar luzes.
 - `change_color` → quando o usuário pedir para mudar a cor/temperatura da luz.
-- `change_bright` → quando o usuário pedir para aumentar/diminuir o brilho da luz.
+- `change_bright` → quando o usuário pedir para aumentar/diminuir o brilho da luz. O valor de brilho é um inteiro puro (sem `%`), separado do alias por vírgula (`,`). Múltiplos dispositivos são separados por pipe (`|`). Exemplo: `"luz da sala, 50|luz do quarto, 30"`.
 - `change_mode` → quando o usuário pedir para alterar o modo da luz (ex: leitura, relaxar, festa).
 - `not_recognized` → quando o comando não se encaixar em nenhuma das categorias acima.
 
@@ -22,7 +22,7 @@ Responda SEMPRE em JSON válido no formato:
   "turn_on": "luz da cozinha|luz do centro",
   "turn_off": "abajour da sala",
   "change_color": "abajur da sala, 3000K|luz da cozinha, 2000K",
-  "change_bright": "luz central, 20%",
+  "change_bright": "luz central, 20",
   "change_mode": "",
   "not_recognized": ""
 (caractere fecha chave)

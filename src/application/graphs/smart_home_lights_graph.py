@@ -134,10 +134,53 @@ class SmartHomeLightsGraph(Graph):
 
     def _handle_change_bright(self, data):
         devices = data.get("output_change_bright", "")
-        if devices:
-            print(f"[SmartHomeLightsGraph._handle_change_bright]: {devices}")
-            return {"output_change_bright": devices}
-        return {}
+        if not devices:
+            return {}
+
+        print(f"[SmartHomeLightsGraph._handle_change_bright]: {devices}")
+
+        available_entities = data.get("available_entities", {})
+        segments = devices.split("|")
+        found_aliases: list[str] = []
+        not_found: list[str] = []
+
+        for segment in segments:
+            segment = segment.strip()
+            if "," not in segment:
+                not_found.append(segment)
+                continue
+
+            alias_str, pct_str = segment.rsplit(",", 1)
+            alias_str = alias_str.strip()
+
+            try:
+                brightness_pct = int(pct_str.strip())
+                brightness_pct = max(0, min(100, brightness_pct))
+            except ValueError:
+                brightness_pct = 50
+
+            entity_ids: List[str] = self._find_entity_ids(
+                entity_alias_delimited_str=alias_str,
+                available_entities=available_entities,
+            )
+
+            if not entity_ids:
+                not_found.append(alias_str)
+                continue
+
+            for entity_id in entity_ids:
+                turn_on_command = LightTurnOn(entity_id=entity_id, brightness_pct=brightness_pct)
+                asyncio.run(self.smart_home_service.light_turn_on(turn_on_command=turn_on_command))
+
+            found_aliases.append(alias_str)
+
+        output_parts: list[str] = []
+        if found_aliases:
+            output_parts.append(f"Brilho alterado: {', '.join(found_aliases)}")
+        if not_found:
+            output_parts.append("Dispositivo nao encontrado")
+
+        return {"output_change_bright": ". ".join(output_parts)}
 
     def _handle_change_mode(self, data):
         devices = data.get("output_change_mode", "")

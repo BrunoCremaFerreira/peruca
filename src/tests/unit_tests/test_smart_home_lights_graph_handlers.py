@@ -244,3 +244,135 @@ class TestHandleTurnOffDeviceNotFound:
             "turn_off handler must use key 'output_turn_off', not 'output_turn_on'"
         )
         assert "output_turn_on" not in result
+
+
+# ---------------------------------------------------------------------------
+# Mudança 4 — _handle_change_bright: parse payload, resolve entity_id,
+#             call light_turn_on with brightness_pct
+# ---------------------------------------------------------------------------
+
+class TestHandleChangeBright:
+    """
+    TDD tests for _handle_change_bright.
+
+    Expected payload format: "alias, percentual_inteiro"
+    Multiple devices separated by "|": "sala, 50|quarto, 30"
+
+    The handler must:
+      1. Return {} when output_change_bright is None/empty.
+      2. Parse each "alias, pct" pair and call _find_entity_ids(alias, available_entities).
+      3. Build LightTurnOn(entity_id=entity_id, brightness_pct=brightness_pct).
+      4. Call asyncio.run(smart_home_service.light_turn_on(turn_on_command=command)).
+      5. Return {"output_change_bright": "Brilho alterado: <alias>"} for found devices.
+      6. Return {"output_change_bright": "Dispositivo nao encontrado"} when entity_id not found.
+    """
+
+    def test_handle_change_bright__empty_payload__returns_empty_dict(self):
+        graph = _make_graph()
+        state = _state(output_change_bright=None)
+
+        result = graph._handle_change_bright(state)
+
+        assert result == {}, (
+            f"Expected empty dict for None payload, got: {result}"
+        )
+
+    def test_handle_change_bright__entity_found__calls_service_light_turn_on(self):
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(return_value=["light.sala"])
+        graph.smart_home_service.light_turn_on = AsyncMock()
+        state = _state(
+            output_change_bright="luz central, 20",
+            available_entities={"luz central": "light.sala"},
+        )
+
+        graph._handle_change_bright(state)
+
+        graph.smart_home_service.light_turn_on.assert_called_once()
+
+    def test_handle_change_bright__entity_found__brightness_pct_is_correct(self):
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(return_value=["light.sala"])
+        graph.smart_home_service.light_turn_on = AsyncMock()
+        state = _state(
+            output_change_bright="luz central, 20",
+            available_entities={"luz central": "light.sala"},
+        )
+
+        graph._handle_change_bright(state)
+
+        call_kwargs = graph.smart_home_service.light_turn_on.call_args
+        command = call_kwargs.kwargs.get("turn_on_command") or call_kwargs.args[0]
+        assert command.brightness_pct == 20, (
+            f"Expected brightness_pct=20, got: {command.brightness_pct}"
+        )
+
+    def test_handle_change_bright__entity_found__entity_id_is_correct(self):
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(return_value=["light.sala"])
+        graph.smart_home_service.light_turn_on = AsyncMock()
+        state = _state(
+            output_change_bright="luz central, 20",
+            available_entities={"luz central": "light.sala"},
+        )
+
+        graph._handle_change_bright(state)
+
+        call_kwargs = graph.smart_home_service.light_turn_on.call_args
+        command = call_kwargs.kwargs.get("turn_on_command") or call_kwargs.args[0]
+        assert command.entity_id == "light.sala", (
+            f"Expected entity_id='light.sala', got: {command.entity_id}"
+        )
+
+    def test_handle_change_bright__entity_not_found__returns_dispositivo_nao_encontrado(self):
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(return_value=[])
+        state = _state(
+            output_change_bright="luz inexistente, 50",
+            available_entities={},
+        )
+
+        result = graph._handle_change_bright(state)
+
+        assert "output_change_bright" in result
+        assert "Dispositivo nao encontrado" in result["output_change_bright"], (
+            f"Expected 'Dispositivo nao encontrado' in output, got: {result}"
+        )
+
+    def test_handle_change_bright__entity_found__output_contains_brilho_alterado(self):
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(return_value=["light.sala"])
+        graph.smart_home_service.light_turn_on = AsyncMock()
+        state = _state(
+            output_change_bright="luz central, 20",
+            available_entities={"luz central": "light.sala"},
+        )
+
+        result = graph._handle_change_bright(state)
+
+        assert "output_change_bright" in result
+        assert "Brilho alterado:" in result["output_change_bright"], (
+            f"Expected 'Brilho alterado:' in output, got: {result}"
+        )
+
+    def test_handle_change_bright__multiple_devices__calls_service_for_each(self):
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(side_effect=[
+            ["light.sala"],
+            ["light.quarto"],
+        ])
+        graph.smart_home_service.light_turn_on = AsyncMock()
+        state = _state(
+            output_change_bright="sala, 50|quarto, 30",
+            available_entities={
+                "sala": "light.sala",
+                "quarto": "light.quarto",
+            },
+        )
+
+        graph._handle_change_bright(state)
+
+        assert graph.smart_home_service.light_turn_on.call_count == 2, (
+            f"Expected 2 calls to light_turn_on, got: "
+            f"{graph.smart_home_service.light_turn_on.call_count}"
+        )
