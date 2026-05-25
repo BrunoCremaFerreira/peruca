@@ -18,6 +18,7 @@ class HomeAssistantSmartHomeLightRepository(SmartHomeLightRepository):
         """
         self.base_url = base_url.rstrip("/")
         self.token = token
+        self._ssl = False if self.base_url.startswith("https") else None
         self.headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json"
@@ -35,7 +36,7 @@ class HomeAssistantSmartHomeLightRepository(SmartHomeLightRepository):
         """
         url = f"{self.base_url}/api/states/{entity_id}"
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=self.headers) as resp:
+            async with session.get(url, headers=self.headers, ssl=self._ssl) as resp:
                 resp.raise_for_status()
                 data = await resp.json()
 
@@ -72,7 +73,7 @@ class HomeAssistantSmartHomeLightRepository(SmartHomeLightRepository):
         payload = {k: v for k, v in asdict(turn_on_command).items() if v is not None}
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=self.headers, json=payload) as resp:
+            async with session.post(url, headers=self.headers, json=payload, ssl=self._ssl) as resp:
                 resp.raise_for_status()
                 return await resp.json()
 
@@ -90,7 +91,7 @@ class HomeAssistantSmartHomeLightRepository(SmartHomeLightRepository):
         payload = {"entity_id": entity_id}
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=self.headers, json=payload) as resp:
+            async with session.post(url, headers=self.headers, json=payload, ssl=self._ssl) as resp:
                 resp.raise_for_status()
                 try:
                     return await resp.json()
