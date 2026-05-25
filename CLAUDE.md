@@ -12,6 +12,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The **only** exception is `infra/prompts/` — prompt files may be written in any language required by the use case (currently Portuguese).
 
+## Test-Driven Development (TDD) — Mandatory
+
+**TDD must always be followed for every code change, without exception.** The cycle is strictly:
+
+1. **Write the unit test first** — the test must fail before any implementation exists.
+2. **Implement only enough code to make the test pass** — no untested logic.
+3. **Refactor** — clean up while keeping all tests green.
+
+No implementation PR or commit may be created without a corresponding unit test written beforehand. Any code change that lacks test coverage is considered incomplete and must not be merged.
+
 ## Mandatory Agent Usage
 
 All analysis and implementation tasks **must** use the specialized agents defined in `.claude/agents/`:
