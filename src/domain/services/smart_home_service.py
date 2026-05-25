@@ -38,6 +38,7 @@ class SmartHomeService:
                     aliases = await self.smart_home_configuration_repository \
                         .get_aliases_by_entity_id(entity_id=entity_id)
 
+                    aliases = [a for a in aliases if a]
                     if not aliases:
                         continue
 
