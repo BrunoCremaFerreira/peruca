@@ -148,3 +148,24 @@ class SmartHomeLight:
     rgbww_color: Optional[Tuple[int, int, int, int, int]] = None
     supported_color_modes: List['SmartHomeColorMode'] = None
     xy_color: Optional[Tuple[float, float]] = None
+
+# Smart Home Climate Related Classes
+
+class SmartHomeHvacMode(Enum):
+    COOL     = "cool"
+    HEAT     = "heat"
+    AUTO     = "auto"
+    FAN_ONLY = "fan_only"
+    DRY      = "dry"
+    OFF      = "off"
+
+@dataclass
+class SmartHomeClimate:
+    entity_id: str
+    is_on: Optional[bool] = None
+    hvac_mode: Optional['SmartHomeHvacMode'] = None
+    hvac_modes: Optional[List[str]] = None
+    current_temperature: Optional[float] = None
+    target_temperature: Optional[float] = None
+    fan_mode: Optional[str] = None
+    swing_mode: Optional[str] = None

@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List
 
-from domain.commands import LightTurnOn
-from domain.entities import SmartHomeLight
+from domain.commands import ClimateSetHvacMode, ClimateSetTemperature, ClimateTurnOff, ClimateTurnOn, LightTurnOn
+from domain.entities import SmartHomeClimate, SmartHomeLight
 
 
 class SmartHomeLightRepository(ABC):
@@ -48,4 +48,29 @@ class SmartHomeConfigurationRepository(ABC):
         """
         Get entity aliases
         """
+        pass
+
+class SmartHomeClimateRepository(ABC):
+    """
+    Interface for Smart Home Climate integration
+    """
+
+    @abstractmethod
+    async def get_state(self, entity_id: str) -> SmartHomeClimate:
+        pass
+
+    @abstractmethod
+    async def set_temperature(self, command: ClimateSetTemperature) -> dict:
+        pass
+
+    @abstractmethod
+    async def set_hvac_mode(self, command: ClimateSetHvacMode) -> dict:
+        pass
+
+    @abstractmethod
+    async def turn_on(self, command: ClimateTurnOn) -> dict:
+        pass
+
+    @abstractmethod
+    async def turn_off(self, command: ClimateTurnOff) -> dict:
         pass

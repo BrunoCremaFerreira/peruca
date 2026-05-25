@@ -84,3 +84,24 @@ class LightTurnOn:
     flash: Optional[str] = None
     effect: Optional[str] = None
     profile: Optional[str] = None
+
+# =====================================
+# Smart Home - Climate Commands
+# =====================================
+@dataclass
+class ClimateSetTemperature:
+    entity_id: str
+    temperature: float
+
+@dataclass
+class ClimateSetHvacMode:
+    entity_id: str
+    hvac_mode: str
+
+@dataclass
+class ClimateTurnOn:
+    entity_id: str
+
+@dataclass
+class ClimateTurnOff:
+    entity_id: str

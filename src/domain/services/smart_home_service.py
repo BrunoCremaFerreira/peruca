@@ -1,9 +1,9 @@
 from typing import List
 import uuid
-from domain.commands import LightTurnOn
-from domain.entities import SmartHomeEntityAlias
+from domain.commands import LightTurnOn, ClimateSetTemperature, ClimateSetHvacMode, ClimateTurnOn, ClimateTurnOff
+from domain.entities import SmartHomeEntityAlias, SmartHomeClimate
 from domain.interfaces.data_repository import SmartHomeEntityAliasRepository
-from domain.interfaces.smart_home_repository import SmartHomeConfigurationRepository, SmartHomeLightRepository
+from domain.interfaces.smart_home_repository import SmartHomeConfigurationRepository, SmartHomeLightRepository, SmartHomeClimateRepository
 
 
 class SmartHomeService:
@@ -11,13 +11,15 @@ class SmartHomeService:
     Smart Home Service
     """
 
-    def __init__(self, 
+    def __init__(self,
                  smart_home_light_repository: SmartHomeLightRepository,
                  smart_home_configuration_repository: SmartHomeConfigurationRepository,
-                 smart_home_entity_alias_repository: SmartHomeEntityAliasRepository):
+                 smart_home_entity_alias_repository: SmartHomeEntityAliasRepository,
+                 smart_home_climate_repository: SmartHomeClimateRepository):
         self.smart_home_light_repository = smart_home_light_repository
         self.smart_home_configuration_repository = smart_home_configuration_repository
         self.smart_home_entity_alias_repository = smart_home_entity_alias_repository
+        self.smart_home_climate_repository = smart_home_climate_repository
 
     async def update_entity_aliases(self) -> None:
         """
@@ -58,8 +60,23 @@ class SmartHomeService:
         finally:
             await self.smart_home_configuration_repository.close()
 
-    async def light_turn_on(self, turn_on_command: LightTurnOn)-> dict:
+    async def light_turn_on(self, turn_on_command: LightTurnOn) -> dict:
         await self.smart_home_light_repository.turn_on(turn_on_command=turn_on_command)
 
-    async def light_turn_off(self, entity_id: str):
+    async def light_turn_off(self, entity_id: str) -> dict:
         await self.smart_home_light_repository.turn_off(entity_id=entity_id)
+
+    async def climate_turn_on(self, command: ClimateTurnOn) -> dict:
+        return await self.smart_home_climate_repository.turn_on(command=command)
+
+    async def climate_turn_off(self, command: ClimateTurnOff) -> dict:
+        return await self.smart_home_climate_repository.turn_off(command=command)
+
+    async def climate_set_temperature(self, command: ClimateSetTemperature) -> dict:
+        return await self.smart_home_climate_repository.set_temperature(command=command)
+
+    async def climate_set_hvac_mode(self, command: ClimateSetHvacMode) -> dict:
+        return await self.smart_home_climate_repository.set_hvac_mode(command=command)
+
+    async def climate_get_state(self, entity_id: str) -> SmartHomeClimate:
+        return await self.smart_home_climate_repository.get_state(entity_id=entity_id)
