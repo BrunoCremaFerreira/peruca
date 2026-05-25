@@ -34,6 +34,21 @@ All analysis and implementation tasks **must** use the specialized agents define
 | `especialista-de-prompt` | Writing/optimizing prompts in `infra/prompts/`, LangGraph node design, intent classifiers |
 | `especialista-de-seguranca` | Security audits, endpoint exposure, pre-deploy reviews |
 
+## Agent Consultation — Mandatory Before Planning
+
+Before assembling any plan or starting any implementation, Claude Code **must**
+consult the relevant specialized agents. This applies to every task — analysis,
+design, implementation, testing, security review — without exception.
+
+The consultation order for most tasks:
+1. `arquiteto` — validates architectural fit and layer boundaries.
+2. `especialista-de-prompt` — reviews or designs any LangGraph/prompt changes.
+3. `programador-tester` — writes or approves unit tests before implementation begins.
+4. `programador` — implements only after tests are approved.
+
+Do **not** produce a final plan or write any code until the relevant agents have
+been consulted and their output has been incorporated.
+
 ## Commands
 
 All commands run from `src/`:
