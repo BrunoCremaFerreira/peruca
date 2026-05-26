@@ -17,7 +17,11 @@ class Graph(ABC):
         pass
 
     def _remove_thinking_tag(self, input_str: str) -> str:
-        return input_str.replace("<think>\n\n</think>\n\n", "").strip()
+        cleaned = input_str.replace("<think>\n\n</think>\n\n", "").strip()
+        if cleaned.startswith("```"):
+            lines = cleaned.splitlines()
+            cleaned = "\n".join(lines[1:-1]).strip()
+        return cleaned
 
     def load_prompt(self, name: str) -> str:
         """

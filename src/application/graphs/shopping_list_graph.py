@@ -103,7 +103,7 @@ class ShoppingListGraph(Graph):
         if not all_items:
             return {"output_delete_item": "A lista esta vazia"}
 
-        items_to_delete = [e.split(",", 1)[0] for e in payload.split("|")]
+        items_to_delete = [e.split(",", 1)[0].strip() for e in payload.split("|")]
         for item_name in items_to_delete:
             item = next((e for e in all_items if e.name.lower() == item_name.lower()), None)
             if item:

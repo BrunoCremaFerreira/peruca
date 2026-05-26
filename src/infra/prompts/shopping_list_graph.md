@@ -54,6 +54,11 @@ Pode tirar os ovos da lista.
 **Resposta:**  
 ["delete_item"]
 
+**Usuário:**  
+Cerveja e carvão já comprei, pode apagar da lista.  
+**Resposta:**  
+["delete_item"]
+
 ---
 
 Depois de identificar as intenções, extraia os dados relevantes de acordo com o seguinte formato:

@@ -432,3 +432,61 @@ class TestHandleUncheckItemOutput:
         graph._handle_uncheck_item(state)
         # Assert — match must be case-insensitive
         graph.shopping_list_service.uncheck.assert_called_once_with(item.id)
+
+
+# ---------------------------------------------------------------------------
+# Bug 2 — _handle_delete_item must strip whitespace from extracted item names
+#
+# _handle_check_item already uses .strip() when splitting by "|"; _handle_delete_item
+# does not. When the LLM returns payloads like "cerveja,1 | carvão,1" the extra
+# spaces around "|" cause the name comparison to fail and items are never deleted.
+# ---------------------------------------------------------------------------
+
+class TestHandleDeleteItemWhitespaceTolerance:
+
+    def test_handle_delete_item__payload_with_spaces_around_pipe__both_items_deleted(self):
+        """
+        Payload "cerveja,1 | carvão,1" — spaces surround the pipe separator.
+        After splitting by "|" the fragments are "cerveja,1 " and " carvão,1".
+        Without .strip() on the extracted name, " carvão" != "carvão" and the
+        second item is never deleted.
+
+        Expected: shopping_list_service.delete is called exactly twice (once per item).
+        FAILS with current implementation (no .strip() on name after split by ",").
+        """
+        # Arrange
+        graph = _make_graph()
+        item_cerveja = _sample_item(name="cerveja")
+        item_carvao = ShoppingListItem(id="carvao-id", name="carvão", quantity=1.0, checked=False)
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item_cerveja, item_carvao])
+        graph.shopping_list_service.delete = MagicMock()
+        state = {"output_delete_item": "cerveja,1 | carvão,1"}
+        # Act
+        graph._handle_delete_item(state)
+        # Assert — both items must have been deleted
+        assert graph.shopping_list_service.delete.call_count == 2, (
+            f"Expected delete called 2 times, got {graph.shopping_list_service.delete.call_count}. "
+            "Likely cause: missing .strip() on item name extracted from pipe-split payload."
+        )
+        graph.shopping_list_service.delete.assert_any_call(item_cerveja.id)
+        graph.shopping_list_service.delete.assert_any_call(item_carvao.id)
+
+    def test_handle_delete_item__payload_with_leading_space_in_name__item_matched_and_deleted(self):
+        """
+        Payload " leite,1" — leading space before the item name.
+        Without .strip() on the name extracted after split(",", 1)[0], the
+        comparison " leite".lower() == "leite".lower() is False.
+
+        Expected: shopping_list_service.delete is called exactly once.
+        FAILS with current implementation.
+        """
+        # Arrange
+        graph = _make_graph()
+        item_leite = _sample_item(name="leite")
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item_leite])
+        graph.shopping_list_service.delete = MagicMock()
+        state = {"output_delete_item": " leite,1"}
+        # Act
+        graph._handle_delete_item(state)
+        # Assert — item must have been deleted despite the leading space
+        graph.shopping_list_service.delete.assert_called_once_with(item_leite.id)
