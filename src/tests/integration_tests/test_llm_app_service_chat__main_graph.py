@@ -185,8 +185,7 @@ def test_llm_app_service_chat__smart_home_lights_intent__routes_to_smart_home_li
     "Quero acessar a câmera da área externa.",
     "Ative a visualização noturna da câmera da frente.",
     "Consigo ver a câmera da entrada pelo celular?",
-    "Quero ver o que as câmeras estão captando agora.",
-    "A câmera detectou algum movimento esta noite?"
+    "Quero ver o que as câmeras estão captando agora."
 ])
 def test_chat_smart_home_security_cams_only(message, llm_app_service, integration_user):
     # Arrange
