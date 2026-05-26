@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
+
+
 # =====================================
 # User
 # =====================================
@@ -105,3 +107,17 @@ class ClimateTurnOn:
 @dataclass
 class ClimateTurnOff:
     entity_id: str
+
+# =====================================
+# Smart Home - Sensor Commands
+# =====================================
+@dataclass
+class SensorQueryCurrent:
+    sensor_type: str
+    location: Optional[str] = None
+
+@dataclass
+class SensorQueryHistory:
+    sensor_type: str
+    location: Optional[str] = None
+    hours_back: int = 3

@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     llm_smart_home_climate_graph_chat_model: str = "qwen3:14b"
     llm_smart_home_climate_graph_chat_temperature: float = 0.5
 
+    llm_smart_home_sensors_graph_chat_model: str = "qwen3:14b"
+    llm_smart_home_sensors_graph_chat_temperature: float = 0.1
+
 
     # ===============================
     # NLP Models config

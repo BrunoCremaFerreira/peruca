@@ -1,3 +1,4 @@
+import asyncio
 import os
 from unittest.mock import MagicMock, patch
 import pytest
@@ -6,6 +7,15 @@ from infra.ioc import get_user_app_service, get_user_repository
 
 
 DB_PATH = "/home/brn/tests/data/tests.db"
+
+
+@pytest.fixture(autouse=True)
+def fresh_event_loop():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    yield
+    loop.close()
+    asyncio.set_event_loop(None)
 
 
 @pytest.fixture

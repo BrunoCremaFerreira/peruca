@@ -169,3 +169,25 @@ class SmartHomeClimate:
     target_temperature: Optional[float] = None
     fan_mode: Optional[str] = None
     swing_mode: Optional[str] = None
+
+# Smart Home Sensor Related Classes
+
+class SensorType(Enum):
+    TEMPERATURE = "temperature"
+    DOOR = "door"
+    WINDOW = "window"
+    MOTION = "motion"
+    PRESENCE = "presence"
+    HUMIDITY = "humidity"
+    SMOKE = "smoke"
+    ILLUMINANCE = "illuminance"
+    UNKNOWN = "unknown"
+
+@dataclass
+class SensorReading:
+    entity_id: str
+    sensor_type: SensorType
+    state: str
+    unit: Optional[str] = None
+    friendly_name: Optional[str] = None
+    last_changed: Optional[datetime] = None
