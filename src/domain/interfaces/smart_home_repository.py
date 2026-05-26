@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List
 
 from domain.commands import ClimateSetHvacMode, ClimateSetTemperature, ClimateTurnOff, ClimateTurnOn, LightTurnOn
-from domain.entities import SmartHomeClimate, SmartHomeLight, SensorReading
+from domain.entities import SmartHomeClimate, SmartHomeLight, SensorReading, SmartHomeCamera, SmartHomeCameraSnapshot
 
 
 class SmartHomeLightRepository(ABC):
@@ -86,4 +86,18 @@ class SmartHomeSensorRepository(ABC):
 
     @abstractmethod
     async def get_history(self, entity_id: str, hours_back: int) -> List[SensorReading]:
+        pass
+
+
+class SmartHomeCameraRepository(ABC):
+    """
+    Interface for Smart Home Camera integration
+    """
+
+    @abstractmethod
+    async def get_state(self, entity_id: str) -> SmartHomeCamera:
+        pass
+
+    @abstractmethod
+    async def get_snapshot(self, entity_id: str) -> SmartHomeCameraSnapshot:
         pass

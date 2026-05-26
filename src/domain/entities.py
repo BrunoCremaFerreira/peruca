@@ -191,3 +191,18 @@ class SensorReading:
     unit: Optional[str] = None
     friendly_name: Optional[str] = None
     last_changed: Optional[datetime] = None
+
+# Smart Home Camera Related Classes
+
+@dataclass
+class SmartHomeCamera:
+    entity_id: str
+    state: str
+    friendly_name: Optional[str] = None
+    is_available: Optional[bool] = None
+
+@dataclass
+class SmartHomeCameraSnapshot:
+    entity_id: str
+    image_bytes: bytes
+    content_type: str = "image/jpeg"

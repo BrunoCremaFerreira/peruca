@@ -9,6 +9,7 @@ from application.graphs.shopping_list_graph import ShoppingListGraph
 from application.graphs.smart_home_lights_graph import SmartHomeLightsGraph
 from application.graphs.smart_home_climate_graph import SmartHomeClimateGraph
 from application.graphs.smart_home_sensors_graph import SmartHomeSensorsGraph
+from application.graphs.smart_home_cameras_graph import SmartHomeCamerasGraph
 from domain.entities import GraphInvokeRequest
 
 class MainGraphState(TypedDict):
@@ -30,13 +31,15 @@ class MainGraph(Graph):
                  shopping_list_graph: ShoppingListGraph,
                  smart_home_lights_graph: SmartHomeLightsGraph,
                  smart_home_climate_graph: SmartHomeClimateGraph,
-                 smart_home_sensors_graph: SmartHomeSensorsGraph):
+                 smart_home_sensors_graph: SmartHomeSensorsGraph,
+                 smart_home_cameras_graph: SmartHomeCamerasGraph = None):
         self.llm_chat = llm_chat
         self.only_talk_graph = only_talk_graph
         self.shopping_list_graph = shopping_list_graph
         self.smart_home_lights_graph = smart_home_lights_graph
         self.smart_home_climate_graph = smart_home_climate_graph
         self.smart_home_sensors_graph = smart_home_sensors_graph
+        self.smart_home_cameras_graph = smart_home_cameras_graph
         self.classification_prompt = ChatPromptTemplate.from_template(self.load_prompt("main_graph.md"))
     
     #===============================================
@@ -97,7 +100,10 @@ class MainGraph(Graph):
 
     def _handle_smart_home_security_cams(self, data):
         print(f"[main_graph.handle_smart_home_security_cams]: Triggered...")
-        return {"output_cams": "Desculpe. Você não tem acesso para ver as câmeras."}
+        result = self.smart_home_cameras_graph.invoke(
+            GraphInvokeRequest(message=data["input"].message, user=data["input"].user)
+        )
+        return {"output_cams": result.get("output", "")}
 
     def _handle_shopping_list(self, data):
         print(f"[main_graph.handle_shopping_list]: : Triggered...")

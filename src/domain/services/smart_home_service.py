@@ -1,9 +1,9 @@
 from typing import List, Optional
 import uuid
 from domain.commands import LightTurnOn, ClimateSetTemperature, ClimateSetHvacMode, ClimateTurnOn, ClimateTurnOff
-from domain.entities import SmartHomeEntityAlias, SmartHomeClimate, SensorReading
+from domain.entities import SmartHomeEntityAlias, SmartHomeClimate, SensorReading, SmartHomeCamera, SmartHomeCameraSnapshot
 from domain.interfaces.data_repository import SmartHomeEntityAliasRepository
-from domain.interfaces.smart_home_repository import SmartHomeConfigurationRepository, SmartHomeLightRepository, SmartHomeClimateRepository, SmartHomeSensorRepository
+from domain.interfaces.smart_home_repository import SmartHomeConfigurationRepository, SmartHomeLightRepository, SmartHomeClimateRepository, SmartHomeSensorRepository, SmartHomeCameraRepository
 
 
 class SmartHomeService:
@@ -16,12 +16,14 @@ class SmartHomeService:
                  smart_home_configuration_repository: SmartHomeConfigurationRepository,
                  smart_home_entity_alias_repository: SmartHomeEntityAliasRepository,
                  smart_home_climate_repository: SmartHomeClimateRepository,
-                 smart_home_sensor_repository: Optional[SmartHomeSensorRepository] = None):
+                 smart_home_sensor_repository: Optional[SmartHomeSensorRepository] = None,
+                 smart_home_camera_repository: Optional[SmartHomeCameraRepository] = None):
         self.smart_home_light_repository = smart_home_light_repository
         self.smart_home_configuration_repository = smart_home_configuration_repository
         self.smart_home_entity_alias_repository = smart_home_entity_alias_repository
         self.smart_home_climate_repository = smart_home_climate_repository
         self.smart_home_sensor_repository = smart_home_sensor_repository
+        self.smart_home_camera_repository = smart_home_camera_repository
 
     async def update_entity_aliases(self) -> None:
         """
@@ -89,3 +91,9 @@ class SmartHomeService:
 
     async def sensor_get_history(self, entity_id: str, hours_back: int) -> List[SensorReading]:
         return await self.smart_home_sensor_repository.get_history(entity_id, hours_back)
+
+    async def camera_get_state(self, entity_id: str) -> SmartHomeCamera:
+        return await self.smart_home_camera_repository.get_state(entity_id)
+
+    async def camera_get_snapshot(self, entity_id: str) -> SmartHomeCameraSnapshot:
+        return await self.smart_home_camera_repository.get_snapshot(entity_id)

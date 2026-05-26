@@ -8,8 +8,9 @@ from application.graphs.shopping_list_graph import ShoppingListGraph
 from application.graphs.smart_home_lights_graph import SmartHomeLightsGraph
 from application.graphs.smart_home_climate_graph import SmartHomeClimateGraph
 from application.graphs.smart_home_sensors_graph import SmartHomeSensorsGraph
+from application.graphs.smart_home_cameras_graph import SmartHomeCamerasGraph
 from domain.interfaces.data_repository import ContextRepository, ShoppingListRepository, SmartHomeEntityAliasRepository, UserRepository
-from domain.interfaces.smart_home_repository import SmartHomeLightRepository, SmartHomeClimateRepository, SmartHomeSensorRepository
+from domain.interfaces.smart_home_repository import SmartHomeLightRepository, SmartHomeClimateRepository, SmartHomeSensorRepository, SmartHomeCameraRepository
 from domain.services.shopping_list_service import ShoppingListService
 from domain.services.smart_home_service import SmartHomeService
 from domain.services.user_service import UserService
@@ -17,6 +18,7 @@ from infra.data.external.smart_home.home_assistant.home_assistant_smart_home_con
 from infra.data.external.smart_home.home_assistant.home_assistant_smart_home_light_repository import HomeAssistantSmartHomeLightRepository
 from infra.data.external.smart_home.home_assistant.home_assistant_smart_home_climate_repository import HomeAssistantSmartHomeClimateRepository
 from infra.data.external.smart_home.home_assistant.home_assistant_smart_home_sensor_repository import HomeAssistantSmartHomeSensorRepository
+from infra.data.external.smart_home.home_assistant.home_assistant_smart_home_camera_repository import HomeAssistantSmartHomeCameraRepository
 from infra.data.sqlite.context_repository_redis import RedisContextRepository
 from langchain_ollama import ChatOllama
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -44,13 +46,15 @@ def get_main_graph() -> MainGraph:
     smart_home_lights_graph = get_smart_home_lights_graph()
     smart_home_climate_graph = get_smart_home_climate_graph()
     smart_home_sensors_graph = get_smart_home_sensors_graph()
+    smart_home_cameras_graph = get_smart_home_cameras_graph()
 
     return MainGraph(llm_chat=llm_chat,
                      only_talk_graph=only_talk_graph,
                      shopping_list_graph=shopping_list_graph,
                      smart_home_lights_graph=smart_home_lights_graph,
                      smart_home_climate_graph=smart_home_climate_graph,
-                     smart_home_sensors_graph=smart_home_sensors_graph)
+                     smart_home_sensors_graph=smart_home_sensors_graph,
+                     smart_home_cameras_graph=smart_home_cameras_graph)
 
 def get_only_talk_graph() -> OnlyTalkGraph:
     """
@@ -140,6 +144,27 @@ def get_smart_home_sensors_graph() -> SmartHomeSensorsGraph:
         smart_home_entity_alias_repository=smart_home_entity_alias_repository
     )
 
+def get_smart_home_cameras_graph() -> SmartHomeCamerasGraph:
+    """
+    IOC for Smart Home Cameras Graph
+    """
+
+    settings = Settings()
+
+    llm_chat = get_llm_chat(
+        model=settings.llm_smart_home_cameras_graph_chat_model,
+        temperature=settings.llm_smart_home_cameras_graph_chat_temperature
+    )
+
+    smart_home_service = get_smart_home_service()
+    smart_home_entity_alias_repository = get_smart_home_entity_alias_repository()
+
+    return SmartHomeCamerasGraph(
+        llm_chat=llm_chat,
+        smart_home_service=smart_home_service,
+        smart_home_entity_alias_repository=smart_home_entity_alias_repository
+    )
+
 # ====================================
 # App Services
 # ====================================
@@ -214,7 +239,8 @@ def get_smart_home_service() -> SmartHomeService:
         smart_home_configuration_repository=get_home_assistant_smart_home_configuration_repository(),
         smart_home_light_repository=get_smart_home_light_repository(),
         smart_home_climate_repository=get_smart_home_climate_repository(),
-        smart_home_sensor_repository=get_smart_home_sensor_repository()
+        smart_home_sensor_repository=get_smart_home_sensor_repository(),
+        smart_home_camera_repository=get_smart_home_camera_repository()
     )
 
 # ====================================
@@ -285,6 +311,17 @@ def get_smart_home_sensor_repository() -> SmartHomeSensorRepository:
 
     settings = Settings()
     return HomeAssistantSmartHomeSensorRepository(
+        base_url=settings.home_assistant_url,
+        token=settings.home_assistant_token
+    )
+
+def get_smart_home_camera_repository() -> SmartHomeCameraRepository:
+    """
+    Smart Home Camera Repository
+    """
+
+    settings = Settings()
+    return HomeAssistantSmartHomeCameraRepository(
         base_url=settings.home_assistant_url,
         token=settings.home_assistant_token
     )
