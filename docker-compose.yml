@@ -1,0 +1,16 @@
+services:
+  peruca:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: peruca
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - peruca_data:/data
+    restart: unless-stopped
+
+volumes:
+  peruca_data:

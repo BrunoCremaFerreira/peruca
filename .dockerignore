@@ -1,0 +1,12 @@
+.git
+.venv
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/.pytest_cache
+src/.env
+src/peruca.db
+docs/
+scripts/
+*.md
+!src/infra/prompts/*.md
