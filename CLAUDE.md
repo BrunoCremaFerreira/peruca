@@ -12,6 +12,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The **only** exception is `infra/prompts/` — prompt files may be written in any language required by the use case (currently Portuguese).
 
+## Git Commits — Never Automatic
+
+**Claude Code must never create a git commit automatically.** Commits are only allowed when the user explicitly requests one. This rule applies to all agents, skills, and workflows — no automatic commit at the end of a feature implementation, test run, or any other automated step.
+
 ## Test-Driven Development (TDD) — Mandatory
 
 **TDD must always be followed for every code change, without exception.** The cycle is strictly:

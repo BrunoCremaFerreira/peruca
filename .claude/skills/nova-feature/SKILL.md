@@ -1,6 +1,6 @@
 ---
 name: nova-feature
-description: Orquestra o ciclo completo de implementação de uma nova feature no projeto Peruca, coordenando os agentes especializados em sequência: planejamento colaborativo (arquiteto + especialista-de-prompt + programador-tester), implementação TDD estrito por camadas (testes antes da implementação, sempre), execução e correção de testes, e commit com gitflow. Use este skill sempre que o usuário pedir para "implementar", "criar" ou "adicionar" uma nova funcionalidade ao Peruca — mesmo que não mencione explicitamente os agentes ou o processo.
+description: Orquestra o ciclo completo de implementação de uma nova feature no projeto Peruca, coordenando os agentes especializados em sequência: planejamento colaborativo (arquiteto + especialista-de-prompt + programador-tester), implementação TDD estrito por camadas (testes antes da implementação, sempre), execução e correção de testes. Use este skill sempre que o usuário pedir para "implementar", "criar" ou "adicionar" uma nova funcionalidade ao Peruca — mesmo que não mencione explicitamente os agentes ou o processo.
 ---
 
 # Nova Feature — Peruca
@@ -124,28 +124,6 @@ cd src && .venv/bin/python -m pytest tests/integration_tests/test_llm_app_servic
 | `KeyError` em `langchain_core/prompts/base.py` | Exemplos JSON no prompt têm `{` e `}` literais interpretados como variáveis de template | Substituir por `(caractere abre chave)` / `(caractere fecha chave)` — igual ao padrão do `smart_home_lights_graph.md` |
 | Frase classificada como `only_talking` | Mensagem de teste é declarativa, não imperativa/interrogativa | Adicionar `?` ou reformular como comando |
 | `asyncio.run()` dentro de async context | Incompatibilidade com FastAPI async | Manter exatamente o padrão de `SmartHomeLightsGraph` — não alterar |
-
----
-
-## Fase 6 — Commit
-
-Após **todos** os testes (unitários + integração) passarem:
-
-```bash
-git add src/<arquivos_da_feature>
-# NÃO commitar .claude/settings.local.json
-git commit -m "feat: <descrição da feature>
-
-<detalhes das camadas implementadas>
-
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
-```
-
-Padrão de prefixo (gitflow):
-- `feat:` nova funcionalidade
-- `fix:` correção de bug
-- `test:` testes sem mudança de comportamento
-- `refactor:` refatoração sem mudança funcional
 
 ---
 
