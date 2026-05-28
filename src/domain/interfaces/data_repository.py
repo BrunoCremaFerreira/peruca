@@ -2,7 +2,13 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 
 from domain.commands import LightTurnOn
-from domain.entities import ShoppingListItem, SmartHomeEntityAlias, SmartHomeLight, User
+from domain.entities import (
+    ShoppingListItem,
+    SmartHomeArea,
+    SmartHomeEntityAlias,
+    SmartHomeLight,
+    User,
+)
 
 
 # =====================================
@@ -202,5 +208,42 @@ class SmartHomeEntityAliasRepository(ABC):
     def delete_all(self) -> None:
         """
         Remove all SmartHomeEntityAlias
+        """
+        pass
+
+
+# =====================================
+# Smart Home Area Data Repository
+# =====================================
+class SmartHomeAreaRepository(ABC):
+    """
+    Interface for Smart Home Area Data Repository
+    """
+
+    @abstractmethod
+    def add(self, area: SmartHomeArea) -> None:
+        """
+        Add Smart Home Area
+        """
+        pass
+
+    @abstractmethod
+    def get_all(self) -> List[SmartHomeArea]:
+        """
+        Get all Smart Home Areas
+        """
+        pass
+
+    @abstractmethod
+    def get_by_area_id(self, area_id: str) -> Optional[SmartHomeArea]:
+        """
+        Get Smart Home Area by area_id
+        """
+        pass
+
+    @abstractmethod
+    def delete_all(self) -> None:
+        """
+        Remove all SmartHomeArea
         """
         pass

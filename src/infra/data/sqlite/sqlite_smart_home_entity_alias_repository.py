@@ -13,6 +13,7 @@ class SqliteSmartHomeEntityAliasRepository(
     def _startup(self) -> None:
         self.connect()
         self._create_table()
+        self._ensure_area_id_column()
 
     def _create_table(self) -> None:
         with self.conn:
@@ -21,11 +22,25 @@ class SqliteSmartHomeEntityAliasRepository(
                     id TEXT PRIMARY KEY,
                     entity_id TEXT NOT NULL,
                     alias TEXT NOT NULL,
+                    area_id TEXT,
                     when_created TIMESTAMP,
                     when_updated TIMESTAMP DEFAULT NULL,
                     when_deleted TIMESTAMP DEFAULT NULL
                 )
             """)
+
+    def _ensure_area_id_column(self) -> None:
+        """
+        Idempotent migration: when the table already exists from a previous
+        deployment without the area_id column, add it via ALTER TABLE.
+        """
+        cursor = self.conn.execute("PRAGMA table_info(smart_home_entity_alias)")
+        columns = [row["name"] for row in cursor.fetchall()]
+        if "area_id" not in columns:
+            with self.conn:
+                self.conn.execute(
+                    "ALTER TABLE smart_home_entity_alias ADD COLUMN area_id TEXT"
+                )
 
     def add(self, entity_alias: SmartHomeEntityAlias):
         """
@@ -33,11 +48,16 @@ class SqliteSmartHomeEntityAliasRepository(
         """
         with self.conn:
             self.conn.execute(
-                "INSERT INTO smart_home_entity_alias (id, entity_id, alias, when_created) VALUES (?, ?, ?, ?)",
+                """
+                INSERT INTO smart_home_entity_alias
+                    (id, entity_id, alias, area_id, when_created)
+                VALUES (?, ?, ?, ?, ?)
+                """,
                 (
                     entity_alias.id,
                     entity_alias.entity_id,
                     entity_alias.alias,
+                    entity_alias.area_id,
                     entity_alias.when_created,
                 ),
             )
@@ -47,16 +67,17 @@ class SqliteSmartHomeEntityAliasRepository(
         Get Smart Home Entity Alias by Entity Id
         """
         cursor = self.conn.execute(
-            """SELECT 
-                id, 
-                entity_id, 
+            """SELECT
+                id,
+                entity_id,
                 alias,
-                when_created, 
-                when_updated, 
-                when_deleted 
-            FROM 
+                area_id,
+                when_created,
+                when_updated,
+                when_deleted
+            FROM
                 smart_home_entity_alias
-            WHERE 
+            WHERE
                 entity_id = ?
             """,
             (entity_id,),
@@ -69,16 +90,17 @@ class SqliteSmartHomeEntityAliasRepository(
         Get Smart Home Entity Alias
         """
         cursor = self.conn.execute(
-            """SELECT 
-                id, 
-                entity_id, 
+            """SELECT
+                id,
+                entity_id,
                 alias,
-                when_created, 
-                when_updated, 
-                when_deleted 
-            FROM 
+                area_id,
+                when_created,
+                when_updated,
+                when_deleted
+            FROM
                 smart_home_entity_alias
-            WHERE 
+            WHERE
                 alias like ?
             """,
             (f"%{alias}%",),
@@ -92,14 +114,15 @@ class SqliteSmartHomeEntityAliasRepository(
         """
 
         base_query = """
-            SELECT 
-                id, 
-                entity_id, 
+            SELECT
+                id,
+                entity_id,
                 alias,
-                when_created, 
-                when_updated, 
-                when_deleted 
-            FROM 
+                area_id,
+                when_created,
+                when_updated,
+                when_deleted
+            FROM
                 smart_home_entity_alias
         """
 
@@ -126,6 +149,7 @@ class SqliteSmartHomeEntityAliasRepository(
             id=row["id"],
             entity_id=row["entity_id"],
             alias=row["alias"],
+            area_id=row["area_id"],
             when_created=row["when_created"],
             when_updated=row["when_updated"],
             when_deleted=row["when_deleted"],

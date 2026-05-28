@@ -9,6 +9,8 @@ from domain.commands import (
     LightTurnOn,
 )
 from domain.entities import (
+    ExposedEntity,
+    SmartHomeArea,
     SmartHomeClimate,
     SmartHomeLight,
     SensorReading,
@@ -26,6 +28,14 @@ class SmartHomeLightRepository(ABC):
     async def get_state(self, entity_id: str) -> SmartHomeLight:
         """
         Get entity current state.
+        """
+        pass
+
+    @abstractmethod
+    async def get_all_states(self) -> List[SmartHomeLight]:
+        """
+        Get the current state of every light exposed by the smart home in a
+        single round-trip.
         """
         pass
 
@@ -60,6 +70,20 @@ class SmartHomeConfigurationRepository(ABC):
     async def get_aliases_by_entity_id(self, entity_id: str) -> List[str]:
         """
         Get entity aliases
+        """
+        pass
+
+    @abstractmethod
+    async def get_all_areas(self) -> List[SmartHomeArea]:
+        """
+        Get every area registered in the smart home.
+        """
+        pass
+
+    @abstractmethod
+    async def get_exposed_entities(self) -> List[ExposedEntity]:
+        """
+        Get every exposed entity together with its area_id (denormalized).
         """
         pass
 

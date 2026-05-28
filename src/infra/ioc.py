@@ -12,6 +12,7 @@ from application.graphs.smart_home_cameras_graph import SmartHomeCamerasGraph
 from domain.interfaces.data_repository import (
     ContextRepository,
     ShoppingListRepository,
+    SmartHomeAreaRepository,
     SmartHomeEntityAliasRepository,
     UserRepository,
 )
@@ -44,6 +45,9 @@ from langchain_ollama import ChatOllama
 from langchain_core.language_models.chat_models import BaseChatModel
 from infra.data.sqlite.sqlite_shopping_list_repository import (
     SqliteShoppingListRepository,
+)
+from infra.data.sqlite.sqlite_smart_home_area_repository import (
+    SqliteSmartHomeAreaRepository,
 )
 from infra.data.sqlite.sqlite_smart_home_entity_alias_repository import (
     SqliteSmartHomeEntityAliasRepository,
@@ -137,11 +141,13 @@ def get_smart_home_lights_graph() -> SmartHomeLightsGraph:
 
     smart_home_service = get_smart_home_service()
     smart_home_entity_alias_repository = get_smart_home_entity_alias_repository()
+    smart_home_area_repository = get_smart_home_area_repository()
 
     return SmartHomeLightsGraph(
         llm_chat=llm_chat,
         smart_home_service=smart_home_service,
         smart_home_entity_alias_repository=smart_home_entity_alias_repository,
+        smart_home_area_repository=smart_home_area_repository,
     )
 
 
@@ -292,6 +298,7 @@ def get_smart_home_service() -> SmartHomeService:
         smart_home_climate_repository=get_smart_home_climate_repository(),
         smart_home_sensor_repository=get_smart_home_sensor_repository(),
         smart_home_camera_repository=get_smart_home_camera_repository(),
+        smart_home_area_repository=get_smart_home_area_repository(),
     )
 
 
@@ -337,6 +344,14 @@ def get_smart_home_entity_alias_repository() -> SmartHomeEntityAliasRepository:
     return SqliteSmartHomeEntityAliasRepository(
         db_path=settings.peruca_db_connection_string
     )
+
+
+def get_smart_home_area_repository() -> SmartHomeAreaRepository:
+    """
+    Smart Home Area Repository
+    """
+    settings = Settings()
+    return SqliteSmartHomeAreaRepository(db_path=settings.peruca_db_connection_string)
 
 
 # ====================================

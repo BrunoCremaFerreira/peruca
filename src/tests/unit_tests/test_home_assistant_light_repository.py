@@ -184,3 +184,227 @@ class TestGetStateColorTempKelvin:
             f"Expected color_temp_kelvin=2700 (from kelvin attribute), "
             f"got {result.color_temp_kelvin!r} — likely reading mireds value 370"
         )
+
+
+# ===========================================================================
+# TestGetAllLightsState — TDD (area-based commands feature)
+# ===========================================================================
+#
+# Contract being introduced:
+#   - HomeAssistantSmartHomeLightRepository.get_all_states() returns
+#     List[SmartHomeLight] using ONE HTTP GET to /api/states (no per-entity
+#     fan-out — plan decision #5).
+#   - Must filter the global states list to entries whose entity_id starts
+#     with 'light.'.
+#   - Must map HA state == "unavailable" to SmartHomeLight.is_available=False
+#     (otherwise True). is_on must remain False when the light is unavailable.
+#   - Must propagate HTTP errors (raise_for_status) — no silent swallow.
+
+
+def _make_ha_all_states_response(states: list) -> list:
+    """Simulate a typical /api/states response: a JSON list of state dicts."""
+    return states
+
+
+def _make_state_dict(
+    entity_id: str,
+    state: str = "on",
+    friendly_name: str = None,
+    brightness: int = 200,
+):
+    attrs = {"brightness": brightness}
+    if friendly_name is not None:
+        attrs["friendly_name"] = friendly_name
+    return {
+        "entity_id": entity_id,
+        "state": state,
+        "attributes": attrs,
+    }
+
+
+class TestGetAllLightsState:
+    def test_get_all_lights_state__http_returns_states__maps_lights(self):
+        """
+        Given a /api/states response containing two light entities, the repo
+        must return a list with two SmartHomeLight objects, with entity_id
+        populated from the HA payload.
+        """
+        from domain.entities import SmartHomeLight
+
+        payload = _make_ha_all_states_response(
+            [
+                _make_state_dict(
+                    "light.cozinha_1", state="on", friendly_name="Luz Central"
+                ),
+                _make_state_dict(
+                    "light.sala", state="off", friendly_name="Luz da Sala"
+                ),
+            ]
+        )
+
+        repo = _make_repo()
+        mock_cm_session, _ = _make_mock_session(payload)
+
+        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+            result = asyncio.get_event_loop().run_until_complete(
+                repo.get_all_states()
+            )
+
+        assert isinstance(result, list)
+        assert len(result) == 2, f"Expected 2 lights, got {len(result)}"
+        assert all(isinstance(l, SmartHomeLight) for l in result), (
+            f"Expected List[SmartHomeLight], got {[type(l) for l in result]!r}"
+        )
+        ids = {l.entity_id for l in result}
+        assert ids == {"light.cozinha_1", "light.sala"}
+
+    def test_get_all_lights_state__state_on__is_on_true_and_is_available_true(self):
+        payload = _make_ha_all_states_response(
+            [_make_state_dict("light.cozinha_1", state="on")]
+        )
+
+        repo = _make_repo()
+        mock_cm_session, _ = _make_mock_session(payload)
+
+        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+            result = asyncio.get_event_loop().run_until_complete(
+                repo.get_all_states()
+            )
+
+        assert len(result) == 1
+        light = result[0]
+        assert light.is_on is True, f"Expected is_on=True, got {light.is_on!r}"
+        assert light.is_available is True, (
+            f"Expected is_available=True (state='on'), got {light.is_available!r}"
+        )
+
+    def test_get_all_lights_state__state_off__is_on_false_and_is_available_true(self):
+        payload = _make_ha_all_states_response(
+            [_make_state_dict("light.sala", state="off")]
+        )
+
+        repo = _make_repo()
+        mock_cm_session, _ = _make_mock_session(payload)
+
+        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+            result = asyncio.get_event_loop().run_until_complete(
+                repo.get_all_states()
+            )
+
+        light = result[0]
+        assert light.is_on is False, f"Expected is_on=False, got {light.is_on!r}"
+        assert light.is_available is True, (
+            f"state='off' must still be is_available=True, got {light.is_available!r}"
+        )
+
+    def test_get_all_lights_state__state_unavailable__is_available_false(self):
+        """
+        Plan checkpoint: state='unavailable' must yield is_available=False.
+        is_on must be False (the light is not lit, regardless of unavailability).
+        """
+        payload = _make_ha_all_states_response(
+            [_make_state_dict("light.quebrada", state="unavailable")]
+        )
+
+        repo = _make_repo()
+        mock_cm_session, _ = _make_mock_session(payload)
+
+        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+            result = asyncio.get_event_loop().run_until_complete(
+                repo.get_all_states()
+            )
+
+        light = result[0]
+        assert light.is_available is False, (
+            f"state='unavailable' must produce is_available=False, "
+            f"got {light.is_available!r}"
+        )
+        assert light.is_on is False, (
+            f"Unavailable lights must not be reported as on, got is_on={light.is_on!r}"
+        )
+
+    def test_get_all_lights_state__non_light_entities__filtered_out(self):
+        """
+        Plan checkpoint: get_all_states must filter the /api/states list,
+        returning only entities whose entity_id starts with 'light.'.
+        """
+        payload = _make_ha_all_states_response(
+            [
+                _make_state_dict("light.cozinha_1", state="on"),
+                _make_state_dict("switch.tomada", state="on"),
+                _make_state_dict("climate.sala", state="cool"),
+                _make_state_dict("sensor.temp", state="22.5"),
+                _make_state_dict("light.sala", state="off"),
+            ]
+        )
+
+        repo = _make_repo()
+        mock_cm_session, _ = _make_mock_session(payload)
+
+        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+            result = asyncio.get_event_loop().run_until_complete(
+                repo.get_all_states()
+            )
+
+        ids = sorted(l.entity_id for l in result)
+        assert ids == ["light.cozinha_1", "light.sala"], (
+            f"Only 'light.*' entities expected, got {ids!r}"
+        )
+
+    def test_get_all_lights_state__friendly_name_populated(self):
+        """When HA payload supplies friendly_name, it must be carried to the entity."""
+        payload = _make_ha_all_states_response(
+            [
+                _make_state_dict(
+                    "light.cozinha_1", state="on", friendly_name="Luz Central"
+                )
+            ]
+        )
+
+        repo = _make_repo()
+        mock_cm_session, _ = _make_mock_session(payload)
+
+        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+            result = asyncio.get_event_loop().run_until_complete(
+                repo.get_all_states()
+            )
+
+        assert result[0].friendly_name == "Luz Central", (
+            f"Expected friendly_name='Luz Central', got {result[0].friendly_name!r}"
+        )
+
+    def test_get_all_lights_state__http_error__raises(self):
+        """
+        When raise_for_status throws, the error must propagate (no swallow).
+        """
+        repo = _make_repo()
+        mock_cm_session, mock_session = _make_mock_session([])
+
+        # Force raise_for_status to raise via the response mock.
+        # We re-build the session so the response's raise_for_status raises.
+        mock_resp = AsyncMock()
+        mock_resp.raise_for_status = MagicMock(side_effect=RuntimeError("HTTP 500"))
+        mock_resp.json = AsyncMock(return_value=[])
+        mock_resp.status = 500
+
+        mock_cm_resp = AsyncMock()
+        mock_cm_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_cm_resp.__aexit__ = AsyncMock(return_value=False)
+        mock_session.get = MagicMock(return_value=mock_cm_resp)
+
+        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+            with pytest.raises(RuntimeError):
+                asyncio.get_event_loop().run_until_complete(repo.get_all_states())
+
+    def test_get_all_lights_state__empty_response__returns_empty_list(self):
+        payload = _make_ha_all_states_response([])
+
+        repo = _make_repo()
+        mock_cm_session, _ = _make_mock_session(payload)
+
+        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+            result = asyncio.get_event_loop().run_until_complete(
+                repo.get_all_states()
+            )
+
+        assert result == [], f"Expected [] for empty response, got {result!r}"

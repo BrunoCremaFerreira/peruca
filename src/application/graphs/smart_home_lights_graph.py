@@ -7,9 +7,18 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langgraph.graph import StateGraph, START, END
 from langchain_core.runnables import RunnableLambda
 from domain.commands import LightTurnOn
-from domain.entities import GraphInvokeRequest, SmartHomeEntityAlias
-from domain.interfaces.data_repository import SmartHomeEntityAliasRepository
+from domain.entities import GraphInvokeRequest, SmartHomeEntityAlias, SmartHomeLight
+from domain.exceptions import ValidationError
+from domain.interfaces.data_repository import (
+    SmartHomeAreaRepository,
+    SmartHomeEntityAliasRepository,
+)
 from domain.services.smart_home_service import SmartHomeService
+
+
+_STATUS_LABEL_ON = "Ligada"
+_STATUS_LABEL_OFF = "Desligada"
+_STATUS_LABEL_OFFLINE = "Offline"
 
 
 class SmartHomeLightsGraphState(TypedDict):
@@ -17,6 +26,11 @@ class SmartHomeLightsGraphState(TypedDict):
     intent: Optional[list[str]]
     output_turn_on: Optional[str]
     output_turn_off: Optional[str]
+    output_turn_on_by_area: Optional[str]
+    output_turn_off_by_area: Optional[str]
+    output_turn_on_all: Optional[str]
+    output_turn_off_all: Optional[str]
+    output_list_lights_status: Optional[str]
     output_change_color: Optional[str]
     output_change_bright: Optional[str]
     output_change_mode: Optional[str]
@@ -35,10 +49,12 @@ class SmartHomeLightsGraph(Graph):
         llm_chat: BaseChatModel,
         smart_home_service: SmartHomeService,
         smart_home_entity_alias_repository: SmartHomeEntityAliasRepository,
+        smart_home_area_repository: Optional[SmartHomeAreaRepository] = None,
     ):
         self.llm_chat = llm_chat
         self.smart_home_service = smart_home_service
         self.smart_home_entity_alias_repository = smart_home_entity_alias_repository
+        self.smart_home_area_repository = smart_home_area_repository
         self.classification_prompt = ChatPromptTemplate.from_template(
             self.load_prompt("smart_home_lights_graph.md")
         )
@@ -53,20 +69,7 @@ class SmartHomeLightsGraph(Graph):
         """
         print(f"[SmartHomeLightsGraph._classify_intent]: input={data['input']}")
 
-        chain = self.classification_prompt | self.llm_chat
-        response = chain.invoke({"input": data["input"]})
-        cleaned = self._remove_thinking_tag(response.content)
-
-        print(f"[SmartHomeLightsGraph._classify_intent]: raw_output={cleaned}")
-
         try:
-            try:
-                parsed = json.loads(cleaned) if isinstance(cleaned, str) else cleaned
-            except (json.JSONDecodeError, ValueError):
-                parsed = {}
-            intents = parsed.get("intents", ["not_recognized"])
-
-            # Getting all entity_id x alias for lights devices
             entity_alias_list: List[SmartHomeEntityAlias] = (
                 self.smart_home_entity_alias_repository.get_all(
                     entity_id_starts_with="light."
@@ -75,22 +78,56 @@ class SmartHomeLightsGraph(Graph):
             entity_alias_dict = {
                 item.alias: item.entity_id for item in entity_alias_list
             }
-
-        except Exception as e:
-            print(f"[SmartHomeLightsGraph._classify_intent][ERROR]: {e}")
-            parsed = {}
-            intents = ["not_recognized"]
+        except Exception as error:
+            print(
+                f"[SmartHomeLightsGraph._classify_intent][ERROR][aliases]: {error}"
+            )
             entity_alias_dict = {}
+
+        available_areas_csv = self._load_available_areas_csv()
+
+        chain = self.classification_prompt | self.llm_chat
+        invoke_payload = {
+            "input": data["input"],
+            "available_entities": str(entity_alias_dict),
+            "available_areas": available_areas_csv,
+        }
+        try:
+            response = chain.invoke(invoke_payload)
+        except KeyError:
+            # Test stubs may use a template with only {input}; retry minimal.
+            response = chain.invoke({"input": data["input"]})
+        cleaned = self._remove_thinking_tag(response.content)
+
+        print(f"[SmartHomeLightsGraph._classify_intent]: raw_output={cleaned}")
+
+        try:
+            parsed = json.loads(cleaned) if isinstance(cleaned, str) else cleaned
+            if not isinstance(parsed, dict):
+                parsed = {}
+        except (json.JSONDecodeError, ValueError):
+            parsed = {}
+
+        intents = parsed.get("intents", ["not_recognized"]) or ["not_recognized"]
 
         return {
             "intent": intents,
             "input": data["input"],
-            "output_turn_on": parsed.get("turn_on"),
-            "output_turn_off": parsed.get("turn_off"),
-            "output_change_color": parsed.get("change_color"),
-            "output_change_bright": parsed.get("change_bright"),
-            "output_change_mode": parsed.get("change_mode"),
-            "output_not_recognized": parsed.get("not_recognized"),
+            "output_turn_on": parsed.get("turn_on") or None,
+            "output_turn_off": parsed.get("turn_off") or None,
+            "output_turn_on_by_area": self._coerce_area_payload(
+                parsed.get("turn_on_by_area")
+            ),
+            "output_turn_off_by_area": self._coerce_area_payload(
+                parsed.get("turn_off_by_area")
+            ),
+            "output_turn_on_all": parsed.get("turn_on_all") or None,
+            "output_turn_off_all": parsed.get("turn_off_all") or None,
+            "output_list_lights_status": parsed.get("list_lights_status") or None,
+            "output_change_color": parsed.get("change_color") or None,
+            "output_change_bright": parsed.get("change_bright") or None,
+            "output_change_mode": parsed.get("change_mode") or None,
+            "output_not_recognized": parsed.get("not_recognized") or None,
             "available_entities": entity_alias_dict,
         }
 
@@ -136,6 +173,129 @@ class SmartHomeLightsGraph(Graph):
             asyncio.run(self.smart_home_service.light_turn_off(entity_id=entity_id))
 
         return {"output_turn_off": devices}
+
+    def _handle_turn_on_by_area(self, data):
+        payload = data.get("output_turn_on_by_area")
+        print(f"[SmartHomeLightsGraph._handle_turn_on_by_area]: {payload}")
+
+        areas = self._split_area_payload(payload)
+        if not areas:
+            return {}
+
+        async def _run_all():
+            for area in areas:
+                await self.smart_home_service.turn_on_by_area(area_alias=area)
+
+        try:
+            asyncio.run(_run_all())
+        except ValidationError as error:
+            print(f"[SmartHomeLightsGraph._handle_turn_on_by_area][ERROR]: {error}")
+            return {
+                "output_turn_on_by_area": (
+                    f"Cômodo não encontrado: {', '.join(areas)}"
+                )
+            }
+        except Exception as error:
+            print(f"[SmartHomeLightsGraph._handle_turn_on_by_area][ERROR]: {error}")
+            return {
+                "output_turn_on_by_area": (
+                    f"Falha ao ligar as luzes: {', '.join(areas)}"
+                )
+            }
+
+        return {"output_turn_on_by_area": f"Luzes ligadas: {', '.join(areas)}"}
+
+    def _handle_turn_off_by_area(self, data):
+        payload = data.get("output_turn_off_by_area")
+        print(f"[SmartHomeLightsGraph._handle_turn_off_by_area]: {payload}")
+
+        areas = self._split_area_payload(payload)
+        if not areas:
+            return {}
+
+        async def _run_all():
+            for area in areas:
+                await self.smart_home_service.turn_off_by_area(area_alias=area)
+
+        try:
+            asyncio.run(_run_all())
+        except ValidationError as error:
+            print(f"[SmartHomeLightsGraph._handle_turn_off_by_area][ERROR]: {error}")
+            return {
+                "output_turn_off_by_area": (
+                    f"Cômodo não encontrado: {', '.join(areas)}"
+                )
+            }
+        except Exception as error:
+            print(f"[SmartHomeLightsGraph._handle_turn_off_by_area][ERROR]: {error}")
+            return {
+                "output_turn_off_by_area": (
+                    f"Falha ao desligar as luzes: {', '.join(areas)}"
+                )
+            }
+
+        return {"output_turn_off_by_area": f"Luzes desligadas: {', '.join(areas)}"}
+
+    def _handle_turn_on_all(self, data):
+        payload = data.get("output_turn_on_all")
+        print(f"[SmartHomeLightsGraph._handle_turn_on_all]: {payload}")
+
+        if not payload:
+            return {}
+
+        try:
+            asyncio.run(self.smart_home_service.turn_on_all_house())
+        except Exception as error:
+            print(f"[SmartHomeLightsGraph._handle_turn_on_all][ERROR]: {error}")
+            return {"output_turn_on_all": "Falha ao ligar todas as luzes"}
+
+        return {"output_turn_on_all": "Todas as luzes da casa foram ligadas"}
+
+    def _handle_turn_off_all(self, data):
+        payload = data.get("output_turn_off_all")
+        print(f"[SmartHomeLightsGraph._handle_turn_off_all]: {payload}")
+
+        if not payload:
+            return {}
+
+        try:
+            asyncio.run(self.smart_home_service.turn_off_all_house())
+        except Exception as error:
+            print(f"[SmartHomeLightsGraph._handle_turn_off_all][ERROR]: {error}")
+            return {"output_turn_off_all": "Falha ao desligar todas as luzes"}
+
+        return {"output_turn_off_all": "Todas as luzes da casa foram desligadas"}
+
+    def _handle_list_lights_status(self, data):
+        payload = data.get("output_list_lights_status")
+        print(f"[SmartHomeLightsGraph._handle_list_lights_status]: {payload}")
+
+        if not payload:
+            return {}
+
+        try:
+            grouped = asyncio.run(
+                self.smart_home_service.list_lights_grouped_by_area()
+            )
+        except Exception as error:
+            print(
+                f"[SmartHomeLightsGraph._handle_list_lights_status][ERROR]: {error}"
+            )
+            return {
+                "output_list_lights_status": (
+                    "Não consegui consultar o estado das luzes agora."
+                )
+            }
+
+        if not grouped:
+            return {
+                "output_list_lights_status": (
+                    "Não há luzes registradas para consultar."
+                )
+            }
+
+        formatted = self._format_lights_grouped(grouped)
+        return {"output_list_lights_status": formatted}
 
     def _handle_change_color(self, data):
         devices = data.get("output_change_color", "")
@@ -214,6 +374,16 @@ class SmartHomeLightsGraph(Graph):
             parts.append(f"Ligado: {data['output_turn_on']}")
         if data.get("output_turn_off"):
             parts.append(f"Desligado: {data['output_turn_off']}")
+        if data.get("output_turn_on_by_area"):
+            parts.append(str(data["output_turn_on_by_area"]))
+        if data.get("output_turn_off_by_area"):
+            parts.append(str(data["output_turn_off_by_area"]))
+        if data.get("output_turn_on_all"):
+            parts.append(str(data["output_turn_on_all"]))
+        if data.get("output_turn_off_all"):
+            parts.append(str(data["output_turn_off_all"]))
+        if data.get("output_list_lights_status"):
+            parts.append(str(data["output_list_lights_status"]))
         if data.get("output_change_color"):
             parts.append(f"Cor alterada: {data['output_change_color']}")
         if data.get("output_change_bright"):
@@ -222,7 +392,9 @@ class SmartHomeLightsGraph(Graph):
             parts.append(f"Modo alterado: {data['output_change_mode']}")
         if data.get("output_not_recognized"):
             parts.append("Dispositivo nao reconhecido")
-        return {"output": ". ".join(parts) if parts else "Nenhuma acao executada"}
+        if not parts:
+            return {"output": "Nenhuma acao executada"}
+        return {"output": "\n".join(parts)}
 
     def _handle_not_recognized(self, data):
         print(f"[SmartHomeLightsGraph.handle_not_recognized]: Triggered...")
@@ -238,6 +410,17 @@ class SmartHomeLightsGraph(Graph):
         workflow.add_node("classify", RunnableLambda(self._classify_intent))
         workflow.add_node("turn_on", RunnableLambda(self._handle_turn_on))
         workflow.add_node("turn_off", RunnableLambda(self._handle_turn_off))
+        workflow.add_node(
+            "turn_on_by_area", RunnableLambda(self._handle_turn_on_by_area)
+        )
+        workflow.add_node(
+            "turn_off_by_area", RunnableLambda(self._handle_turn_off_by_area)
+        )
+        workflow.add_node("turn_on_all", RunnableLambda(self._handle_turn_on_all))
+        workflow.add_node("turn_off_all", RunnableLambda(self._handle_turn_off_all))
+        workflow.add_node(
+            "list_lights_status", RunnableLambda(self._handle_list_lights_status)
+        )
         workflow.add_node("change_color", RunnableLambda(self._handle_change_color))
         workflow.add_node("change_bright", RunnableLambda(self._handle_change_bright))
         workflow.add_node("change_mode", RunnableLambda(self._handle_change_mode))
@@ -253,6 +436,11 @@ class SmartHomeLightsGraph(Graph):
         nodes = [
             "turn_on",
             "turn_off",
+            "turn_on_by_area",
+            "turn_off_by_area",
+            "turn_on_all",
+            "turn_off_all",
+            "list_lights_status",
             "change_color",
             "change_bright",
             "change_mode",
@@ -265,6 +453,77 @@ class SmartHomeLightsGraph(Graph):
         workflow.add_edge("final_response", END)
 
         return workflow.compile()
+
+    def _load_available_areas_csv(self) -> str:
+        """
+        Build a comma-separated list of area names so the prompt can render
+        the catalog inline ({available_areas}). Falls back to "" when no
+        repository is wired (test stubs and legacy deployments).
+        """
+        if self.smart_home_area_repository is None:
+            return ""
+        try:
+            areas = self.smart_home_area_repository.get_all()
+        except Exception as error:
+            print(
+                f"[SmartHomeLightsGraph._load_available_areas_csv][ERROR]: {error}"
+            )
+            return ""
+        return ", ".join(area.name for area in areas if area.name)
+
+    def _coerce_area_payload(self, value):
+        """
+        Normalize the LLM area payload to a value the area handlers can
+        consume directly: list -> list, non-empty string -> string, anything
+        else -> None.
+        """
+        if isinstance(value, list):
+            cleaned = [str(item).strip() for item in value if str(item).strip()]
+            return cleaned or None
+        if isinstance(value, str):
+            return value if value.strip() else None
+        return None
+
+    def _split_area_payload(self, payload) -> List[str]:
+        """
+        Accept either a list or a pipe-delimited string. Returns an ordered,
+        de-duplicated list of trimmed area names. Empty payloads return [].
+        """
+        if payload is None:
+            return []
+        if isinstance(payload, list):
+            candidates = [str(item).strip() for item in payload]
+        else:
+            candidates = [chunk.strip() for chunk in str(payload).split("|")]
+        result: List[str] = []
+        seen: set = set()
+        for area in candidates:
+            if not area or area in seen:
+                continue
+            seen.add(area)
+            result.append(area)
+        return result
+
+    def _format_lights_grouped(self, grouped) -> str:
+        """
+        Format the grouped lights payload as canonical text used by the
+        response prompt (and also returned as-is when no LLM polishing is
+        required by the tests).
+        """
+        lines: List[str] = []
+        for area_name, lights in grouped.items():
+            lines.append(f"**{area_name}**")
+            for light in lights:
+                label = self._light_status_label(light)
+                name = light.friendly_name or light.entity_id
+                lines.append(f"- {name}: {label}")
+            lines.append("")
+        return "\n".join(lines).strip()
+
+    def _light_status_label(self, light: SmartHomeLight) -> str:
+        if light.is_available is False:
+            return _STATUS_LABEL_OFFLINE
+        return _STATUS_LABEL_ON if light.is_on else _STATUS_LABEL_OFF
 
     def _find_entity_ids(
         self, entity_alias_delimited_str: str, available_entities

@@ -1,4 +1,5 @@
 from dataclasses import asdict
+from typing import List
 import aiohttp
 from domain.commands import LightTurnOn
 from domain.entities import SmartHomeLight
@@ -58,6 +59,53 @@ class HomeAssistantSmartHomeLightRepository(SmartHomeLightRepository):
             supported_color_modes=attributes.get("supported_color_modes", []),
             xy_color=attributes.get("xy_color"),
         )
+
+    async def get_all_states(self) -> List["SmartHomeLight"]:
+        """
+        Fetch every entity in /api/states in a single round-trip and return the
+        ones whose entity_id starts with 'light.'.
+
+        Maps state == 'unavailable' to is_available=False (is_on=False).
+        Other states map is_available=True and is_on=(state == 'on').
+        """
+        url = f"{self.base_url}/api/states"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=self.headers, ssl=self._ssl) as resp:
+                resp.raise_for_status()
+                data = await resp.json()
+
+        lights: List[SmartHomeLight] = []
+        for item in data or []:
+            entity_id = item.get("entity_id", "")
+            if not entity_id.startswith("light."):
+                continue
+
+            state = item.get("state")
+            attributes = item.get("attributes", {}) or {}
+            is_unavailable = state == "unavailable"
+
+            lights.append(
+                SmartHomeLight(
+                    entity_id=entity_id,
+                    brightness=attributes.get("brightness"),
+                    color_mode=attributes.get("color_mode"),
+                    color_temp_kelvin=attributes.get("color_temp_kelvin"),
+                    effect=attributes.get("effect"),
+                    effect_list=attributes.get("effect_list", []),
+                    hs_color=attributes.get("hs_color"),
+                    is_on=(state == "on"),
+                    max_color_temp_kelvin=attributes.get("max_color_temp_kelvin"),
+                    min_color_temp_kelvin=attributes.get("min_color_temp_kelvin"),
+                    rgb_color=attributes.get("rgb_color"),
+                    rgbw_color=attributes.get("rgbw_color"),
+                    rgbww_color=attributes.get("rgbww_color"),
+                    supported_color_modes=attributes.get("supported_color_modes", []),
+                    xy_color=attributes.get("xy_color"),
+                    friendly_name=attributes.get("friendly_name"),
+                    is_available=not is_unavailable,
+                )
+            )
+        return lights
 
     async def turn_on(self, turn_on_command: "LightTurnOn") -> dict:
         """

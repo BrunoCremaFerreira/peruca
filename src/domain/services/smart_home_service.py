@@ -1,27 +1,50 @@
-from typing import List, Optional
+import unicodedata
 import uuid
+from typing import Dict, List, Optional
+
 from domain.commands import (
-    LightTurnOn,
-    ClimateSetTemperature,
     ClimateSetHvacMode,
-    ClimateTurnOn,
+    ClimateSetTemperature,
     ClimateTurnOff,
+    ClimateTurnOn,
+    LightTurnOn,
 )
 from domain.entities import (
-    SmartHomeEntityAlias,
-    SmartHomeClimate,
     SensorReading,
     SmartHomeCamera,
     SmartHomeCameraSnapshot,
+    SmartHomeClimate,
+    SmartHomeEntityAlias,
+    SmartHomeLight,
 )
-from domain.interfaces.data_repository import SmartHomeEntityAliasRepository
+from domain.exceptions import NofFoundValidationError
+from domain.interfaces.data_repository import (
+    SmartHomeAreaRepository,
+    SmartHomeEntityAliasRepository,
+)
 from domain.interfaces.smart_home_repository import (
+    SmartHomeCameraRepository,
+    SmartHomeClimateRepository,
     SmartHomeConfigurationRepository,
     SmartHomeLightRepository,
-    SmartHomeClimateRepository,
     SmartHomeSensorRepository,
-    SmartHomeCameraRepository,
 )
+
+
+_UNASSIGNED_AREA_LABEL = "Sem cômodo"
+
+
+def _normalize(value: Optional[str]) -> str:
+    """
+    Normalize a string by stripping accents and lowercasing. Used to resolve
+    user-provided area names against SmartHomeArea.name in a deterministic,
+    case- and accent-insensitive way.
+    """
+    if value is None:
+        return ""
+    decomposed = unicodedata.normalize("NFD", value)
+    stripped = decomposed.encode("ascii", "ignore").decode("ascii")
+    return stripped.lower().strip()
 
 
 class SmartHomeService:
@@ -37,6 +60,7 @@ class SmartHomeService:
         smart_home_climate_repository: SmartHomeClimateRepository,
         smart_home_sensor_repository: Optional[SmartHomeSensorRepository] = None,
         smart_home_camera_repository: Optional[SmartHomeCameraRepository] = None,
+        smart_home_area_repository: Optional[SmartHomeAreaRepository] = None,
     ):
         self.smart_home_light_repository = smart_home_light_repository
         self.smart_home_configuration_repository = smart_home_configuration_repository
@@ -44,14 +68,18 @@ class SmartHomeService:
         self.smart_home_climate_repository = smart_home_climate_repository
         self.smart_home_sensor_repository = smart_home_sensor_repository
         self.smart_home_camera_repository = smart_home_camera_repository
+        self.smart_home_area_repository = smart_home_area_repository
 
     async def update_entity_aliases(self) -> None:
         """
-        Update all entities aliases
+        Update all entities aliases. Also refreshes the SmartHomeArea catalog
+        when an area repository is configured.
         """
         try:
             # Get all entity ids exposed to Virtual Asistant
-            exposed_entities_ids = await self.smart_home_configuration_repository.get_all_exposed_entities_ids()
+            exposed_entities_ids = (
+                await self.smart_home_configuration_repository.get_all_exposed_entities_ids()
+            )
 
             entity_alias_to_add: List[SmartHomeEntityAlias] = []
 
@@ -83,8 +111,167 @@ class SmartHomeService:
                     f"[smart_home_service]: Adding alias for entity '{item.entity_id}' => '{item.alias}'"
                 )
                 self.smart_home_entity_alias_repository.add(entity_alias=item)
+
+            # Refresh the area catalog (if an area repository is configured)
+            if self.smart_home_area_repository is not None:
+                try:
+                    areas = (
+                        await self.smart_home_configuration_repository.get_all_areas()
+                    )
+                except Exception as error:
+                    print(f"[smart_home_service]: Failed to fetch areas: {error}")
+                    areas = []
+
+                print(f"[smart_home_service]: Removing all SmartHomeArea entries")
+                self.smart_home_area_repository.delete_all()
+                for area in areas:
+                    print(
+                        f"[smart_home_service]: Adding area '{area.area_id}' => '{area.name}'"
+                    )
+                    self.smart_home_area_repository.add(area)
         finally:
             await self.smart_home_configuration_repository.close()
+
+    async def list_lights_grouped_by_area(
+        self,
+    ) -> Dict[str, List[SmartHomeLight]]:
+        """
+        List every light grouped by its area human name. Lights whose area_id
+        is None (or unknown) are bucketed under the canonical label
+        'Sem cômodo'.
+        """
+        self._require_area_repository("list_lights_grouped_by_area")
+
+        lights = await self.smart_home_light_repository.get_all_states()
+        areas = await self.smart_home_configuration_repository.get_all_areas()
+
+        area_id_to_name: Dict[str, str] = {area.area_id: area.name for area in areas}
+
+        grouping: Dict[str, List[SmartHomeLight]] = {}
+        for light in lights:
+            area_label = area_id_to_name.get(light.area_id) if light.area_id else None
+            label = area_label if area_label else _UNASSIGNED_AREA_LABEL
+            grouping.setdefault(label, []).append(light)
+
+        return grouping
+
+    async def turn_on_by_area(self, area_alias: str) -> None:
+        """
+        Turn on every light belonging to the given area.
+        Raises NofFoundValidationError when the area cannot be resolved.
+        """
+        entity_ids = self.find_entity_ids_by_area(
+            area_alias=area_alias, entity_prefix="light."
+        )
+        for entity_id in entity_ids:
+            try:
+                await self.smart_home_light_repository.turn_on(
+                    turn_on_command=LightTurnOn(entity_id=entity_id)
+                )
+            except Exception as error:
+                print(
+                    f"[smart_home_service]: turn_on_by_area failed for '{entity_id}': {error}"
+                )
+                continue
+
+    async def turn_off_by_area(self, area_alias: str) -> None:
+        """
+        Turn off every light belonging to the given area.
+        Raises NofFoundValidationError when the area cannot be resolved.
+        """
+        entity_ids = self.find_entity_ids_by_area(
+            area_alias=area_alias, entity_prefix="light."
+        )
+        for entity_id in entity_ids:
+            try:
+                await self.smart_home_light_repository.turn_off(entity_id=entity_id)
+            except Exception as error:
+                print(
+                    f"[smart_home_service]: turn_off_by_area failed for '{entity_id}': {error}"
+                )
+                continue
+
+    async def turn_on_all_house(self) -> None:
+        """
+        Turn on every light in the house. Partial failures are logged but do
+        not abort the loop.
+        """
+        lights = await self.smart_home_light_repository.get_all_states()
+        for light in lights:
+            try:
+                await self.smart_home_light_repository.turn_on(
+                    turn_on_command=LightTurnOn(entity_id=light.entity_id)
+                )
+            except Exception as error:
+                print(
+                    f"[smart_home_service]: turn_on_all_house failed for '{light.entity_id}': {error}"
+                )
+                continue
+
+    async def turn_off_all_house(self) -> None:
+        """
+        Turn off every light in the house. Partial failures are logged but do
+        not abort the loop.
+        """
+        lights = await self.smart_home_light_repository.get_all_states()
+        for light in lights:
+            try:
+                await self.smart_home_light_repository.turn_off(
+                    entity_id=light.entity_id
+                )
+            except Exception as error:
+                print(
+                    f"[smart_home_service]: turn_off_all_house failed for '{light.entity_id}': {error}"
+                )
+                continue
+
+    def find_entity_ids_by_area(
+        self, area_alias: str, entity_prefix: str
+    ) -> List[str]:
+        """
+        Resolve a user-provided area name into the list of entity_ids that
+        belong to that area and match the given entity prefix.
+
+        Resolution is deterministic (no LLM): the area alias is compared to
+        SmartHomeArea.name after NFD-stripping accents and lowercasing.
+        """
+        self._require_area_repository("find_entity_ids_by_area")
+
+        normalized_alias = _normalize(area_alias)
+        areas = self.smart_home_area_repository.get_all()
+        matching_area = next(
+            (area for area in areas if _normalize(area.name) == normalized_alias),
+            None,
+        )
+        if matching_area is None:
+            raise NofFoundValidationError(
+                entity_name="SmartHomeArea", key_name="name", value=area_alias
+            )
+
+        aliases = self.smart_home_entity_alias_repository.get_all(
+            entity_id_starts_with=entity_prefix
+        )
+
+        seen: set = set()
+        entity_ids: List[str] = []
+        for alias in aliases:
+            if alias.area_id != matching_area.area_id:
+                continue
+            if not alias.entity_id.startswith(entity_prefix):
+                continue
+            if alias.entity_id in seen:
+                continue
+            seen.add(alias.entity_id)
+            entity_ids.append(alias.entity_id)
+        return entity_ids
+
+    def _require_area_repository(self, method_name: str) -> None:
+        if self.smart_home_area_repository is None:
+            raise RuntimeError(
+                f"SmartHomeService.{method_name}() requires an "
+                f"area_repository — pass smart_home_area_repository in the "
+                f"constructor."
+            )
 
     async def light_turn_on(self, turn_on_command: LightTurnOn) -> dict:
         await self.smart_home_light_repository.turn_on(turn_on_command=turn_on_command)

@@ -6,6 +6,7 @@ from websockets.asyncio.client import connect as websockets_connect
 from websockets.exceptions import ConnectionClosed
 
 from typing import List
+from domain.entities import ExposedEntity, SmartHomeArea
 from domain.interfaces.smart_home_repository import SmartHomeConfigurationRepository
 
 
@@ -146,6 +147,53 @@ class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationReposi
             raise Exception(f"Error while fetching states: {response}")
 
         return response.get("result", {}).get("aliases", [])
+
+    async def get_all_areas(self) -> List[SmartHomeArea]:
+        """
+        Return every area registered in the Home Assistant area registry.
+        """
+        if self._ws is None:
+            await self._connect()
+
+        response = await self._send({"type": "config/area_registry/list"})
+
+        if "result" not in response:
+            raise Exception(f"Error while fetching areas: {response}")
+
+        return [
+            SmartHomeArea(
+                area_id=area.get("area_id", ""),
+                name=area.get("name", ""),
+            )
+            for area in response["result"]
+        ]
+
+    async def get_exposed_entities(self) -> List[ExposedEntity]:
+        """
+        Return every entity flagged as exposed to the conversation agent,
+        carrying the entity_id and the (possibly None) area_id.
+        """
+        if self._ws is None:
+            await self._connect()
+
+        response = await self._send({"type": "config/entity_registry/list"})
+
+        if "result" not in response:
+            raise Exception(f"Error while fetching entities: {response}")
+
+        exposed_entities: List[ExposedEntity] = []
+        for entity in response["result"]:
+            options = entity.get("options") or {}
+            conversation = options.get("conversation") or {}
+            if not conversation.get("should_expose", False):
+                continue
+            exposed_entities.append(
+                ExposedEntity(
+                    entity_id=entity["entity_id"],
+                    area_id=entity.get("area_id"),
+                )
+            )
+        return exposed_entities
 
     async def close(self):
         """Close the WebSocket connection."""

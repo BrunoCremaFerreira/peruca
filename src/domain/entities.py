@@ -44,6 +44,25 @@ class ShoppingListItem(BaseEntity):
 class SmartHomeEntityAlias(BaseEntity):
     entity_id: str = ""
     alias: str = ""
+    area_id: Optional[str] = None
+
+
+# ====================================
+# Smart Home Area
+# ====================================
+@dataclass
+class SmartHomeArea(BaseEntity):
+    area_id: str = ""
+    name: str = ""
+
+
+# ====================================
+# Smart Home Exposed Entity (DTO returned by configuration repository)
+# ====================================
+@dataclass
+class ExposedEntity:
+    entity_id: str
+    area_id: Optional[str] = None
 
 
 # ====================================
@@ -158,6 +177,9 @@ class SmartHomeLight:
     rgbww_color: Optional[Tuple[int, int, int, int, int]] = None
     supported_color_modes: List["SmartHomeColorMode"] = None
     xy_color: Optional[Tuple[float, float]] = None
+    area_id: Optional[str] = None
+    friendly_name: Optional[str] = None
+    is_available: Optional[bool] = None
 
 
 # Smart Home Climate Related Classes
