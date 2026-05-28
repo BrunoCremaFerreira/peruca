@@ -22,8 +22,8 @@ from domain.entities import SmartHomeCamera, SmartHomeCameraSnapshot
 # TestSmartHomeCameraEntity
 # ===========================================================================
 
-class TestSmartHomeCameraEntity:
 
+class TestSmartHomeCameraEntity:
     def test_smart_home_camera__create_with_required_fields_only__succeeds(self):
         """
         SmartHomeCamera must be constructable with only entity_id and state.
@@ -34,9 +34,7 @@ class TestSmartHomeCameraEntity:
         assert camera.entity_id == "camera.cozinha", (
             f"Expected entity_id='camera.cozinha', got {camera.entity_id!r}"
         )
-        assert camera.state == "idle", (
-            f"Expected state='idle', got {camera.state!r}"
-        )
+        assert camera.state == "idle", f"Expected state='idle', got {camera.state!r}"
 
     def test_smart_home_camera__optional_friendly_name_defaults_to_none(self):
         """When friendly_name is not supplied it must default to None."""
@@ -119,9 +117,11 @@ class TestSmartHomeCameraEntity:
 # TestSmartHomeCameraSnapshotEntity
 # ===========================================================================
 
-class TestSmartHomeCameraSnapshotEntity:
 
-    def test_smart_home_camera_snapshot__create_with_required_fields_only__succeeds(self):
+class TestSmartHomeCameraSnapshotEntity:
+    def test_smart_home_camera_snapshot__create_with_required_fields_only__succeeds(
+        self,
+    ):
         """
         SmartHomeCameraSnapshot must be constructable with entity_id and image_bytes.
         content_type must default to 'image/jpeg'.

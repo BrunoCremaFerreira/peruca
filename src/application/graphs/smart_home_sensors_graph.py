@@ -28,10 +28,12 @@ class SmartHomeSensorsGraph(Graph):
     Smart Home Sensors Graph — handles sensor state queries and history queries.
     """
 
-    def __init__(self,
-                 llm_chat: BaseChatModel,
-                 smart_home_service: SmartHomeService,
-                 smart_home_entity_alias_repository: SmartHomeEntityAliasRepository):
+    def __init__(
+        self,
+        llm_chat: BaseChatModel,
+        smart_home_service: SmartHomeService,
+        smart_home_entity_alias_repository: SmartHomeEntityAliasRepository,
+    ):
         self.llm_chat = llm_chat
         self.smart_home_service = smart_home_service
         self.smart_home_entity_alias_repository = smart_home_entity_alias_repository
@@ -54,7 +56,9 @@ class SmartHomeSensorsGraph(Graph):
 
         try:
             try:
-                parsed = json.loads(cleaned) if isinstance(cleaned, str) and cleaned else {}
+                parsed = (
+                    json.loads(cleaned) if isinstance(cleaned, str) and cleaned else {}
+                )
             except (json.JSONDecodeError, ValueError):
                 parsed = {}
 
@@ -105,10 +109,14 @@ class SmartHomeSensorsGraph(Graph):
                     self.smart_home_service.sensor_get_state(entity_id)
                 )
                 name = reading.friendly_name or reading.entity_id
-                value = f"{reading.state} {reading.unit}" if reading.unit else reading.state
+                value = (
+                    f"{reading.state} {reading.unit}" if reading.unit else reading.state
+                )
                 lines.append(f"{name}: {value}")
             except Exception as exc:
-                print(f"[SmartHomeSensorsGraph._handle_query_current_state][ERROR]: {exc}")
+                print(
+                    f"[SmartHomeSensorsGraph._handle_query_current_state][ERROR]: {exc}"
+                )
                 lines.append(f"{entity_id}: estado indisponível")
 
         return {"output_query_current_state": "\n".join(lines) if lines else ""}
@@ -126,7 +134,9 @@ class SmartHomeSensorsGraph(Graph):
         hours_back = int(parts[2]) if len(parts) > 2 and parts[2] else 3
 
         available_entities = data.get("available_entities", {})
-        entity_ids = self._find_entity_ids(f"{sensor_type}|{location}", available_entities)
+        entity_ids = self._find_entity_ids(
+            f"{sensor_type}|{location}", available_entities
+        )
 
         lines = []
         for entity_id in entity_ids:
@@ -155,10 +165,14 @@ class SmartHomeSensorsGraph(Graph):
 
     def _handle_not_recognized(self, data):
         print(f"[SmartHomeSensorsGraph._handle_not_recognized]: Triggered...")
-        return {"output_not_recognized": "Não consegui identificar qual sensor você quer consultar."}
+        return {
+            "output_not_recognized": "Não consegui identificar qual sensor você quer consultar."
+        }
 
     def _handle_final_response(self, data):
-        print(f"[SmartHomeSensorsGraph._handle_final_response]: Aggregating response...")
+        print(
+            f"[SmartHomeSensorsGraph._handle_final_response]: Aggregating response..."
+        )
 
         sensor_data_parts = []
         if data.get("output_query_current_state"):
@@ -166,7 +180,9 @@ class SmartHomeSensorsGraph(Graph):
         if data.get("output_query_history"):
             sensor_data_parts.append(data["output_query_history"])
         if data.get("output_not_recognized"):
-            return {"output": "Não consegui identificar qual sensor você quer consultar."}
+            return {
+                "output": "Não consegui identificar qual sensor você quer consultar."
+            }
 
         sensor_data = "\n".join(sensor_data_parts)
 
@@ -174,10 +190,12 @@ class SmartHomeSensorsGraph(Graph):
             self.load_prompt("smart_home_sensors_graph_response.md")
         )
         chain = response_template | self.llm_chat
-        llm_response = chain.invoke({
-            "user_question": data["input"],
-            "sensor_data": sensor_data,
-        })
+        llm_response = chain.invoke(
+            {
+                "user_question": data["input"],
+                "sensor_data": sensor_data,
+            }
+        )
         return {"output": self._remove_thinking_tag(llm_response.content)}
 
     # ===============================================
@@ -188,7 +206,9 @@ class SmartHomeSensorsGraph(Graph):
         workflow = StateGraph(SmartHomeSensorsGraphState)
 
         workflow.add_node("classify", RunnableLambda(self._classify_intent))
-        workflow.add_node("query_current_state", RunnableLambda(self._handle_query_current_state))
+        workflow.add_node(
+            "query_current_state", RunnableLambda(self._handle_query_current_state)
+        )
         workflow.add_node("query_history", RunnableLambda(self._handle_query_history))
         workflow.add_node("not_recognized", RunnableLambda(self._handle_not_recognized))
         workflow.add_node("final_response", RunnableLambda(self._handle_final_response))
@@ -207,21 +227,21 @@ class SmartHomeSensorsGraph(Graph):
 
         return workflow.compile()
 
-    def _find_entity_ids(self, entity_alias_delimited_str: str, available_entities: dict) -> List[str]:
+    def _find_entity_ids(
+        self, entity_alias_delimited_str: str, available_entities: dict
+    ) -> List[str]:
         parser_template = ChatPromptTemplate.from_template(
             self.load_prompt("smart_home_sensors_graph_id_parser_by_alias.md")
         )
 
         prompt = parser_template.format(
-            input=entity_alias_delimited_str,
-            available_entities=str(available_entities)
+            input=entity_alias_delimited_str, available_entities=str(available_entities)
         )
 
         async def _invoke_with_timeout():
             try:
                 response = await asyncio.wait_for(
-                    self.llm_chat.ainvoke(prompt),
-                    timeout=15
+                    self.llm_chat.ainvoke(prompt), timeout=15
                 )
                 return self._remove_thinking_tag(response.content).strip()
             except asyncio.TimeoutError:

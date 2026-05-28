@@ -7,7 +7,12 @@ try:
     from infra.data.external.smart_home.home_assistant.home_assistant_smart_home_climate_repository import (
         HomeAssistantSmartHomeClimateRepository,
     )
-    from domain.commands import ClimateSetTemperature, ClimateSetHvacMode, ClimateTurnOn, ClimateTurnOff
+    from domain.commands import (
+        ClimateSetTemperature,
+        ClimateSetHvacMode,
+        ClimateTurnOn,
+        ClimateTurnOff,
+    )
     from domain.entities import SmartHomeClimate, SmartHomeHvacMode
 except ImportError:
     pass
@@ -28,6 +33,7 @@ Covers the complete contract of the climate repository adapter:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_repo() -> "HomeAssistantSmartHomeClimateRepository":
     return HomeAssistantSmartHomeClimateRepository(
@@ -52,7 +58,9 @@ def _make_ha_climate_state_response(
         "attributes": {
             "current_temperature": current_temperature,
             "temperature": target_temperature,  # HA field is 'temperature', not 'target_temperature'
-            "hvac_modes": hvac_modes if hvac_modes is not None else ["cool", "heat", "auto", "off"],
+            "hvac_modes": hvac_modes
+            if hvac_modes is not None
+            else ["cool", "heat", "auto", "off"],
             "fan_mode": fan_mode,
             "swing_mode": swing_mode,
         },
@@ -117,8 +125,8 @@ def _mock_aiohttp_session_content_type_error(status: int = 200):
 # TestGetState
 # ===========================================================================
 
-class TestGetState:
 
+class TestGetState:
     def test_get_state__entity_id__is_populated_in_result(self):
         """entity_id passed to get_state must be reflected on the returned entity."""
         entity_id = "climate.quarto"
@@ -216,7 +224,9 @@ class TestGetState:
             f"Expected current_temperature=26.3, got {result.current_temperature!r}"
         )
 
-    def test_get_state__target_temperature__read_from_attributes_temperature_field(self):
+    def test_get_state__target_temperature__read_from_attributes_temperature_field(
+        self,
+    ):
         """
         target_temperature must be read from attributes['temperature'].
         The HA API field is named 'temperature', not 'target_temperature'.
@@ -303,7 +313,9 @@ class TestGetState:
 
         mock_resp = AsyncMock()
         mock_resp.raise_for_status = MagicMock(
-            side_effect=aiohttp.ClientResponseError(MagicMock(), MagicMock(), status=404)
+            side_effect=aiohttp.ClientResponseError(
+                MagicMock(), MagicMock(), status=404
+            )
         )
         mock_resp.status = 404
 
@@ -329,8 +341,8 @@ class TestGetState:
 # TestSetTemperature
 # ===========================================================================
 
-class TestSetTemperature:
 
+class TestSetTemperature:
     def test_set_temperature__sends_correct_url(self):
         """POST must be sent to /api/services/climate/set_temperature."""
         repo = _make_repo()
@@ -386,7 +398,9 @@ class TestSetTemperature:
 
         with patch("aiohttp.ClientSession", return_value=mock_cm_session):
             cmd = ClimateSetTemperature(entity_id="climate.sala", temperature=22.0)
-            result = asyncio.get_event_loop().run_until_complete(repo.set_temperature(cmd))
+            result = asyncio.get_event_loop().run_until_complete(
+                repo.set_temperature(cmd)
+            )
 
         assert result == expected_response, (
             f"Expected {expected_response!r}, got {result!r}"
@@ -397,8 +411,8 @@ class TestSetTemperature:
 # TestSetHvacMode
 # ===========================================================================
 
-class TestSetHvacMode:
 
+class TestSetHvacMode:
     def test_set_hvac_mode__sends_correct_url(self):
         """POST must be sent to /api/services/climate/set_hvac_mode."""
         repo = _make_repo()
@@ -458,8 +472,8 @@ class TestSetHvacMode:
 # TestTurnOn
 # ===========================================================================
 
-class TestTurnOn:
 
+class TestTurnOn:
     def test_turn_on__sends_correct_url(self):
         """POST must be sent to /api/services/climate/turn_on."""
         repo = _make_repo()
@@ -511,8 +525,8 @@ class TestTurnOn:
 # TestTurnOff
 # ===========================================================================
 
-class TestTurnOff:
 
+class TestTurnOff:
     def test_turn_off__sends_correct_url(self):
         """POST must be sent to /api/services/climate/turn_off."""
         repo = _make_repo()

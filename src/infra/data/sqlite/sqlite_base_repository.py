@@ -11,9 +11,9 @@ class SqliteBaseRepository(ABC):
         self.db_path = db_path.replace("sqlite://", "")
         self._startup()
 
-    #=======================================
+    # =======================================
     # Abstract Methods
-    #=======================================
+    # =======================================
 
     @abstractmethod
     def _startup(self) -> None:
@@ -23,9 +23,9 @@ class SqliteBaseRepository(ABC):
     def _create_table(self) -> None:
         pass
 
-    #=======================================
+    # =======================================
     # Connection Methods
-    #=======================================
+    # =======================================
 
     def connect(self):
         """

@@ -14,11 +14,12 @@ ShoppingListService Unit Tests
 
 
 def _sample_item(name="Bread", quantity=2.0, checked=False) -> ShoppingListItem:
-    return ShoppingListItem(id=str(uuid.uuid4()), name=name, quantity=quantity, checked=checked)
+    return ShoppingListItem(
+        id=str(uuid.uuid4()), name=name, quantity=quantity, checked=checked
+    )
 
 
 class TestShoppingListServiceAdd:
-
     def test_add_valid_item_calls_repository(self, shopping_list_repo_mock):
         # Arrange
         service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
@@ -58,7 +59,9 @@ class TestShoppingListServiceAdd:
         # Act / Assert
         with pytest.raises(ValidationError) as exc:
             service.add(ShoppingListItemAdd(name="Butter", quantity=0))
-        assert "quantity" in str(exc.value.errors).lower() or "Invalid" in str(exc.value.errors)
+        assert "quantity" in str(exc.value.errors).lower() or "Invalid" in str(
+            exc.value.errors
+        )
 
     def test_add_raises_when_quantity_is_negative(self, shopping_list_repo_mock):
         # Arrange
@@ -78,7 +81,6 @@ class TestShoppingListServiceAdd:
 
 
 class TestShoppingListServiceGetAll:
-
     def test_get_all_returns_list_from_repository(self, shopping_list_repo_mock):
         # Arrange
         items = [_sample_item("Apple"), _sample_item("Banana")]
@@ -101,7 +103,6 @@ class TestShoppingListServiceGetAll:
 
 
 class TestShoppingListServiceUpdateQuantity:
-
     def test_update_quantity_valid_item_calls_repository(self, shopping_list_repo_mock):
         # Arrange
         item = _sample_item(name="Cheese", quantity=1.0)
@@ -124,7 +125,9 @@ class TestShoppingListServiceUpdateQuantity:
             service.update_quantity(cmd)
         assert "was not found" in str(exc.value.errors)
 
-    def test_update_quantity_raises_when_quantity_invalid(self, shopping_list_repo_mock):
+    def test_update_quantity_raises_when_quantity_invalid(
+        self, shopping_list_repo_mock
+    ):
         # Arrange
         service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
         cmd = ShoppingListItemUpdate(id=str(uuid.uuid4()), name="Yogurt", quantity=-2)
@@ -134,7 +137,6 @@ class TestShoppingListServiceUpdateQuantity:
 
 
 class TestShoppingListServiceCheck:
-
     def test_check_sets_checked_true_and_updates(self, shopping_list_repo_mock):
         # Arrange
         item = _sample_item(name="Tomato", checked=False)
@@ -155,7 +157,9 @@ class TestShoppingListServiceCheck:
             service.check(str(uuid.uuid4()))
         assert "was not found" in str(exc.value.errors)
 
-    def test_check__already_checked_item__calls_update_again(self, shopping_list_repo_mock):
+    def test_check__already_checked_item__calls_update_again(
+        self, shopping_list_repo_mock
+    ):
         # Arrange — item already has checked=True; service must still call update
         item = _sample_item(name="Tomato", checked=True)
         shopping_list_repo_mock.get_by_id.return_value = item
@@ -166,7 +170,9 @@ class TestShoppingListServiceCheck:
         shopping_list_repo_mock.update.assert_called_once()
         assert item.checked is True
 
-    def test_check__invalid_id_empty_string__raises_validation_error(self, shopping_list_repo_mock):
+    def test_check__invalid_id_empty_string__raises_validation_error(
+        self, shopping_list_repo_mock
+    ):
         # Arrange
         # This test documents the bug: check() calls validate_id() but omits
         # the final .validate() call, so ValidationError is never raised.
@@ -178,7 +184,6 @@ class TestShoppingListServiceCheck:
 
 
 class TestShoppingListServiceUncheck:
-
     def test_uncheck_sets_checked_false_and_updates(self, shopping_list_repo_mock):
         # Arrange
         item = _sample_item(name="Onion", checked=True)
@@ -199,7 +204,9 @@ class TestShoppingListServiceUncheck:
             service.uncheck(str(uuid.uuid4()))
         assert "was not found" in str(exc.value.errors)
 
-    def test_uncheck__already_unchecked_item__calls_update_again(self, shopping_list_repo_mock):
+    def test_uncheck__already_unchecked_item__calls_update_again(
+        self, shopping_list_repo_mock
+    ):
         # Arrange — item already has checked=False; service must still call update
         item = _sample_item(name="Onion", checked=False)
         shopping_list_repo_mock.get_by_id.return_value = item
@@ -210,7 +217,9 @@ class TestShoppingListServiceUncheck:
         shopping_list_repo_mock.update.assert_called_once()
         assert item.checked is False
 
-    def test_uncheck__invalid_id_empty_string__raises_validation_error(self, shopping_list_repo_mock):
+    def test_uncheck__invalid_id_empty_string__raises_validation_error(
+        self, shopping_list_repo_mock
+    ):
         # Arrange
         # This test documents the bug: uncheck() calls validate_id() but omits
         # the final .validate() call, so ValidationError is never raised.
@@ -222,7 +231,6 @@ class TestShoppingListServiceUncheck:
 
 
 class TestShoppingListServiceDelete:
-
     def test_delete_calls_repository_with_correct_id(self, shopping_list_repo_mock):
         # Arrange
         service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
@@ -234,7 +242,6 @@ class TestShoppingListServiceDelete:
 
 
 class TestShoppingListServiceClear:
-
     def test_clear_calls_repository_clear(self, shopping_list_repo_mock):
         # Arrange
         service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)

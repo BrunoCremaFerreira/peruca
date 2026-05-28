@@ -45,9 +45,12 @@ def sqlite_db_path():
 
 @pytest.fixture
 def user_app_service_with_db(sqlite_db_path):
-    with patch.dict(os.environ, {
-        "PERUCA_DB_CONNECTION_STRING": f"sqlite://{sqlite_db_path}",
-    }):
+    with patch.dict(
+        os.environ,
+        {
+            "PERUCA_DB_CONNECTION_STRING": f"sqlite://{sqlite_db_path}",
+        },
+    ):
         repo = get_user_repository()
         app_service = get_user_app_service()
         yield app_service, repo

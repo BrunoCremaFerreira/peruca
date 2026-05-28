@@ -15,11 +15,12 @@ app.include_router(router)
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.cors_origin],   # CORS origin
+    allow_origins=[settings.cors_origin],  # CORS origin
     allow_credentials=True,
-    allow_methods=["*"],                    # Allow all HTTP Methods (GET, POST, etc)
-    allow_headers=["*"],                    # Allow all headers
+    allow_methods=["*"],  # Allow all HTTP Methods (GET, POST, etc)
+    allow_headers=["*"],  # Allow all headers
 )
+
 
 def custom_openapi():
     if app.openapi_schema:
@@ -33,12 +34,14 @@ def custom_openapi():
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
+
 @app.exception_handler(ValidationError)
 async def app_validation_exception_handler(request: Request, exc: ValidationError):
     return JSONResponse(
         status_code=exc.status_code,
         content={"message": str(exc), "errors": exc.errors},
     )
+
 
 app.openapi = custom_openapi
 

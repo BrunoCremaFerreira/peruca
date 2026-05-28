@@ -10,14 +10,15 @@ class SmartHomeAppService:
     Smart Home App Service
     """
 
-    def __init__(self, 
-                 smart_home_light_repository: SmartHomeLightRepository,
-                 smart_home_entity_alias_repository: SmartHomeEntityAliasRepository,
-                 smart_home_service: SmartHomeService):
+    def __init__(
+        self,
+        smart_home_light_repository: SmartHomeLightRepository,
+        smart_home_entity_alias_repository: SmartHomeEntityAliasRepository,
+        smart_home_service: SmartHomeService,
+    ):
         self.smart_home_light_repository = smart_home_light_repository
         self.smart_home_entity_alias_repository = smart_home_entity_alias_repository
         self.smart_home_service = smart_home_service
-
 
     # =====================================
     # Queries

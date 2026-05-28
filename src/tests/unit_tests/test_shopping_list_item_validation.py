@@ -10,7 +10,6 @@ ShoppingListItemValidator Unit Tests
 
 
 class TestShoppingListItemValidatorId:
-
     def test_validate_id_valid_uuid4_passes(self):
         # Arrange
         valid_uuid = "550e8400-e29b-41d4-a716-446655440000"
@@ -46,7 +45,6 @@ class TestShoppingListItemValidatorId:
 
 
 class TestShoppingListItemValidatorName:
-
     def test_validate_name_valid_passes(self):
         # Arrange
         validator = ShoppingListItemValidator()
@@ -89,7 +87,6 @@ class TestShoppingListItemValidatorName:
 
 
 class TestShoppingListItemValidatorQuantity:
-
     def test_validate_quantity_positive_passes(self):
         # Arrange
         validator = ShoppingListItemValidator()
@@ -124,20 +121,17 @@ class TestShoppingListItemValidatorQuantity:
 
 
 class TestShoppingListItemValidatorChaining:
-
     def test_chained_errors_are_all_collected(self):
         # Arrange / Act
         with pytest.raises(ValidationError) as exc:
-            ShoppingListItemValidator() \
-                .validate_name("") \
-                .validate_quantity(-3) \
-                .validate()
+            ShoppingListItemValidator().validate_name("").validate_quantity(
+                -3
+            ).validate()
         # Assert
         assert len(exc.value.errors) >= 2
 
     def test_valid_item_raises_no_exception(self):
         # Arrange / Act / Assert — no exception expected
-        ShoppingListItemValidator() \
-            .validate_name("Bread") \
-            .validate_quantity(1) \
-            .validate()
+        ShoppingListItemValidator().validate_name("Bread").validate_quantity(
+            1
+        ).validate()

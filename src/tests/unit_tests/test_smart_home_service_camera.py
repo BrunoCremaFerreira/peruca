@@ -21,6 +21,7 @@ from domain.services.smart_home_service import SmartHomeService
 try:
     from domain.entities import SmartHomeCamera, SmartHomeCameraSnapshot
     from domain.interfaces.smart_home_repository import SmartHomeCameraRepository
+
     _CAMERA_AVAILABLE = True
 except ImportError:
     SmartHomeCamera = None  # type: ignore[assignment,misc]
@@ -37,6 +38,7 @@ _SKIP_IF_NOT_IMPLEMENTED = pytest.mark.skipif(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_service(camera_repo=None):
     """
@@ -88,9 +90,9 @@ def _sample_snapshot() -> "SmartHomeCameraSnapshot":
 # TestSmartHomeServiceCameraGetState
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestSmartHomeServiceCameraGetState:
-
     def test_camera_get_state__delegates_to_camera_repository(self):
         """
         camera_get_state must call smart_home_camera_repository.get_state()
@@ -103,8 +105,9 @@ class TestSmartHomeServiceCameraGetState:
             service.camera_get_state(entity_id="camera.cozinha")
         )
 
-        camera_repo.get_state.assert_awaited_once(), (
-            "Expected camera_repo.get_state to be awaited exactly once"
+        (
+            camera_repo.get_state.assert_awaited_once(),
+            ("Expected camera_repo.get_state to be awaited exactly once"),
         )
 
     def test_camera_get_state__passes_entity_id_to_repository(self):
@@ -117,7 +120,9 @@ class TestSmartHomeServiceCameraGetState:
         )
 
         call_args = camera_repo.get_state.call_args
-        passed_entity_id = call_args[0][0] if call_args[0] else call_args[1].get("entity_id")
+        passed_entity_id = (
+            call_args[0][0] if call_args[0] else call_args[1].get("entity_id")
+        )
         assert passed_entity_id == "camera.portao", (
             f"Expected entity_id='camera.portao' forwarded to repo, got: {passed_entity_id!r}"
         )
@@ -154,9 +159,9 @@ class TestSmartHomeServiceCameraGetState:
 # TestSmartHomeServiceCameraGetSnapshot
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestSmartHomeServiceCameraGetSnapshot:
-
     def test_camera_get_snapshot__delegates_to_camera_repository(self):
         """
         camera_get_snapshot must call smart_home_camera_repository.get_snapshot()
@@ -169,8 +174,9 @@ class TestSmartHomeServiceCameraGetSnapshot:
             service.camera_get_snapshot(entity_id="camera.cozinha")
         )
 
-        camera_repo.get_snapshot.assert_awaited_once(), (
-            "Expected camera_repo.get_snapshot to be awaited exactly once"
+        (
+            camera_repo.get_snapshot.assert_awaited_once(),
+            ("Expected camera_repo.get_snapshot to be awaited exactly once"),
         )
 
     def test_camera_get_snapshot__passes_entity_id_to_repository(self):
@@ -183,7 +189,9 @@ class TestSmartHomeServiceCameraGetSnapshot:
         )
 
         call_args = camera_repo.get_snapshot.call_args
-        passed_entity_id = call_args[0][0] if call_args[0] else call_args[1].get("entity_id")
+        passed_entity_id = (
+            call_args[0][0] if call_args[0] else call_args[1].get("entity_id")
+        )
         assert passed_entity_id == "camera.sala", (
             f"Expected entity_id='camera.sala' forwarded to repo, got: {passed_entity_id!r}"
         )
@@ -220,9 +228,9 @@ class TestSmartHomeServiceCameraGetSnapshot:
 # TestSmartHomeServiceCameraBackwardCompat
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestSmartHomeServiceCameraBackwardCompat:
-
     def test_service_constructed_without_camera_repository__does_not_raise(self):
         """
         SmartHomeService must remain constructable without smart_home_camera_repository

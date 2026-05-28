@@ -12,7 +12,7 @@ class ShoppingListItemValidator(BaseValidation):
     def validate_id(self, id: str):
         if not id:
             self.errors.append("The 'Id' is empty")
-        
+
         if not super().is_valid_uuid4(id):
             self.errors.append("The 'Id' is not a valid uuid4")
         return self

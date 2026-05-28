@@ -25,6 +25,7 @@ Covers the following behaviour changes (TDD — written before implementation):
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_graph() -> SmartHomeLightsGraph:
     """
     Build a SmartHomeLightsGraph with all external dependencies mocked.
@@ -71,8 +72,8 @@ def _state(**kwargs) -> dict:
 # Mudança 1 — _handle_final_response returns a descriptive string
 # ---------------------------------------------------------------------------
 
-class TestHandleFinalResponseOutputFormat:
 
+class TestHandleFinalResponseOutputFormat:
     def test_handle_final_response__only_turn_on__returns_ligado_string(self):
         graph = _make_graph()
         state = _state(output_turn_on="luz da sala")
@@ -108,7 +109,9 @@ class TestHandleFinalResponseOutputFormat:
         assert "Desligado" in output
         assert "quarto" in output
 
-    def test_handle_final_response__all_outputs_empty_or_none__returns_nenhuma_acao(self):
+    def test_handle_final_response__all_outputs_empty_or_none__returns_nenhuma_acao(
+        self,
+    ):
         graph = _make_graph()
         state = _state()
 
@@ -116,7 +119,9 @@ class TestHandleFinalResponseOutputFormat:
 
         assert result["output"] == "Nenhuma acao executada"
 
-    def test_handle_final_response__output_not_recognized_truthy__returns_dispositivo_nao_reconhecido(self):
+    def test_handle_final_response__output_not_recognized_truthy__returns_dispositivo_nao_reconhecido(
+        self,
+    ):
         graph = _make_graph()
         state = _state(output_not_recognized="Not Recognized Triggered")
 
@@ -140,8 +145,8 @@ class TestHandleFinalResponseOutputFormat:
 # Mudança 2 — _handle_turn_on: device not found message in Portuguese
 # ---------------------------------------------------------------------------
 
-class TestHandleTurnOnDeviceNotFound:
 
+class TestHandleTurnOnDeviceNotFound:
     def test_handle_turn_on__entity_not_found__returns_dispositivo_nao_encontrado(self):
         graph = _make_graph()
         # _find_entity_ids is patched to simulate no match
@@ -188,9 +193,11 @@ class TestHandleTurnOnDeviceNotFound:
 # Mudança 3 — _handle_turn_off: device not found message in Portuguese
 # ---------------------------------------------------------------------------
 
-class TestHandleTurnOffDeviceNotFound:
 
-    def test_handle_turn_off__entity_not_found__returns_dispositivo_nao_encontrado(self):
+class TestHandleTurnOffDeviceNotFound:
+    def test_handle_turn_off__entity_not_found__returns_dispositivo_nao_encontrado(
+        self,
+    ):
         graph = _make_graph()
         graph._find_entity_ids = MagicMock(return_value=[])
         state = _state(output_turn_off="luz inexistente", available_entities={})
@@ -213,7 +220,9 @@ class TestHandleTurnOffDeviceNotFound:
     def test_handle_turn_off__entity_found__calls_service_and_returns_device_name(self):
         graph = _make_graph()
         graph._find_entity_ids = MagicMock(return_value=["light.quarto"])
-        state = _state(output_turn_off="quarto", available_entities={"quarto": "light.quarto"})
+        state = _state(
+            output_turn_off="quarto", available_entities={"quarto": "light.quarto"}
+        )
 
         result = graph._handle_turn_off(state)
 
@@ -228,7 +237,9 @@ class TestHandleTurnOffDeviceNotFound:
 
         assert result == {}
 
-    def test_handle_turn_off__entity_not_found__key_is_output_turn_off_not_output_turn_on(self):
+    def test_handle_turn_off__entity_not_found__key_is_output_turn_off_not_output_turn_on(
+        self,
+    ):
         """
         Regression: original code incorrectly returned {"output_turn_on": "Device not found"}
         when the turn_off handler could not find the entity.
@@ -250,6 +261,7 @@ class TestHandleTurnOffDeviceNotFound:
 # Mudança 4 — _handle_change_bright: parse payload, resolve entity_id,
 #             call light_turn_on with brightness_pct
 # ---------------------------------------------------------------------------
+
 
 class TestHandleChangeBright:
     """
@@ -273,9 +285,7 @@ class TestHandleChangeBright:
 
         result = graph._handle_change_bright(state)
 
-        assert result == {}, (
-            f"Expected empty dict for None payload, got: {result}"
-        )
+        assert result == {}, f"Expected empty dict for None payload, got: {result}"
 
     def test_handle_change_bright__entity_found__calls_service_light_turn_on(self):
         graph = _make_graph()
@@ -324,7 +334,9 @@ class TestHandleChangeBright:
             f"Expected entity_id='light.sala', got: {command.entity_id}"
         )
 
-    def test_handle_change_bright__entity_not_found__returns_dispositivo_nao_encontrado(self):
+    def test_handle_change_bright__entity_not_found__returns_dispositivo_nao_encontrado(
+        self,
+    ):
         graph = _make_graph()
         graph._find_entity_ids = MagicMock(return_value=[])
         state = _state(
@@ -357,10 +369,12 @@ class TestHandleChangeBright:
 
     def test_handle_change_bright__multiple_devices__calls_service_for_each(self):
         graph = _make_graph()
-        graph._find_entity_ids = MagicMock(side_effect=[
-            ["light.sala"],
-            ["light.quarto"],
-        ])
+        graph._find_entity_ids = MagicMock(
+            side_effect=[
+                ["light.sala"],
+                ["light.quarto"],
+            ]
+        )
         graph.smart_home_service.light_turn_on = AsyncMock()
         state = _state(
             output_change_bright="sala, 50|quarto, 30",

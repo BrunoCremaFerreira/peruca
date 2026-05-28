@@ -23,6 +23,7 @@ from domain.entities import SmartHomeEntityAlias
 
 try:
     from application.graphs.smart_home_sensors_graph import SmartHomeSensorsGraph
+
     _GRAPH_AVAILABLE = True
 except ImportError:
     SmartHomeSensorsGraph = None  # type: ignore[assignment,misc]
@@ -37,6 +38,7 @@ _SKIP_IF_NOT_IMPLEMENTED = pytest.mark.skipif(
 # ===========================================================================
 # Helpers
 # ===========================================================================
+
 
 def _make_graph() -> "SmartHomeSensorsGraph":
     """
@@ -76,10 +78,12 @@ def _configure_cleaned_output(graph: "SmartHomeSensorsGraph", cleaned_str: str) 
 # TestSmartHomeSensorsGraphClassifyIntentQueryCurrentState
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestSmartHomeSensorsGraphClassifyIntentQueryCurrentState:
-
-    def test_classify_query_current_state__door_cozinha__intent_and_fields_populated(self):
+    def test_classify_query_current_state__door_cozinha__intent_and_fields_populated(
+        self,
+    ):
         """
         JSON with intents=["query_current_state"] and query_current_state="door|cozinha"
         must produce:
@@ -105,7 +109,9 @@ class TestSmartHomeSensorsGraphClassifyIntentQueryCurrentState:
             f"Expected 'cozinha' in output_query_current_state, got {result['output_query_current_state']!r}"
         )
 
-    def test_classify_query_current_state__temperature_no_location__empty_location(self):
+    def test_classify_query_current_state__temperature_no_location__empty_location(
+        self,
+    ):
         """
         When the LLM returns query_current_state="temperature|" (no location),
         the output field must still be populated and the intent must be set.
@@ -148,7 +154,9 @@ class TestSmartHomeSensorsGraphClassifyIntentQueryCurrentState:
             f"Expected 'query_current_state' in intent list, got {result['intent']!r}"
         )
 
-    def test_classify_query_current_state__motion_sala__intent_and_field_populated(self):
+    def test_classify_query_current_state__motion_sala__intent_and_field_populated(
+        self,
+    ):
         """
         JSON with query_current_state="motion|sala" must map intent and output correctly.
         """
@@ -170,10 +178,12 @@ class TestSmartHomeSensorsGraphClassifyIntentQueryCurrentState:
 # TestSmartHomeSensorsGraphClassifyIntentQueryHistory
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestSmartHomeSensorsGraphClassifyIntentQueryHistory:
-
-    def test_classify_query_history__motion_lavanderia__intent_and_fields_populated(self):
+    def test_classify_query_history__motion_lavanderia__intent_and_fields_populated(
+        self,
+    ):
         """
         JSON with intents=["query_history"] and query_history="motion|lavanderia|3"
         must produce:
@@ -187,7 +197,9 @@ class TestSmartHomeSensorsGraphClassifyIntentQueryHistory:
             ' "query_history": "motion|lavanderia|3", "not_recognized": ""}',
         )
 
-        result = graph._classify_intent({"input": "houve movimento na lavanderia nas últimas 3 horas?"})
+        result = graph._classify_intent(
+            {"input": "houve movimento na lavanderia nas últimas 3 horas?"}
+        )
 
         assert result["intent"] == ["query_history"], (
             f"Expected intent=['query_history'], got {result['intent']!r}"
@@ -211,7 +223,9 @@ class TestSmartHomeSensorsGraphClassifyIntentQueryHistory:
             ' "query_history": "temperature|sala|6", "not_recognized": ""}',
         )
 
-        result = graph._classify_intent({"input": "como variou a temperatura da sala nas últimas 6 horas?"})
+        result = graph._classify_intent(
+            {"input": "como variou a temperatura da sala nas últimas 6 horas?"}
+        )
 
         assert "6" in result["output_query_history"], (
             f"Expected hours_back '6' in output_query_history, got {result['output_query_history']!r}"
@@ -229,7 +243,9 @@ class TestSmartHomeSensorsGraphClassifyIntentQueryHistory:
             ' "query_history": "door|entrada|2", "not_recognized": ""}',
         )
 
-        result = graph._classify_intent({"input": "a porta da entrada abriu nas últimas 2 horas?"})
+        result = graph._classify_intent(
+            {"input": "a porta da entrada abriu nas últimas 2 horas?"}
+        )
 
         assert "query_history" in result["intent"]
         assert "query_current_state" not in result["intent"]
@@ -239,9 +255,9 @@ class TestSmartHomeSensorsGraphClassifyIntentQueryHistory:
 # TestSmartHomeSensorsGraphClassifyIntentNotRecognized
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestSmartHomeSensorsGraphClassifyIntentNotRecognized:
-
     def test_classify_not_recognized__unrelated_input__intent_is_not_recognized(self):
         """
         Input unrelated to sensors must produce result["intent"] == ["not_recognized"].
@@ -282,9 +298,9 @@ class TestSmartHomeSensorsGraphClassifyIntentNotRecognized:
 # TestSmartHomeSensorsGraphClassifyIntentRobustness
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestSmartHomeSensorsGraphClassifyIntentRobustness:
-
     def test_classify__handles_null_values_in_json(self):
         """
         JSON with null in optional fields must parse correctly without raising
@@ -336,7 +352,9 @@ class TestSmartHomeSensorsGraphClassifyIntentRobustness:
             ' "query_history": "smoke|cozinha|1", "not_recognized": ""}',
         )
 
-        result = graph._classify_intent({"input": "houve fumaça na cozinha na última hora?"})
+        result = graph._classify_intent(
+            {"input": "houve fumaça na cozinha na última hora?"}
+        )
 
         assert result["intent"] == ["query_history"]
 
@@ -347,7 +365,9 @@ class TestSmartHomeSensorsGraphClassifyIntentRobustness:
         No exception must propagate.
         """
         graph = _make_graph()
-        _configure_cleaned_output(graph, "Desculpe, não entendi o comando sobre sensores.")
+        _configure_cleaned_output(
+            graph, "Desculpe, não entendi o comando sobre sensores."
+        )
 
         result = graph._classify_intent({"input": "algum input"})
 
@@ -408,9 +428,9 @@ class TestSmartHomeSensorsGraphClassifyIntentRobustness:
 # TestSmartHomeSensorsGraphClassifyIntentEntityAliasResolution
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestSmartHomeSensorsGraphClassifyIntentEntityAliasResolution:
-
     def test_classify__alias_repo_queried_for_sensor_entities(self):
         """
         The alias repository must be queried for sensor entities (entity_id_starts_with
@@ -446,7 +466,9 @@ class TestSmartHomeSensorsGraphClassifyIntentEntityAliasResolution:
         as {alias: entity_id}.
         """
         graph = _make_graph()
-        alias = SmartHomeEntityAlias(entity_id="binary_sensor.door_frente", alias="Porta da Frente")
+        alias = SmartHomeEntityAlias(
+            entity_id="binary_sensor.door_frente", alias="Porta da Frente"
+        )
         graph.smart_home_entity_alias_repository.get_all.return_value = [alias]
         _configure_cleaned_output(
             graph,
@@ -456,7 +478,9 @@ class TestSmartHomeSensorsGraphClassifyIntentEntityAliasResolution:
 
         result = graph._classify_intent({"input": "a porta da frente está aberta?"})
 
-        assert result["available_entities"] == {"Porta da Frente": "binary_sensor.door_frente"}, (
+        assert result["available_entities"] == {
+            "Porta da Frente": "binary_sensor.door_frente"
+        }, (
             f"Expected available_entities to map alias to entity_id, "
             f"got {result['available_entities']!r}"
         )
@@ -485,7 +509,9 @@ class TestSmartHomeSensorsGraphClassifyIntentEntityAliasResolution:
         fall back gracefully: intent=["not_recognized"], available_entities={}.
         """
         graph = _make_graph()
-        graph.smart_home_entity_alias_repository.get_all.side_effect = RuntimeError("DB error")
+        graph.smart_home_entity_alias_repository.get_all.side_effect = RuntimeError(
+            "DB error"
+        )
         _configure_cleaned_output(
             graph,
             '{"intents": ["query_current_state"], "query_current_state": "door|cozinha",'
@@ -502,9 +528,9 @@ class TestSmartHomeSensorsGraphClassifyIntentEntityAliasResolution:
 # TestSmartHomeSensorsGraphClassifyIntentMultipleIntents
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestSmartHomeSensorsGraphClassifyIntentMultipleIntents:
-
     def test_classify__multiple_intents__all_returned_in_order(self):
         """
         When the LLM returns multiple intents (e.g. query_current_state + query_history),
@@ -518,9 +544,11 @@ class TestSmartHomeSensorsGraphClassifyIntentMultipleIntents:
             ' "query_history": "motion|cozinha|2", "not_recognized": ""}',
         )
 
-        result = graph._classify_intent({
-            "input": "a porta da cozinha está aberta e houve movimento lá nas últimas 2 horas?"
-        })
+        result = graph._classify_intent(
+            {
+                "input": "a porta da cozinha está aberta e houve movimento lá nas últimas 2 horas?"
+            }
+        )
 
         assert result["intent"] == ["query_current_state", "query_history"], (
             f"Expected both intents in order, got {result['intent']!r}"

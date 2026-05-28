@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional, Tuple
 
+
 # ====================================
 # Base entities Classes
 # ====================================
@@ -13,15 +14,18 @@ class BaseEntity:
     when_updated: Optional[datetime] = None
     when_deleted: Optional[datetime] = None
 
+
 # ====================================
 # User Related Classes
 # ====================================
+
 
 @dataclass
 class User(BaseEntity):
     external_id: str = ""
     name: str = ""
     summary: str = ""
+
 
 # ====================================
 # Shopping List Related Classes
@@ -32,6 +36,7 @@ class ShoppingListItem(BaseEntity):
     quantity: float = 1
     checked: bool = False
 
+
 # ====================================
 # Smart Home Entity Alias
 # ====================================
@@ -40,9 +45,11 @@ class SmartHomeEntityAlias(BaseEntity):
     entity_id: str = ""
     alias: str = ""
 
+
 # ====================================
 # Graph Related Classes
 # ====================================
+
 
 @dataclass
 class GraphInvokeRequest:
@@ -53,9 +60,11 @@ class GraphInvokeRequest:
     message: str
     user: User
 
+
 # ====================================
 # Smart Home Related Classes
 # ====================================
+
 
 class SmartHomeColorMode(Enum):
     """
@@ -84,7 +93,6 @@ class SmartHomeColorMode(Enum):
             The light supports CIE 1931 XY color space.
     """
 
-
     UNKNOWN = "UNKNOWN"
     ONOFF = "ONOFF"
     BRIGHTNESS = "BRIGHTNESS"
@@ -95,6 +103,7 @@ class SmartHomeColorMode(Enum):
     RGBWW = "RGBWW"
     WHITE = "WHITE"
     XY = "XY"
+
 
 @dataclass
 class SmartHomeLight:
@@ -133,9 +142,10 @@ class SmartHomeLight:
         xy_color (Optional[Tuple[float, float]]):
             The xy color value (float, float). This property will be copied to the light's state attribute when the light's color mode is set to ColorMode.XY and ignored otherwise.
     """
+
     entity_id: str
     brightness: Optional[int] = None
-    color_mode: Optional['SmartHomeColorMode'] = None
+    color_mode: Optional["SmartHomeColorMode"] = None
     color_temp_kelvin: Optional[int] = None
     effect: Optional[str] = None
     effect_list: List[str] = None
@@ -146,31 +156,36 @@ class SmartHomeLight:
     rgb_color: Optional[Tuple[int, int, int]] = None
     rgbw_color: Optional[Tuple[int, int, int, int]] = None
     rgbww_color: Optional[Tuple[int, int, int, int, int]] = None
-    supported_color_modes: List['SmartHomeColorMode'] = None
+    supported_color_modes: List["SmartHomeColorMode"] = None
     xy_color: Optional[Tuple[float, float]] = None
+
 
 # Smart Home Climate Related Classes
 
+
 class SmartHomeHvacMode(Enum):
-    COOL     = "cool"
-    HEAT     = "heat"
-    AUTO     = "auto"
+    COOL = "cool"
+    HEAT = "heat"
+    AUTO = "auto"
     FAN_ONLY = "fan_only"
-    DRY      = "dry"
-    OFF      = "off"
+    DRY = "dry"
+    OFF = "off"
+
 
 @dataclass
 class SmartHomeClimate:
     entity_id: str
     is_on: Optional[bool] = None
-    hvac_mode: Optional['SmartHomeHvacMode'] = None
+    hvac_mode: Optional["SmartHomeHvacMode"] = None
     hvac_modes: Optional[List[str]] = None
     current_temperature: Optional[float] = None
     target_temperature: Optional[float] = None
     fan_mode: Optional[str] = None
     swing_mode: Optional[str] = None
 
+
 # Smart Home Sensor Related Classes
+
 
 class SensorType(Enum):
     TEMPERATURE = "temperature"
@@ -183,6 +198,7 @@ class SensorType(Enum):
     ILLUMINANCE = "illuminance"
     UNKNOWN = "unknown"
 
+
 @dataclass
 class SensorReading:
     entity_id: str
@@ -192,7 +208,9 @@ class SensorReading:
     friendly_name: Optional[str] = None
     last_changed: Optional[datetime] = None
 
+
 # Smart Home Camera Related Classes
+
 
 @dataclass
 class SmartHomeCamera:
@@ -200,6 +218,7 @@ class SmartHomeCamera:
     state: str
     friendly_name: Optional[str] = None
     is_available: Optional[bool] = None
+
 
 @dataclass
 class SmartHomeCameraSnapshot:

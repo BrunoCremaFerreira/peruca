@@ -56,8 +56,8 @@ def _sample_sensor_reading() -> "SensorReading":
 # TestSmartHomeServiceSensorGetState
 # ===========================================================================
 
-class TestSmartHomeServiceSensorGetState:
 
+class TestSmartHomeServiceSensorGetState:
     def test_sensor_get_state__delegates_to_repository(self):
         """
         sensor_get_state must forward the entity_id to sensor_repo.get_state
@@ -107,9 +107,7 @@ class TestSmartHomeServiceSensorGetState:
         entity_id = "binary_sensor.door_front"
 
         # Act
-        asyncio.get_event_loop().run_until_complete(
-            service.sensor_get_state(entity_id)
-        )
+        asyncio.get_event_loop().run_until_complete(service.sensor_get_state(entity_id))
 
         # Assert
         called_with = sensor_repo.get_state.call_args[0][0]
@@ -122,8 +120,8 @@ class TestSmartHomeServiceSensorGetState:
 # TestSmartHomeServiceSensorGetHistory
 # ===========================================================================
 
-class TestSmartHomeServiceSensorGetHistory:
 
+class TestSmartHomeServiceSensorGetHistory:
     def test_sensor_get_history__delegates_to_repository(self):
         """
         sensor_get_history must forward entity_id and hours_back to
@@ -179,7 +177,9 @@ class TestSmartHomeServiceSensorGetHistory:
 
         # Assert
         call_args = sensor_repo.get_history.call_args
-        passed_hours = call_args[0][1] if len(call_args[0]) > 1 else call_args[1].get("hours_back")
+        passed_hours = (
+            call_args[0][1] if len(call_args[0]) > 1 else call_args[1].get("hours_back")
+        )
         assert passed_hours == hours_back, (
             f"Expected hours_back={hours_back} forwarded unchanged, got {passed_hours!r}"
         )
@@ -198,6 +198,4 @@ class TestSmartHomeServiceSensorGetHistory:
         )
 
         # Assert
-        assert result == [], (
-            f"Expected empty list, got {result!r}"
-        )
+        assert result == [], f"Expected empty list, got {result!r}"

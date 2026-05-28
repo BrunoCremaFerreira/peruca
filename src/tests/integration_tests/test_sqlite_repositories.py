@@ -10,7 +10,9 @@ import uuid
 import pytest
 
 from domain.entities import ShoppingListItem, User
-from infra.data.sqlite.sqlite_shopping_list_repository import SqliteShoppingListRepository
+from infra.data.sqlite.sqlite_shopping_list_repository import (
+    SqliteShoppingListRepository,
+)
 from infra.data.sqlite.sqlite_user_repository import SqliteUserRepository
 
 
@@ -20,6 +22,7 @@ pytestmark = pytest.mark.integration
 # ======================================================
 # Fixtures
 # ======================================================
+
 
 @pytest.fixture
 def user_repo(integration_db_path):
@@ -44,20 +47,27 @@ def _make_item(name: str = "leite", quantity: float = 1.0) -> ShoppingListItem:
 # SqliteUserRepository
 # ======================================================
 
-class TestSqliteUserRepositoryStartup:
 
-    def test_user_repository_startup__fresh_db__admin_user_is_created_automatically(self, user_repo):
+class TestSqliteUserRepositoryStartup:
+    def test_user_repository_startup__fresh_db__admin_user_is_created_automatically(
+        self, user_repo
+    ):
         # _startup calls _create_table and inserts Admin user when table is empty
         all_users = user_repo.get_all()
 
-        assert len(all_users) >= 1, "Expected at least the Admin user to exist after startup"
+        assert len(all_users) >= 1, (
+            "Expected at least the Admin user to exist after startup"
+        )
         admin_users = [u for u in all_users if u.name == "Admin"]
-        assert len(admin_users) == 1, f"Expected exactly one Admin user, found: {admin_users}"
+        assert len(admin_users) == 1, (
+            f"Expected exactly one Admin user, found: {admin_users}"
+        )
 
 
 class TestSqliteUserRepositoryAdd:
-
-    def test_user_repository_add__valid_user__user_is_retrievable_by_external_id(self, user_repo):
+    def test_user_repository_add__valid_user__user_is_retrievable_by_external_id(
+        self, user_repo
+    ):
         # Arrange
         user = _make_user(external_id="ext-001", name="Bruno")
 
@@ -70,7 +80,9 @@ class TestSqliteUserRepositoryAdd:
         assert found.external_id == "ext-001"
         assert found.name == "Bruno"
 
-    def test_user_repository_add__duplicate_external_id__raises_integrity_error(self, user_repo):
+    def test_user_repository_add__duplicate_external_id__raises_integrity_error(
+        self, user_repo
+    ):
         import sqlite3
 
         # Arrange
@@ -84,8 +96,9 @@ class TestSqliteUserRepositoryAdd:
 
 
 class TestSqliteUserRepositoryGetByExternalId:
-
-    def test_user_repository_get_by_external_id__existing_user__returns_user(self, user_repo):
+    def test_user_repository_get_by_external_id__existing_user__returns_user(
+        self, user_repo
+    ):
         # Arrange
         user = _make_user(external_id="ext-get-1", name="Carlos")
         user_repo.add(user)
@@ -97,7 +110,9 @@ class TestSqliteUserRepositoryGetByExternalId:
         assert result is not None
         assert result.name == "Carlos"
 
-    def test_user_repository_get_by_external_id__nonexistent_user__returns_none(self, user_repo):
+    def test_user_repository_get_by_external_id__nonexistent_user__returns_none(
+        self, user_repo
+    ):
         # Act
         result = user_repo.get_by_external_id("does-not-exist-xyz")
 
@@ -109,9 +124,11 @@ class TestSqliteUserRepositoryGetByExternalId:
 # SqliteShoppingListRepository
 # ======================================================
 
-class TestSqliteShoppingListRepositoryAdd:
 
-    def test_shopping_list_repository_add__valid_item__item_is_retrievable(self, shopping_repo):
+class TestSqliteShoppingListRepositoryAdd:
+    def test_shopping_list_repository_add__valid_item__item_is_retrievable(
+        self, shopping_repo
+    ):
         # Arrange
         item = _make_item(name="ovos")
 
@@ -123,7 +140,9 @@ class TestSqliteShoppingListRepositoryAdd:
         assert found is not None
         assert found.name == "ovos"
 
-    def test_shopping_list_repository_add__duplicate_name__raises_integrity_error(self, shopping_repo):
+    def test_shopping_list_repository_add__duplicate_name__raises_integrity_error(
+        self, shopping_repo
+    ):
         import sqlite3
 
         # Arrange
@@ -137,8 +156,9 @@ class TestSqliteShoppingListRepositoryAdd:
 
 
 class TestSqliteShoppingListRepositoryGetByName:
-
-    def test_shopping_list_repository_get_by_name__existing_item__returns_item(self, shopping_repo):
+    def test_shopping_list_repository_get_by_name__existing_item__returns_item(
+        self, shopping_repo
+    ):
         # Arrange
         item = _make_item(name="pão")
         shopping_repo.add(item)
@@ -150,14 +170,18 @@ class TestSqliteShoppingListRepositoryGetByName:
         assert found is not None
         assert found.name == "pão"
 
-    def test_shopping_list_repository_get_by_name__nonexistent_item__returns_none(self, shopping_repo):
+    def test_shopping_list_repository_get_by_name__nonexistent_item__returns_none(
+        self, shopping_repo
+    ):
         # Act
         result = shopping_repo.get_by_name("item-que-nao-existe")
 
         # Assert
         assert result is None
 
-    def test_shopping_list_repository_get_by_name__case_insensitive__returns_item(self, shopping_repo):
+    def test_shopping_list_repository_get_by_name__case_insensitive__returns_item(
+        self, shopping_repo
+    ):
         # Arrange — name stored in mixed case
         item = _make_item(name="Arroz")
         shopping_repo.add(item)
@@ -171,15 +195,18 @@ class TestSqliteShoppingListRepositoryGetByName:
 
 
 class TestSqliteShoppingListRepositoryGetAll:
-
-    def test_shopping_list_repository_get_all__empty_list__returns_empty(self, shopping_repo):
+    def test_shopping_list_repository_get_all__empty_list__returns_empty(
+        self, shopping_repo
+    ):
         # Act
         result = shopping_repo.get_all()
 
         # Assert
         assert result == []
 
-    def test_shopping_list_repository_get_all__multiple_items__returns_all(self, shopping_repo):
+    def test_shopping_list_repository_get_all__multiple_items__returns_all(
+        self, shopping_repo
+    ):
         # Arrange
         items = [_make_item(name=n) for n in ["feijão", "sal", "óleo"]]
         for item in items:
@@ -194,8 +221,9 @@ class TestSqliteShoppingListRepositoryGetAll:
 
 
 class TestSqliteShoppingListRepositoryDelete:
-
-    def test_shopping_list_repository_delete__existing_item__item_is_removed(self, shopping_repo):
+    def test_shopping_list_repository_delete__existing_item__item_is_removed(
+        self, shopping_repo
+    ):
         # Arrange
         item = _make_item(name="café")
         shopping_repo.add(item)
@@ -207,14 +235,17 @@ class TestSqliteShoppingListRepositoryDelete:
         # Assert
         assert shopping_repo.get_by_name("café") is None
 
-    def test_shopping_list_repository_delete__nonexistent_id__no_exception(self, shopping_repo):
+    def test_shopping_list_repository_delete__nonexistent_id__no_exception(
+        self, shopping_repo
+    ):
         # Act & Assert — deleting a non-existent id should not raise
         shopping_repo.delete(str(uuid.uuid4()))
 
 
 class TestSqliteShoppingListRepositoryClear:
-
-    def test_shopping_list_repository_clear__list_with_items__all_items_removed(self, shopping_repo):
+    def test_shopping_list_repository_clear__list_with_items__all_items_removed(
+        self, shopping_repo
+    ):
         # Arrange
         for name in ["maçã", "banana", "uva"]:
             shopping_repo.add(_make_item(name=name))
@@ -226,7 +257,9 @@ class TestSqliteShoppingListRepositoryClear:
         # Assert
         assert shopping_repo.get_all() == []
 
-    def test_shopping_list_repository_clear__empty_list__no_exception(self, shopping_repo):
+    def test_shopping_list_repository_clear__empty_list__no_exception(
+        self, shopping_repo
+    ):
         # Act & Assert — clearing an already empty list should not raise
         shopping_repo.clear()
         assert shopping_repo.get_all() == []

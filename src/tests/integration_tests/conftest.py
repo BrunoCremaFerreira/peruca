@@ -3,7 +3,11 @@ from unittest.mock import patch
 import pytest
 
 from domain.commands import UserAdd
-from infra.ioc import get_llm_app_service, get_shopping_list_repository, get_user_app_service
+from infra.ioc import (
+    get_llm_app_service,
+    get_shopping_list_repository,
+    get_user_app_service,
+)
 
 
 DB_PATH = "/home/brn/tests/data/tests.db"

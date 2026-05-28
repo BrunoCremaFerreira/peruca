@@ -12,27 +12,30 @@ from application.graphs.smart_home_sensors_graph import SmartHomeSensorsGraph
 from application.graphs.smart_home_cameras_graph import SmartHomeCamerasGraph
 from domain.entities import GraphInvokeRequest
 
+
 class MainGraphState(TypedDict):
-        input: str
-        intent: Optional[list[str]]
-        output_lights: Optional[str]
-        output_shopping: Optional[str]
-        output_cams: Optional[str]
-        output_only_talking: Optional[str]
-        output_climate: Optional[str]
-        output_sensors: Optional[str]
-        output: Optional[str]
+    input: str
+    intent: Optional[list[str]]
+    output_lights: Optional[str]
+    output_shopping: Optional[str]
+    output_cams: Optional[str]
+    output_only_talking: Optional[str]
+    output_climate: Optional[str]
+    output_sensors: Optional[str]
+    output: Optional[str]
+
 
 class MainGraph(Graph):
-
-    def __init__(self,
-                 llm_chat: BaseChatModel,
-                 only_talk_graph: OnlyTalkGraph,
-                 shopping_list_graph: ShoppingListGraph,
-                 smart_home_lights_graph: SmartHomeLightsGraph,
-                 smart_home_climate_graph: SmartHomeClimateGraph,
-                 smart_home_sensors_graph: SmartHomeSensorsGraph,
-                 smart_home_cameras_graph: SmartHomeCamerasGraph = None):
+    def __init__(
+        self,
+        llm_chat: BaseChatModel,
+        only_talk_graph: OnlyTalkGraph,
+        shopping_list_graph: ShoppingListGraph,
+        smart_home_lights_graph: SmartHomeLightsGraph,
+        smart_home_climate_graph: SmartHomeClimateGraph,
+        smart_home_sensors_graph: SmartHomeSensorsGraph,
+        smart_home_cameras_graph: SmartHomeCamerasGraph = None,
+    ):
         self.llm_chat = llm_chat
         self.only_talk_graph = only_talk_graph
         self.shopping_list_graph = shopping_list_graph
@@ -40,11 +43,13 @@ class MainGraph(Graph):
         self.smart_home_climate_graph = smart_home_climate_graph
         self.smart_home_sensors_graph = smart_home_sensors_graph
         self.smart_home_cameras_graph = smart_home_cameras_graph
-        self.classification_prompt = ChatPromptTemplate.from_template(self.load_prompt("main_graph.md"))
-    
-    #===============================================
+        self.classification_prompt = ChatPromptTemplate.from_template(
+            self.load_prompt("main_graph.md")
+        )
+
+    # ===============================================
     # Graph Nodes
-    #===============================================
+    # ===============================================
     def _classify_intent(self, data):
         chain = self.classification_prompt | self.llm_chat
         response = chain.invoke({"input": data["input"].message})
@@ -55,18 +60,21 @@ class MainGraph(Graph):
                 intents = [intents]
         except:
             intents = ["only_talking"]
-        return {"intent": intents, "input": data["input"]}  
-
+        return {"intent": intents, "input": data["input"]}
 
     def _handle_final_response(self, data):
-        outputs = [e for e in [
-            data.get("output_lights"),
-            data.get("output_shopping"),
-            data.get("output_cams"),
-            data.get("output_only_talking"),
-            data.get("output_climate"),
-            data.get("output_sensors"),
-        ] if e is not None]
+        outputs = [
+            e
+            for e in [
+                data.get("output_lights"),
+                data.get("output_shopping"),
+                data.get("output_cams"),
+                data.get("output_only_talking"),
+                data.get("output_climate"),
+                data.get("output_sensors"),
+            ]
+            if e is not None
+        ]
 
         intents = data.get("intent", [])
 
@@ -75,27 +83,31 @@ class MainGraph(Graph):
             response = outputs[0]
         else:
             # Merging multiple cathegory responses into a friendly response
-            responses = '\n\n'.join([f"{i+1}. {s}" for i, s in enumerate(outputs)])
-            final_response_prompt = ChatPromptTemplate.from_template(self.load_prompt("main_graph_final_response.md"))
+            responses = "\n\n".join([f"{i + 1}. {s}" for i, s in enumerate(outputs)])
+            final_response_prompt = ChatPromptTemplate.from_template(
+                self.load_prompt("main_graph_final_response.md")
+            )
             final_reponse_chain = final_response_prompt | self.llm_chat
-            llm_response = final_reponse_chain.invoke({"input": data["input"].message, "responses": responses})
+            llm_response = final_reponse_chain.invoke(
+                {"input": data["input"].message, "responses": responses}
+            )
             response = self._remove_thinking_tag(llm_response.content)
 
         return {"output": response}
-    
+
     def _handle_smart_home_lights(self, data):
         print(f"[main_graph.handle_smart_home_lights]: Triggered...")
-        result: str = self.smart_home_lights_graph.invoke(invoke_request=data['input'])
+        result: str = self.smart_home_lights_graph.invoke(invoke_request=data["input"])
         return {"output_lights": result.get("output")}
 
     def _handle_smart_home_climate(self, data):
         print(f"[main_graph.handle_smart_home_climate]: Triggered...")
-        result = self.smart_home_climate_graph.invoke(invoke_request=data['input'])
+        result = self.smart_home_climate_graph.invoke(invoke_request=data["input"])
         return {"output_climate": result.get("output")}
 
     def _handle_smart_home_sensors(self, data):
         print(f"[main_graph.handle_smart_home_sensors]: Triggered...")
-        result = self.smart_home_sensors_graph.invoke(invoke_request=data['input'])
+        result = self.smart_home_sensors_graph.invoke(invoke_request=data["input"])
         return {"output_sensors": result.get("output")}
 
     def _handle_smart_home_security_cams(self, data):
@@ -107,28 +119,37 @@ class MainGraph(Graph):
 
     def _handle_shopping_list(self, data):
         print(f"[main_graph.handle_shopping_list]: : Triggered...")
-        result: str = self.shopping_list_graph.invoke(invoke_request=data['input'])
+        result: str = self.shopping_list_graph.invoke(invoke_request=data["input"])
         return {"output_shopping": result.get("output")}
 
     def _handle_only_talking(self, data):
         print(f"[main_graph.handle_only_talking]: Triggered...")
-        result = self.only_talk_graph.invoke(invoke_request=data['input'])
+        result = self.only_talk_graph.invoke(invoke_request=data["input"])
         return {"output_only_talking": f"{self._remove_thinking_tag(result)}"}
 
-    #===============================================
+    # ===============================================
     # Private Methods
-    #===============================================
+    # ===============================================
 
     def _compile(self):
         workflow = StateGraph(MainGraphState)
 
         workflow.add_node("classify", RunnableLambda(self._classify_intent))
-        workflow.add_node("smart_home_lights", RunnableLambda(self._handle_smart_home_lights))
-        workflow.add_node("smart_home_security_cams", RunnableLambda(self._handle_smart_home_security_cams))
+        workflow.add_node(
+            "smart_home_lights", RunnableLambda(self._handle_smart_home_lights)
+        )
+        workflow.add_node(
+            "smart_home_security_cams",
+            RunnableLambda(self._handle_smart_home_security_cams),
+        )
         workflow.add_node("shopping_list", RunnableLambda(self._handle_shopping_list))
         workflow.add_node("only_talking", RunnableLambda(self._handle_only_talking))
-        workflow.add_node("smart_home_climate", RunnableLambda(self._handle_smart_home_climate))
-        workflow.add_node("smart_home_sensors", RunnableLambda(self._handle_smart_home_sensors))
+        workflow.add_node(
+            "smart_home_climate", RunnableLambda(self._handle_smart_home_climate)
+        )
+        workflow.add_node(
+            "smart_home_sensors", RunnableLambda(self._handle_smart_home_sensors)
+        )
 
         workflow.add_node("final_response", RunnableLambda(self._handle_final_response))
         workflow.add_edge(START, "classify")
@@ -139,8 +160,12 @@ class MainGraph(Graph):
         workflow.add_conditional_edges("classify", intent_router)
 
         for node in [
-            "smart_home_lights", "smart_home_security_cams", "shopping_list",
-            "only_talking", "smart_home_climate", "smart_home_sensors"
+            "smart_home_lights",
+            "smart_home_security_cams",
+            "shopping_list",
+            "only_talking",
+            "smart_home_climate",
+            "smart_home_sensors",
         ]:
             workflow.add_edge(node, "final_response")
 
@@ -148,9 +173,9 @@ class MainGraph(Graph):
 
         return workflow.compile()
 
-    #===============================================
+    # ===============================================
     # Public Methods
-    #===============================================
+    # ===============================================
     def invoke(self, invoke_request: GraphInvokeRequest) -> dict:
         app = self._compile()
         return app.invoke({"input": invoke_request})

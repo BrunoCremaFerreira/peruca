@@ -1,4 +1,3 @@
-
 import uuid
 from domain.exceptions import ValidationError
 
@@ -15,7 +14,7 @@ class BaseValidation:
         if self.errors:
             raise ValidationError(self.errors)
         return self
-    
+
     def is_valid_uuid4(self, value: str) -> bool:
         try:
             val = uuid.UUID(value, version=4)

@@ -1,4 +1,3 @@
-
 import asyncio
 import json
 from typing import List, Optional, TypedDict
@@ -12,35 +11,41 @@ from domain.entities import GraphInvokeRequest, SmartHomeEntityAlias
 from domain.interfaces.data_repository import SmartHomeEntityAliasRepository
 from domain.services.smart_home_service import SmartHomeService
 
+
 class SmartHomeLightsGraphState(TypedDict):
-        input: str
-        intent: Optional[list[str]]
-        output_turn_on: Optional[str]
-        output_turn_off: Optional[str]
-        output_change_color: Optional[str]
-        output_change_bright: Optional[str]
-        output_change_mode: Optional[str]
-        output_not_recognized: Optional[str]
-        available_entities: Optional[dict]
-        output: Optional[str]
+    input: str
+    intent: Optional[list[str]]
+    output_turn_on: Optional[str]
+    output_turn_off: Optional[str]
+    output_change_color: Optional[str]
+    output_change_bright: Optional[str]
+    output_change_mode: Optional[str]
+    output_not_recognized: Optional[str]
+    available_entities: Optional[dict]
+    output: Optional[str]
+
 
 class SmartHomeLightsGraph(Graph):
     """
     Smart Home Lights Graph
     """
 
-    def __init__(self, 
-                 llm_chat: BaseChatModel, 
-                 smart_home_service: SmartHomeService, 
-                 smart_home_entity_alias_repository: SmartHomeEntityAliasRepository):
+    def __init__(
+        self,
+        llm_chat: BaseChatModel,
+        smart_home_service: SmartHomeService,
+        smart_home_entity_alias_repository: SmartHomeEntityAliasRepository,
+    ):
         self.llm_chat = llm_chat
         self.smart_home_service = smart_home_service
         self.smart_home_entity_alias_repository = smart_home_entity_alias_repository
-        self.classification_prompt = ChatPromptTemplate.from_template(self.load_prompt("smart_home_lights_graph.md"))
+        self.classification_prompt = ChatPromptTemplate.from_template(
+            self.load_prompt("smart_home_lights_graph.md")
+        )
 
-    #===============================================
+    # ===============================================
     # Graph Nodes
-    #===============================================
+    # ===============================================
 
     def _classify_intent(self, data):
         """
@@ -62,12 +67,15 @@ class SmartHomeLightsGraph(Graph):
             intents = parsed.get("intents", ["not_recognized"])
 
             # Getting all entity_id x alias for lights devices
-            entity_alias_list: List[SmartHomeEntityAlias] = \
-                self.smart_home_entity_alias_repository \
-                    .get_all(entity_id_starts_with="light.")
-            entity_alias_dict = \
-                {item.alias: item.entity_id for item in entity_alias_list}
-            
+            entity_alias_list: List[SmartHomeEntityAlias] = (
+                self.smart_home_entity_alias_repository.get_all(
+                    entity_id_starts_with="light."
+                )
+            )
+            entity_alias_dict = {
+                item.alias: item.entity_id for item in entity_alias_list
+            }
+
         except Exception as e:
             print(f"[SmartHomeLightsGraph._classify_intent][ERROR]: {e}")
             parsed = {}
@@ -83,7 +91,7 @@ class SmartHomeLightsGraph(Graph):
             "output_change_bright": parsed.get("change_bright"),
             "output_change_mode": parsed.get("change_mode"),
             "output_not_recognized": parsed.get("not_recognized"),
-            "available_entities": entity_alias_dict
+            "available_entities": entity_alias_dict,
         }
 
     def _handle_turn_on(self, data):
@@ -92,17 +100,20 @@ class SmartHomeLightsGraph(Graph):
 
         if not devices:
             return {}
-        
-        entity_ids: List[str] = self. \
-            _find_entity_ids(entity_alias_delimited_str=devices, 
-                             available_entities=data.get("available_entities", {}))
-        
+
+        entity_ids: List[str] = self._find_entity_ids(
+            entity_alias_delimited_str=devices,
+            available_entities=data.get("available_entities", {}),
+        )
+
         if not entity_ids:
             return {"output_turn_on": "Dispositivo nao encontrado"}
 
         for entity_id in entity_ids:
             turn_on_command = LightTurnOn(entity_id=entity_id)
-            asyncio.run(self.smart_home_service.light_turn_on(turn_on_command=turn_on_command))
+            asyncio.run(
+                self.smart_home_service.light_turn_on(turn_on_command=turn_on_command)
+            )
 
         return {"output_turn_on": devices}
 
@@ -112,11 +123,12 @@ class SmartHomeLightsGraph(Graph):
 
         if not devices:
             return {}
-        
-        entity_ids: List[str] = self. \
-            _find_entity_ids(entity_alias_delimited_str=devices, 
-                             available_entities=data.get("available_entities", {}))
-        
+
+        entity_ids: List[str] = self._find_entity_ids(
+            entity_alias_delimited_str=devices,
+            available_entities=data.get("available_entities", {}),
+        )
+
         if not entity_ids:
             return {"output_turn_off": "Dispositivo nao encontrado"}
 
@@ -169,8 +181,14 @@ class SmartHomeLightsGraph(Graph):
                 continue
 
             for entity_id in entity_ids:
-                turn_on_command = LightTurnOn(entity_id=entity_id, brightness_pct=brightness_pct)
-                asyncio.run(self.smart_home_service.light_turn_on(turn_on_command=turn_on_command))
+                turn_on_command = LightTurnOn(
+                    entity_id=entity_id, brightness_pct=brightness_pct
+                )
+                asyncio.run(
+                    self.smart_home_service.light_turn_on(
+                        turn_on_command=turn_on_command
+                    )
+                )
 
             found_aliases.append(alias_str)
 
@@ -210,9 +228,9 @@ class SmartHomeLightsGraph(Graph):
         print(f"[SmartHomeLightsGraph.handle_not_recognized]: Triggered...")
         return {"output_not_recognized": "Dispositivo nao reconhecido"}
 
-    #===============================================
+    # ===============================================
     # Private Methods
-    #===============================================
+    # ===============================================
 
     def _compile(self):
         workflow = StateGraph(SmartHomeLightsGraphState)
@@ -229,15 +247,17 @@ class SmartHomeLightsGraph(Graph):
 
         def intent_router(state):
             return state.get("intent", [])
-        
+
         workflow.add_conditional_edges("classify", intent_router)
 
-        nodes = ["turn_on", 
-                 "turn_off",
-                 "change_color",
-                 "change_bright",
-                 "change_mode",
-                 "not_recognized"]
+        nodes = [
+            "turn_on",
+            "turn_off",
+            "change_color",
+            "change_bright",
+            "change_mode",
+            "not_recognized",
+        ]
 
         for node in nodes:
             workflow.add_edge(node, "final_response")
@@ -246,21 +266,21 @@ class SmartHomeLightsGraph(Graph):
 
         return workflow.compile()
 
-    def _find_entity_ids(self, entity_alias_delimited_str: str, available_entities) -> List[str]:
+    def _find_entity_ids(
+        self, entity_alias_delimited_str: str, available_entities
+    ) -> List[str]:
         parser_template = ChatPromptTemplate.from_template(
             self.load_prompt("smart_home_lights_graph_id_parser_by_alias.md")
         )
-        
+
         prompt = parser_template.format(
-            input=entity_alias_delimited_str,
-            available_entities=str(available_entities)
+            input=entity_alias_delimited_str, available_entities=str(available_entities)
         )
 
         async def _invoke_with_timeout():
             try:
                 response = await asyncio.wait_for(
-                    self.llm_chat.ainvoke(prompt),
-                    timeout=15
+                    self.llm_chat.ainvoke(prompt), timeout=15
                 )
                 return self._remove_thinking_tag(response.content).strip()
             except asyncio.TimeoutError:
@@ -269,16 +289,14 @@ class SmartHomeLightsGraph(Graph):
 
         entity_ids_delimited_str = asyncio.run(_invoke_with_timeout())
 
-        entity_ids = entity_ids_delimited_str.split('|')
+        entity_ids = entity_ids_delimited_str.split("|")
         entity_ids = [e for e in entity_ids if e.upper() != "NONE" and e.strip() != ""]
 
         return entity_ids
 
-
-
-    #===============================================
+    # ===============================================
     # Public Methods
-    #===============================================
+    # ===============================================
 
     def invoke(self, invoke_request: GraphInvokeRequest) -> dict:
         app = self._compile()

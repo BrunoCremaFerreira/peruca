@@ -8,14 +8,15 @@ from websockets.exceptions import ConnectionClosed
 from typing import List
 from domain.interfaces.smart_home_repository import SmartHomeConfigurationRepository
 
+
 class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationRepository):
     """
     Implementation of SmartHomeConfigurationRepository using Home Assistant WebSocket API.
     """
 
-    #=======================
+    # =======================
     # Private Methods
-    #=======================
+    # =======================
 
     def __init__(self, websocket_url: str, token: str):
         """
@@ -29,15 +30,13 @@ class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationReposi
 
     async def _connect(self):
         """Establish a WebSocket connection and authenticate."""
-        ws_url = self.websocket_url \
-            .replace("https", "wss") \
-            .replace("http", "ws")
-        
+        ws_url = self.websocket_url.replace("https", "wss").replace("http", "ws")
+
         use_ssl = ws_url.startswith("wss://")
         if not ws_url.startswith("ws://") and not use_ssl:
             ws_url = f"ws://{ws_url}"
 
-        ws_url = f"{ws_url.rstrip("/")}/api/websocket"
+        ws_url = f"{ws_url.rstrip('/')}/api/websocket"
 
         if use_ssl:
             # TODO: Warning: host checking is temporarily disabled.
@@ -102,9 +101,9 @@ class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationReposi
             if resp.get("id") == message_id:
                 return resp
 
-    #=======================
+    # =======================
     # Public Methods
-    #=======================
+    # =======================
 
     async def get_all_exposed_entities_ids(self) -> List[str]:
         """
@@ -115,9 +114,7 @@ class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationReposi
             await self._connect()
 
         # Request all entity states
-        response = await self._send({
-            "type": "config/entity_registry/list"
-        })
+        response = await self._send({"type": "config/entity_registry/list"})
 
         if "result" not in response:
             raise Exception(f"Error while fetching states: {response}")
@@ -131,7 +128,7 @@ class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationReposi
                 exposed_entity_ids.append(entity["entity_id"])
 
         return exposed_entity_ids
-    
+
     async def get_aliases_by_entity_id(self, entity_id: str) -> List[str]:
         """
         Get entity aliases
@@ -141,14 +138,13 @@ class HomeAssistantSmartHomeConfigurationRepository(SmartHomeConfigurationReposi
             await self._connect()
 
         # Request all entity states
-        response = await self._send({
-            "type": "config/entity_registry/get",
-            "entity_id": entity_id
-        })
+        response = await self._send(
+            {"type": "config/entity_registry/get", "entity_id": entity_id}
+        )
 
         if "result" not in response:
             raise Exception(f"Error while fetching states: {response}")
-        
+
         return response.get("result", {}).get("aliases", [])
 
     async def close(self):

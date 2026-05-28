@@ -3,7 +3,13 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, call
 import pytest
 
-from domain.commands import LightTurnOn, ClimateTurnOn, ClimateTurnOff, ClimateSetTemperature, ClimateSetHvacMode
+from domain.commands import (
+    LightTurnOn,
+    ClimateTurnOn,
+    ClimateTurnOff,
+    ClimateSetTemperature,
+    ClimateSetHvacMode,
+)
 from domain.entities import SmartHomeEntityAlias, SmartHomeClimate, SmartHomeHvacMode
 from domain.services.smart_home_service import SmartHomeService
 
@@ -46,7 +52,6 @@ def _make_service(exposed_ids=None, aliases_map=None):
 
 
 class TestSmartHomeServiceUpdateEntityAliases:
-
     def test_no_exposed_entities_clears_existing_aliases(self):
         # Arrange
         service, _, _, alias_repo, _ = _make_service(exposed_ids=[])
@@ -153,8 +158,8 @@ class TestSmartHomeServiceUpdateEntityAliases:
 # Bug 5 — update_entity_aliases never closes the WebSocket connection
 # ===========================================================================
 
-class TestSmartHomeServiceUpdateEntityAliasesClosesWebSocket:
 
+class TestSmartHomeServiceUpdateEntityAliasesClosesWebSocket:
     def test_update_entity_aliases__after_success__closes_websocket_connection(self):
         """
         Bug: update_entity_aliases() calls get_all_exposed_entities_ids() and
@@ -172,7 +177,9 @@ class TestSmartHomeServiceUpdateEntityAliasesClosesWebSocket:
         # Assert
         config_repo.close.assert_awaited_once()
 
-    def test_update_entity_aliases__after_error_in_get_aliases__closes_websocket_connection(self):
+    def test_update_entity_aliases__after_error_in_get_aliases__closes_websocket_connection(
+        self,
+    ):
         """
         Bug: when every get_aliases_by_entity_id() raises an exception the bare
         'except: continue' swallows the errors but close() is still never called.
@@ -207,7 +214,6 @@ class TestSmartHomeServiceUpdateEntityAliasesClosesWebSocket:
 
 
 class TestSmartHomeServiceLightTurnOn:
-
     def test_light_turn_on_delegates_to_repository(self):
         # Arrange
         service, light_repo, _, _, _ = _make_service()
@@ -219,12 +225,13 @@ class TestSmartHomeServiceLightTurnOn:
 
 
 class TestSmartHomeServiceLightTurnOff:
-
     def test_light_turn_off_delegates_to_repository(self):
         # Arrange
         service, light_repo, _, _, _ = _make_service()
         # Act
-        asyncio.get_event_loop().run_until_complete(service.light_turn_off("light.bedroom"))
+        asyncio.get_event_loop().run_until_complete(
+            service.light_turn_off("light.bedroom")
+        )
         # Assert
         light_repo.turn_off.assert_awaited_once_with(entity_id="light.bedroom")
 
@@ -232,6 +239,7 @@ class TestSmartHomeServiceLightTurnOff:
 # ---------------------------------------------------------------------------
 # Climate helpers
 # ---------------------------------------------------------------------------
+
 
 def _sample_climate() -> SmartHomeClimate:
     """Returns a pre-built SmartHomeClimate entity with all fields populated."""
@@ -251,8 +259,8 @@ def _sample_climate() -> SmartHomeClimate:
 # TestSmartHomeServiceClimateTurnOn
 # ===========================================================================
 
-class TestSmartHomeServiceClimateTurnOn:
 
+class TestSmartHomeServiceClimateTurnOn:
     def test_climate_turn_on__delegates_to_climate_repository(self):
         """climate_turn_on must forward the call to the climate repository turn_on."""
         # Arrange
@@ -284,8 +292,8 @@ class TestSmartHomeServiceClimateTurnOn:
 # TestSmartHomeServiceClimateTurnOff
 # ===========================================================================
 
-class TestSmartHomeServiceClimateTurnOff:
 
+class TestSmartHomeServiceClimateTurnOff:
     def test_climate_turn_off__delegates_to_climate_repository(self):
         """climate_turn_off must forward the call to the climate repository turn_off."""
         # Arrange
@@ -302,8 +310,8 @@ class TestSmartHomeServiceClimateTurnOff:
 # TestSmartHomeServiceClimateSetTemperature
 # ===========================================================================
 
-class TestSmartHomeServiceClimateSetTemperature:
 
+class TestSmartHomeServiceClimateSetTemperature:
     def test_climate_set_temperature__delegates_to_climate_repository(self):
         """climate_set_temperature must forward the call to the climate repository."""
         # Arrange
@@ -311,7 +319,9 @@ class TestSmartHomeServiceClimateSetTemperature:
         cmd = ClimateSetTemperature(entity_id="climate.sala", temperature=20.0)
         climate_repo.set_temperature.return_value = {"result": "ok"}
         # Act
-        asyncio.get_event_loop().run_until_complete(service.climate_set_temperature(cmd))
+        asyncio.get_event_loop().run_until_complete(
+            service.climate_set_temperature(cmd)
+        )
         # Assert
         climate_repo.set_temperature.assert_awaited_once()
 
@@ -322,7 +332,9 @@ class TestSmartHomeServiceClimateSetTemperature:
         cmd = ClimateSetTemperature(entity_id="climate.sala", temperature=18.5)
         climate_repo.set_temperature.return_value = {"result": "ok"}
         # Act
-        asyncio.get_event_loop().run_until_complete(service.climate_set_temperature(cmd))
+        asyncio.get_event_loop().run_until_complete(
+            service.climate_set_temperature(cmd)
+        )
         # Assert
         call_args = climate_repo.set_temperature.call_args
         passed_cmd = call_args[0][0] if call_args[0] else call_args[1].get("command")
@@ -335,8 +347,8 @@ class TestSmartHomeServiceClimateSetTemperature:
 # TestSmartHomeServiceClimateSetHvacMode
 # ===========================================================================
 
-class TestSmartHomeServiceClimateSetHvacMode:
 
+class TestSmartHomeServiceClimateSetHvacMode:
     def test_climate_set_hvac_mode__delegates_to_climate_repository(self):
         """climate_set_hvac_mode must forward the call to the climate repository."""
         # Arrange
@@ -353,8 +365,8 @@ class TestSmartHomeServiceClimateSetHvacMode:
 # TestSmartHomeServiceClimateGetState
 # ===========================================================================
 
-class TestSmartHomeServiceClimateGetState:
 
+class TestSmartHomeServiceClimateGetState:
     def test_climate_get_state__delegates_to_climate_repository(self):
         """climate_get_state must call the climate repository get_state method."""
         # Arrange

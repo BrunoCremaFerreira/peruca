@@ -21,23 +21,23 @@ class UserAppService:
     # Queries
     # =====================================
 
-    def get_by_id(self, user_id: str)-> UserResponse:
-        
+    def get_by_id(self, user_id: str) -> UserResponse:
+
         if is_null_or_whitespace(user_id):
             raise EmptyParamValidationError(param_name="user_id")
-        
+
         user = self.user_repository.get_by_id(user_id=user_id)
         return auto_map(user, UserResponse, True)
-    
-    def get_by_external_id(self, external_id: str)-> UserResponse:
-        
+
+    def get_by_external_id(self, external_id: str) -> UserResponse:
+
         if is_null_or_whitespace(external_id):
             raise EmptyParamValidationError(param_name="external_id")
-        
+
         user = self.user_repository.get_by_external_id(external_id=external_id)
         return auto_map(user, UserResponse, True)
-    
-    def get_all(self)-> List[UserResponse]:
+
+    def get_all(self) -> List[UserResponse]:
         users = self.user_repository.get_all()
         return [auto_map(user, UserResponse) for user in users]
 
@@ -50,4 +50,3 @@ class UserAppService:
 
     def update(self, user_update: UserUpdate) -> None:
         self.user_service.update(user_update=user_update)
-        

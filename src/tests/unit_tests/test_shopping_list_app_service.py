@@ -3,7 +3,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from application.appservices.shopping_list_app_service import ShoppingListAppService
-from application.appservices.view_models import ShoppingListCleanType, ShoppingListItemResponse
+from application.appservices.view_models import (
+    ShoppingListCleanType,
+    ShoppingListItemResponse,
+)
 from domain.commands import ShoppingListItemAdd, ShoppingListItemUpdate
 from domain.entities import ShoppingListItem
 from domain.exceptions import EmptyParamValidationError, ValidationError
@@ -15,7 +18,9 @@ ShoppingListAppService Unit Tests
 
 
 def _sample_item(name="Bread", quantity=1.0, checked=False) -> ShoppingListItem:
-    return ShoppingListItem(id=str(uuid.uuid4()), name=name, quantity=quantity, checked=checked)
+    return ShoppingListItem(
+        id=str(uuid.uuid4()), name=name, quantity=quantity, checked=checked
+    )
 
 
 def _make_app_service(repo=None, service=None):
@@ -32,7 +37,6 @@ def _make_app_service(repo=None, service=None):
 
 
 class TestShoppingListAppServiceGetById:
-
     def test_get_by_id_returns_mapped_response(self):
         # Arrange
         item = _sample_item("Milk")
@@ -71,7 +75,6 @@ class TestShoppingListAppServiceGetById:
 
 
 class TestShoppingListAppServiceGetAll:
-
     def test_get_all_returns_list_of_responses(self):
         # Arrange
         repo = MagicMock()
@@ -95,7 +98,6 @@ class TestShoppingListAppServiceGetAll:
 
 
 class TestShoppingListAppServiceAdd:
-
     def test_add_delegates_to_domain_service(self):
         # Arrange
         svc = MagicMock()
@@ -108,7 +110,6 @@ class TestShoppingListAppServiceAdd:
 
 
 class TestShoppingListAppServiceUpdateQuantity:
-
     def test_update_quantity_delegates_to_domain_service(self):
         # Arrange
         svc = MagicMock()
@@ -121,7 +122,6 @@ class TestShoppingListAppServiceUpdateQuantity:
 
 
 class TestShoppingListAppServiceDelete:
-
     def test_delete_delegates_to_repository(self):
         # Arrange
         repo = MagicMock()
@@ -134,7 +134,6 @@ class TestShoppingListAppServiceDelete:
 
 
 class TestShoppingListAppServiceClear:
-
     def test_clear_all_deletes_every_item(self):
         # Arrange
         repo = MagicMock()
@@ -170,7 +169,6 @@ class TestShoppingListAppServiceClear:
 
 
 class TestShoppingListAppServiceCheck:
-
     def test_check_delegates_to_domain_service(self):
         # Arrange
         svc = MagicMock()
@@ -183,7 +181,6 @@ class TestShoppingListAppServiceCheck:
 
 
 class TestShoppingListAppServiceUncheck:
-
     def test_uncheck_delegates_to_domain_service(self):
         # Arrange
         svc = MagicMock()

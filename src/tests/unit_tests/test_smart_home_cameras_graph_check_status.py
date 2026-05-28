@@ -19,6 +19,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 try:
     from application.graphs.smart_home_cameras_graph import SmartHomeCamerasGraph
     from domain.entities import SmartHomeCamera
+
     _GRAPH_AVAILABLE = True
 except ImportError:
     SmartHomeCamerasGraph = None  # type: ignore[assignment,misc]
@@ -34,6 +35,7 @@ _SKIP_IF_NOT_IMPLEMENTED = pytest.mark.skipif(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_graph() -> "SmartHomeCamerasGraph":
     """
@@ -92,9 +94,9 @@ def _make_camera(
 # TestHandleCheckStatus
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestHandleCheckStatus:
-
     def test_handle_check_status__entity_found__calls_service_get_state(self):
         """
         When _find_entity_ids resolves to a valid entity_id,
@@ -110,8 +112,9 @@ class TestHandleCheckStatus:
 
         graph._handle_check_status(state)
 
-        graph.smart_home_service.camera_get_state.assert_called_once(), (
-            "Expected camera_get_state to be called exactly once"
+        (
+            graph.smart_home_service.camera_get_state.assert_called_once(),
+            ("Expected camera_get_state to be called exactly once"),
         )
 
     def test_handle_check_status__entity_found__returns_non_empty_string(self):
@@ -121,7 +124,9 @@ class TestHandleCheckStatus:
         """
         graph = _make_graph()
         graph._find_entity_ids = MagicMock(return_value=["camera.cozinha"])
-        graph.smart_home_service.camera_get_state.return_value = _make_camera(state="idle")
+        graph.smart_home_service.camera_get_state.return_value = _make_camera(
+            state="idle"
+        )
         state = _state(
             output_check_status="cozinha",
             available_entities={"cozinha": "camera.cozinha"},
@@ -143,7 +148,9 @@ class TestHandleCheckStatus:
         """
         graph = _make_graph()
         graph._find_entity_ids = MagicMock(return_value=["camera.cozinha"])
-        graph.smart_home_service.camera_get_state.return_value = _make_camera(state="idle")
+        graph.smart_home_service.camera_get_state.return_value = _make_camera(
+            state="idle"
+        )
         state = _state(
             output_check_status="cozinha",
             available_entities={"cozinha": "camera.cozinha"},
@@ -161,7 +168,9 @@ class TestHandleCheckStatus:
         """
         graph = _make_graph()
         graph._find_entity_ids = MagicMock(return_value=["camera.cozinha"])
-        graph.smart_home_service.camera_get_state.return_value = _make_camera(state="recording")
+        graph.smart_home_service.camera_get_state.return_value = _make_camera(
+            state="recording"
+        )
         state = _state(
             output_check_status="cozinha",
             available_entities={"cozinha": "camera.cozinha"},
@@ -179,7 +188,9 @@ class TestHandleCheckStatus:
         """
         graph = _make_graph()
         graph._find_entity_ids = MagicMock(return_value=["camera.cozinha"])
-        graph.smart_home_service.camera_get_state.return_value = _make_camera(state="streaming")
+        graph.smart_home_service.camera_get_state.return_value = _make_camera(
+            state="streaming"
+        )
         state = _state(
             output_check_status="cozinha",
             available_entities={"cozinha": "camera.cozinha"},
@@ -211,7 +222,9 @@ class TestHandleCheckStatus:
         output = result.get("output_check_status", "")
         assert output, "Expected non-empty output_check_status for state='unavailable'"
 
-    def test_handle_check_status__entity_not_found__returns_dispositivo_nao_encontrado(self):
+    def test_handle_check_status__entity_not_found__returns_dispositivo_nao_encontrado(
+        self,
+    ):
         """
         When _find_entity_ids returns [], the handler must return a message in
         output_check_status indicating the device was not found.
@@ -243,9 +256,7 @@ class TestHandleCheckStatus:
 
         result = graph._handle_check_status(state)
 
-        assert result == {}, (
-            f"Expected empty dict for None payload, got: {result}"
-        )
+        assert result == {}, f"Expected empty dict for None payload, got: {result}"
         graph.smart_home_service.camera_get_state.assert_not_called()
 
     def test_handle_check_status__output_key_is_output_check_status(self):
@@ -285,6 +296,7 @@ class TestHandleCheckStatus:
 
         graph._handle_check_status(state)
 
-        graph.smart_home_service.camera_get_snapshot.assert_not_called(), (
-            "check_status handler must not call camera_get_snapshot"
+        (
+            graph.smart_home_service.camera_get_snapshot.assert_not_called(),
+            ("check_status handler must not call camera_get_snapshot"),
         )

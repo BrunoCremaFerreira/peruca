@@ -32,10 +32,12 @@ def _make_app_service(light_repo=None, alias_repo=None, svc=None):
 
 
 class TestSmartHomeAppServiceGetAllEntityAliases:
-
     def test_get_all_entity_aliases_returns_list(self):
         # Arrange
-        aliases = [_sample_alias("light.living_room", "Sala"), _sample_alias("light.bedroom", "Quarto")]
+        aliases = [
+            _sample_alias("light.living_room", "Sala"),
+            _sample_alias("light.bedroom", "Quarto"),
+        ]
         alias_repo = MagicMock()
         alias_repo.get_all.return_value = aliases
         app_service = _make_app_service(alias_repo=alias_repo)
@@ -57,7 +59,6 @@ class TestSmartHomeAppServiceGetAllEntityAliases:
 
 
 class TestSmartHomeAppServiceUpdateEntityAliases:
-
     def test_update_entity_aliases_delegates_to_domain_service(self):
         # Arrange
         svc = AsyncMock()
@@ -74,4 +75,6 @@ class TestSmartHomeAppServiceUpdateEntityAliases:
         app_service = _make_app_service(svc=svc)
         # Act / Assert
         with pytest.raises(RuntimeError, match="HA unreachable"):
-            asyncio.get_event_loop().run_until_complete(app_service.update_entity_aliases())
+            asyncio.get_event_loop().run_until_complete(
+                app_service.update_entity_aliases()
+            )

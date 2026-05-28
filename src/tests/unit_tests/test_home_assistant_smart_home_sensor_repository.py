@@ -27,6 +27,7 @@ Covers the complete contract of the sensor repository adapter:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_repo() -> "HomeAssistantSmartHomeSensorRepository":
     return HomeAssistantSmartHomeSensorRepository(
         base_url="http://localhost:8123",
@@ -107,8 +108,8 @@ def _mock_aiohttp_session(json_response):
 # TestHomeAssistantSmartHomeSensorRepositoryGetState
 # ===========================================================================
 
-class TestHomeAssistantSmartHomeSensorRepositoryGetState:
 
+class TestHomeAssistantSmartHomeSensorRepositoryGetState:
     def test_get_state__returns_sensor_reading(self):
         """
         get_state must return a SensorReading populated from the HA response.
@@ -135,12 +136,8 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetState:
         assert result.entity_id == "sensor.temperature_sala", (
             f"Expected entity_id='sensor.temperature_sala', got {result.entity_id!r}"
         )
-        assert result.state == "23.5", (
-            f"Expected state='23.5', got {result.state!r}"
-        )
-        assert result.unit == "°C", (
-            f"Expected unit='°C', got {result.unit!r}"
-        )
+        assert result.state == "23.5", f"Expected state='23.5', got {result.state!r}"
+        assert result.unit == "°C", f"Expected unit='°C', got {result.unit!r}"
         assert result.friendly_name == "Temperatura Sala", (
             f"Expected friendly_name='Temperatura Sala', got {result.friendly_name!r}"
         )
@@ -286,9 +283,7 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetState:
         )
 
         with patch("aiohttp.ClientSession", return_value=mock_cm_session):
-            asyncio.get_event_loop().run_until_complete(
-                repo.get_state(entity_id)
-            )
+            asyncio.get_event_loop().run_until_complete(repo.get_state(entity_id))
 
         called_url = mock_session.get.call_args[0][0]
         assert called_url.startswith("http://localhost:8123"), (
@@ -307,7 +302,9 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetState:
 
         mock_resp = AsyncMock()
         mock_resp.raise_for_status = MagicMock(
-            side_effect=aiohttp.ClientResponseError(MagicMock(), MagicMock(), status=404)
+            side_effect=aiohttp.ClientResponseError(
+                MagicMock(), MagicMock(), status=404
+            )
         )
         mock_resp.status = 404
 
@@ -333,8 +330,8 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetState:
 # TestHomeAssistantSmartHomeSensorRepositoryGetHistory
 # ===========================================================================
 
-class TestHomeAssistantSmartHomeSensorRepositoryGetHistory:
 
+class TestHomeAssistantSmartHomeSensorRepositoryGetHistory:
     def test_get_history__returns_list_of_sensor_readings(self):
         """
         get_history must parse the HA history response (List[List[dict]])
@@ -344,8 +341,12 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetHistory:
         # HA returns List[List[dict]] — the outer list has one item per entity
         ha_history_response = [
             [
-                _make_ha_history_entry(state="on", last_changed="2026-05-25T08:00:00+00:00"),
-                _make_ha_history_entry(state="off", last_changed="2026-05-25T08:05:00+00:00"),
+                _make_ha_history_entry(
+                    state="on", last_changed="2026-05-25T08:00:00+00:00"
+                ),
+                _make_ha_history_entry(
+                    state="off", last_changed="2026-05-25T08:05:00+00:00"
+                ),
             ]
         ]
         mock_cm_session, _ = _mock_aiohttp_session(ha_history_response)
@@ -397,6 +398,7 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetHistory:
         # Verify the start_time embedded in the URL is within the expected range.
         # Extract ISO timestamp from the URL (format: /api/history/period/<iso_timestamp>)
         import re
+
         match = re.search(r"history/period/([^?]+)", called_url)
         assert match, f"Could not find timestamp in URL: {called_url!r}"
 
@@ -481,9 +483,7 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetHistory:
         mock_cm_session, mock_session = _mock_aiohttp_session([[]])
 
         with patch("aiohttp.ClientSession", return_value=mock_cm_session):
-            asyncio.get_event_loop().run_until_complete(
-                repo.get_history(entity_id, 3)
-            )
+            asyncio.get_event_loop().run_until_complete(repo.get_history(entity_id, 3))
 
         called_url = mock_session.get.call_args[0][0]
         assert entity_id in called_url, (

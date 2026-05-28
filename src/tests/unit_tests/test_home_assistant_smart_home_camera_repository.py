@@ -23,6 +23,7 @@ try:
         HomeAssistantSmartHomeCameraRepository,
     )
     from domain.entities import SmartHomeCamera, SmartHomeCameraSnapshot
+
     _REPO_AVAILABLE = True
 except ImportError:
     HomeAssistantSmartHomeCameraRepository = None  # type: ignore[assignment,misc]
@@ -39,6 +40,7 @@ _SKIP_IF_NOT_IMPLEMENTED = pytest.mark.skipif(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_repo() -> "HomeAssistantSmartHomeCameraRepository":
     """Build the repository with test credentials."""
@@ -140,9 +142,9 @@ def _mock_aiohttp_error_session(status_code: int = 404):
 # TestHomeAssistantSmartHomeCameraRepositoryGetState
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestHomeAssistantSmartHomeCameraRepositoryGetState:
-
     def test_get_state__returns_smart_home_camera(self):
         """
         get_state must return a SmartHomeCamera instance populated from the HA response.
@@ -257,9 +259,7 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetState:
         )
 
         with patch("aiohttp.ClientSession", return_value=mock_cm_session):
-            asyncio.get_event_loop().run_until_complete(
-                repo.get_state(entity_id)
-            )
+            asyncio.get_event_loop().run_until_complete(repo.get_state(entity_id))
 
         called_url = mock_session.get.call_args[0][0]
         assert "api/states" in called_url, (
@@ -299,9 +299,9 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetState:
 # TestHomeAssistantSmartHomeCameraRepositoryGetSnapshot
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestHomeAssistantSmartHomeCameraRepositoryGetSnapshot:
-
     def test_get_snapshot__returns_smart_home_camera_snapshot(self):
         """
         get_snapshot must return a SmartHomeCameraSnapshot populated with
@@ -359,9 +359,7 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetSnapshot:
         mock_cm_session, mock_session = _mock_aiohttp_session_bytes(b"fake_image")
 
         with patch("aiohttp.ClientSession", return_value=mock_cm_session):
-            asyncio.get_event_loop().run_until_complete(
-                repo.get_snapshot(entity_id)
-            )
+            asyncio.get_event_loop().run_until_complete(repo.get_snapshot(entity_id))
 
         called_url = mock_session.get.call_args[0][0]
         assert "camera_proxy" in called_url, (

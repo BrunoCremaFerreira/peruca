@@ -12,11 +12,11 @@ class UserValidator(BaseValidation):
     def validate_id(self, id: str):
         if not id:
             self.errors.append("The 'Id' is empty")
-        
+
         if not super().is_valid_uuid4(id):
             self.errors.append("The 'Id' is not a valid uuid4")
         return self
-    
+
     def validate_external_id(self, external_id: str):
         if external_id and len(external_id) > 100:
             self.errors.append("The 'external_id' has more than 1000 caracteres")

@@ -12,7 +12,7 @@ class RedisContextRepository(ContextRepository):
     def __init__(self, connection_string: str):
         self._connection_string = connection_string
         self._client: Redis
-    
+
     def connect(self):
         self._client = from_url(self._connection_string)
 

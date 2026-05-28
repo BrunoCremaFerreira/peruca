@@ -21,6 +21,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 try:
     from application.graphs.smart_home_cameras_graph import SmartHomeCamerasGraph
     from domain.entities import SmartHomeCameraSnapshot
+
     _GRAPH_AVAILABLE = True
 except ImportError:
     SmartHomeCamerasGraph = None  # type: ignore[assignment,misc]
@@ -36,6 +37,7 @@ _SKIP_IF_NOT_IMPLEMENTED = pytest.mark.skipif(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_graph() -> "SmartHomeCamerasGraph":
     """
@@ -75,7 +77,9 @@ def _state(**kwargs) -> dict:
     return defaults
 
 
-def _make_snapshot(entity_id: str = "camera.cozinha", image_bytes: bytes = b"fake_jpeg") -> "SmartHomeCameraSnapshot":
+def _make_snapshot(
+    entity_id: str = "camera.cozinha", image_bytes: bytes = b"fake_jpeg"
+) -> "SmartHomeCameraSnapshot":
     """Build a SmartHomeCameraSnapshot for use in mocked service responses."""
     return SmartHomeCameraSnapshot(
         entity_id=entity_id,
@@ -88,9 +92,9 @@ def _make_snapshot(entity_id: str = "camera.cozinha", image_bytes: bytes = b"fak
 # TestHandleShowSnapshot
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestHandleShowSnapshot:
-
     def test_handle_show_snapshot__entity_found__calls_service_get_snapshot(self):
         """
         When _find_entity_ids resolves to a valid entity_id,
@@ -106,8 +110,9 @@ class TestHandleShowSnapshot:
 
         graph._handle_show_snapshot(state)
 
-        graph.smart_home_service.camera_get_snapshot.assert_called_once(), (
-            "Expected camera_get_snapshot to be called exactly once"
+        (
+            graph.smart_home_service.camera_get_snapshot.assert_called_once(),
+            ("Expected camera_get_snapshot to be called exactly once"),
         )
 
     def test_handle_show_snapshot__entity_found__output_starts_with_data_uri(self):
@@ -127,12 +132,16 @@ class TestHandleShowSnapshot:
 
         result = graph._handle_show_snapshot(state)
 
-        assert result.get("output_show_snapshot", "").startswith("data:image/jpeg;base64,"), (
+        assert result.get("output_show_snapshot", "").startswith(
+            "data:image/jpeg;base64,"
+        ), (
             f"Expected output to start with 'data:image/jpeg;base64,', "
             f"got: {result.get('output_show_snapshot', '')[:60]!r}"
         )
 
-    def test_handle_show_snapshot__entity_found__base64_encodes_image_bytes_correctly(self):
+    def test_handle_show_snapshot__entity_found__base64_encodes_image_bytes_correctly(
+        self,
+    ):
         """
         The base64 content after the data URI prefix must decode back to the
         original image_bytes from the snapshot. Tests encoding correctness.
@@ -154,14 +163,16 @@ class TestHandleShowSnapshot:
         prefix = "data:image/jpeg;base64,"
         assert output.startswith(prefix), f"Missing data URI prefix in: {output[:80]!r}"
 
-        b64_part = output[len(prefix):]
+        b64_part = output[len(prefix) :]
         decoded = base64.b64decode(b64_part)
         assert decoded == raw_bytes, (
             f"Expected decoded bytes to match original image_bytes. "
             f"Got decoded={decoded!r}, expected={raw_bytes!r}"
         )
 
-    def test_handle_show_snapshot__entity_not_found__returns_dispositivo_nao_encontrado(self):
+    def test_handle_show_snapshot__entity_not_found__returns_dispositivo_nao_encontrado(
+        self,
+    ):
         """
         When _find_entity_ids returns [], the handler must return a Portuguese
         'not found' message in output_show_snapshot instead of raising an error.
@@ -192,12 +203,12 @@ class TestHandleShowSnapshot:
 
         result = graph._handle_show_snapshot(state)
 
-        assert result == {}, (
-            f"Expected empty dict for None payload, got: {result}"
-        )
+        assert result == {}, f"Expected empty dict for None payload, got: {result}"
         graph.smart_home_service.camera_get_snapshot.assert_not_called()
 
-    def test_handle_show_snapshot__entity_found__calls_find_entity_ids_with_payload(self):
+    def test_handle_show_snapshot__entity_found__calls_find_entity_ids_with_payload(
+        self,
+    ):
         """
         _find_entity_ids must be called with the location string from
         output_show_snapshot so aliases are resolved correctly.
@@ -223,7 +234,9 @@ class TestHandleShowSnapshot:
             f"Expected _find_entity_ids called with 'cozinha', got call_args={call_args!r}"
         )
 
-    def test_handle_show_snapshot__entity_found__output_key_is_output_show_snapshot(self):
+    def test_handle_show_snapshot__entity_found__output_key_is_output_show_snapshot(
+        self,
+    ):
         """
         The returned dict must use the key 'output_show_snapshot', not any other key.
         Guards against copy-paste errors from other handlers.

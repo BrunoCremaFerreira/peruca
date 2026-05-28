@@ -38,6 +38,7 @@ from application.graphs.shopping_list_graph import ShoppingListGraph
 # Helpers
 # ===========================================================================
 
+
 def _make_graph() -> ShoppingListGraph:
     """
     Build a ShoppingListGraph with all external dependencies mocked.
@@ -87,6 +88,7 @@ def _make_invoke_request() -> MagicMock:
 # TestClassifyIntentDeleteItemValidJson
 # ===========================================================================
 
+
 class TestClassifyIntentDeleteItemValidJson:
     """
     Happy path: the LLM returns clean JSON (no fences, no think tags).
@@ -135,6 +137,7 @@ class TestClassifyIntentDeleteItemValidJson:
 # TestClassifyIntentMarkdownFences  (Bug 1)
 # ===========================================================================
 
+
 class TestClassifyIntentMarkdownFences:
     """
     Bug 1: when the LLM wraps its JSON in markdown code fences, the current
@@ -149,7 +152,9 @@ class TestClassifyIntentMarkdownFences:
     the real cleaning pipeline runs against the fenced output.
     """
 
-    def test_classify_delete_item__json_fenced_with_json_lang__intent_is_delete_item(self):
+    def test_classify_delete_item__json_fenced_with_json_lang__intent_is_delete_item(
+        self,
+    ):
         """
         LLM response wrapped in ```json ... ``` fences must still produce
         result["intent"] == ["delete_item"].
@@ -173,7 +178,9 @@ class TestClassifyIntentMarkdownFences:
             "Likely cause: _remove_thinking_tag does not strip markdown code fences."
         )
 
-    def test_classify_delete_item__json_fenced_without_lang__intent_is_delete_item(self):
+    def test_classify_delete_item__json_fenced_without_lang__intent_is_delete_item(
+        self,
+    ):
         """
         LLM response wrapped in plain ``` ... ``` fences (no language tag) must
         still produce result["intent"] == ["delete_item"].
@@ -201,6 +208,7 @@ class TestClassifyIntentMarkdownFences:
 # TestClassifyIntentFallback
 # ===========================================================================
 
+
 class TestClassifyIntentFallback:
     """
     Robustness: completely unparseable LLM output must produce
@@ -213,7 +221,9 @@ class TestClassifyIntentFallback:
         must not propagate any exception and must return intent=["not_recognized"].
         """
         graph = _make_graph()
-        _configure_llm_output(graph, "Desculpe, não entendi o que você quis dizer sobre a lista.")
+        _configure_llm_output(
+            graph, "Desculpe, não entendi o que você quis dizer sobre a lista."
+        )
 
         result = graph._classify_intent({"input": _make_invoke_request()})
 

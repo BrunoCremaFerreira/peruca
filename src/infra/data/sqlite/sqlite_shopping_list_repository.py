@@ -35,38 +35,44 @@ class SqliteShoppingListRepository(SqliteBaseRepository, ShoppingListRepository)
         with self.conn:
             self.conn.execute(
                 "INSERT INTO shopping_list (id, name, quantity, when_created) VALUES (?, ?, ?, ?)",
-                (shopping_list_item.id,
-                 shopping_list_item.name,
-                 shopping_list_item.quantity,
-                 shopping_list_item.when_created)
+                (
+                    shopping_list_item.id,
+                    shopping_list_item.name,
+                    shopping_list_item.quantity,
+                    shopping_list_item.when_created,
+                ),
             )
-    
-    
+
     def get_by_id(self, item_id: str) -> Optional[ShoppingListItem]:
         """
         Get Shopping List Item By Id
         """
         cursor = self.conn.execute(
-            "SELECT id, name, quantity, checked, when_created, when_updated, when_deleted FROM shopping_list WHERE id = ?", (item_id,))
+            "SELECT id, name, quantity, checked, when_created, when_updated, when_deleted FROM shopping_list WHERE id = ?",
+            (item_id,),
+        )
         row = cursor.fetchone()
         return self._map_shopping_list_item(row) if row else None
-    
+
     def get_by_name(self, item_name: str) -> Optional[ShoppingListItem]:
         """
         Get Shopping List Item By Name
         """
         cursor = self.conn.execute(
-            "SELECT id, name, quantity, checked, when_created, when_updated, when_deleted FROM shopping_list WHERE LOWER(name) = ?", (item_name.lower(),))
+            "SELECT id, name, quantity, checked, when_created, when_updated, when_deleted FROM shopping_list WHERE LOWER(name) = ?",
+            (item_name.lower(),),
+        )
         row = cursor.fetchone()
         return self._map_shopping_list_item(row) if row else None
-    
+
     def get_all(self) -> List[ShoppingListItem]:
         """
         List All Shopping List
         """
-        cursor = self.conn.execute("SELECT id, name, quantity, checked, when_created, when_updated, when_deleted FROM shopping_list")
+        cursor = self.conn.execute(
+            "SELECT id, name, quantity, checked, when_created, when_updated, when_deleted FROM shopping_list"
+        )
         return [self._map_shopping_list_item(row) for row in cursor.fetchall()]
-
 
     def update(self, item: ShoppingListItem):
         """
@@ -75,7 +81,7 @@ class SqliteShoppingListRepository(SqliteBaseRepository, ShoppingListRepository)
         with self.conn:
             self.conn.execute(
                 "UPDATE shopping_list SET name = ?, quantity = ?, when_created = ? WHERE id = ?",
-                (item.name, item.quantity, item.when_created, item.id)
+                (item.name, item.quantity, item.when_created, item.id),
             )
 
     def check(self, item_id: str) -> None:
@@ -85,7 +91,7 @@ class SqliteShoppingListRepository(SqliteBaseRepository, ShoppingListRepository)
         with self.conn:
             self.conn.execute(
                 "UPDATE shopping_list SET checked = 1, when_updated = ? WHERE id = ?",
-                (datetime.now(timezone.utc), item_id)
+                (datetime.now(timezone.utc), item_id),
             )
 
     def uncheck(self, item_id: str) -> None:
@@ -95,7 +101,7 @@ class SqliteShoppingListRepository(SqliteBaseRepository, ShoppingListRepository)
         with self.conn:
             self.conn.execute(
                 "UPDATE shopping_list SET checked = 0, when_updated = ? WHERE id = ?",
-                (datetime.now(timezone.utc), item_id)
+                (datetime.now(timezone.utc), item_id),
             )
 
     def delete(self, item_id: str):
@@ -120,4 +126,5 @@ class SqliteShoppingListRepository(SqliteBaseRepository, ShoppingListRepository)
             checked=row["checked"],
             when_created=row["when_created"],
             when_updated=row["when_updated"],
-            when_deleted=row["when_deleted"])
+            when_deleted=row["when_deleted"],
+        )

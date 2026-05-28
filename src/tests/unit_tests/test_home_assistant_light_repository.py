@@ -20,11 +20,15 @@ Covers four concrete bugs:
 """
 
 
-def _make_repo(base_url: str = "http://localhost:8123") -> HomeAssistantSmartHomeLightRepository:
+def _make_repo(
+    base_url: str = "http://localhost:8123",
+) -> HomeAssistantSmartHomeLightRepository:
     return HomeAssistantSmartHomeLightRepository(base_url=base_url, token="test-token")
 
 
-def _make_ha_state_response(entity_id: str = "light.sala", color_temp: int = 370, color_temp_kelvin: int = 2700) -> dict:
+def _make_ha_state_response(
+    entity_id: str = "light.sala", color_temp: int = 370, color_temp_kelvin: int = 2700
+) -> dict:
     """Simulate a typical Home Assistant /api/states response."""
     return {
         "entity_id": entity_id,
@@ -70,8 +74,8 @@ def _make_mock_session(json_response: dict):
 # Bug 1 — turn_on URL construction duplicates 'http://' scheme
 # ===========================================================================
 
-class TestTurnOnUrlConstruction:
 
+class TestTurnOnUrlConstruction:
     def test_turn_on__url_construction__does_not_duplicate_scheme(self):
         """
         Bug: line 70 builds 'http://{self.base_url}/...' but self.base_url
@@ -83,7 +87,9 @@ class TestTurnOnUrlConstruction:
 
         with patch("aiohttp.ClientSession", return_value=mock_cm_session):
             cmd = LightTurnOn(entity_id="light.sala")
-            asyncio.get_event_loop().run_until_complete(repo.turn_on(turn_on_command=cmd))
+            asyncio.get_event_loop().run_until_complete(
+                repo.turn_on(turn_on_command=cmd)
+            )
 
         called_url = mock_session.post.call_args[0][0]
         assert not called_url.startswith("http://http://"), (
@@ -98,8 +104,8 @@ class TestTurnOnUrlConstruction:
 # Bug 2 — turn_off URL construction duplicates 'http://' scheme
 # ===========================================================================
 
-class TestTurnOffUrlConstruction:
 
+class TestTurnOffUrlConstruction:
     def test_turn_off__url_construction__does_not_duplicate_scheme(self):
         """
         Bug: line 88 builds 'http://{self.base_url}/...' but self.base_url
@@ -110,7 +116,9 @@ class TestTurnOffUrlConstruction:
         mock_cm_session, mock_session = _make_mock_session({"status": 200})
 
         with patch("aiohttp.ClientSession", return_value=mock_cm_session):
-            asyncio.get_event_loop().run_until_complete(repo.turn_off(entity_id="light.sala"))
+            asyncio.get_event_loop().run_until_complete(
+                repo.turn_off(entity_id="light.sala")
+            )
 
         called_url = mock_session.post.call_args[0][0]
         assert not called_url.startswith("http://http://"), (
@@ -125,8 +133,8 @@ class TestTurnOffUrlConstruction:
 # Bug 3 — get_state does not populate entity_id on SmartHomeLight
 # ===========================================================================
 
-class TestGetStateEntityId:
 
+class TestGetStateEntityId:
     def test_get_state__entity_id__is_populated_in_result(self):
         """
         Bug: lines 43-58 construct SmartHomeLight without passing entity_id=entity_id,
@@ -135,10 +143,14 @@ class TestGetStateEntityId:
         """
         entity_id = "light.quarto"
         repo = _make_repo()
-        mock_cm_session, _ = _make_mock_session(_make_ha_state_response(entity_id=entity_id))
+        mock_cm_session, _ = _make_mock_session(
+            _make_ha_state_response(entity_id=entity_id)
+        )
 
         with patch("aiohttp.ClientSession", return_value=mock_cm_session):
-            result = asyncio.get_event_loop().run_until_complete(repo.get_state(entity_id=entity_id))
+            result = asyncio.get_event_loop().run_until_complete(
+                repo.get_state(entity_id=entity_id)
+            )
 
         assert result.entity_id == entity_id, (
             f"Expected entity_id={entity_id!r}, got {result.entity_id!r}"
@@ -149,8 +161,8 @@ class TestGetStateEntityId:
 # Bug 4 — get_state reads 'color_temp' (mireds) instead of 'color_temp_kelvin'
 # ===========================================================================
 
-class TestGetStateColorTempKelvin:
 
+class TestGetStateColorTempKelvin:
     def test_get_state__color_temp_kelvin__uses_kelvin_attribute(self):
         """
         Bug: line 46 reads attributes.get('color_temp') which is in mireds,

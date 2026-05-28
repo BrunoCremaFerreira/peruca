@@ -1,8 +1,20 @@
 from abc import ABC, abstractmethod
 from typing import List
 
-from domain.commands import ClimateSetHvacMode, ClimateSetTemperature, ClimateTurnOff, ClimateTurnOn, LightTurnOn
-from domain.entities import SmartHomeClimate, SmartHomeLight, SensorReading, SmartHomeCamera, SmartHomeCameraSnapshot
+from domain.commands import (
+    ClimateSetHvacMode,
+    ClimateSetTemperature,
+    ClimateTurnOff,
+    ClimateTurnOn,
+    LightTurnOn,
+)
+from domain.entities import (
+    SmartHomeClimate,
+    SmartHomeLight,
+    SensorReading,
+    SmartHomeCamera,
+    SmartHomeCameraSnapshot,
+)
 
 
 class SmartHomeLightRepository(ABC):
@@ -11,25 +23,26 @@ class SmartHomeLightRepository(ABC):
     """
 
     @abstractmethod
-    async def get_state(self, entity_id: str)-> SmartHomeLight:
+    async def get_state(self, entity_id: str) -> SmartHomeLight:
         """
         Get entity current state.
         """
         pass
 
     @abstractmethod
-    async def turn_on(self, turn_on_command: LightTurnOn)-> dict:
+    async def turn_on(self, turn_on_command: LightTurnOn) -> dict:
         """
         Turn on light
         """
         pass
 
     @abstractmethod
-    async def turn_off(self, entity_id: str)-> dict:
+    async def turn_off(self, entity_id: str) -> dict:
         """
         Turn off light
         """
         pass
+
 
 class SmartHomeConfigurationRepository(ABC):
     """
@@ -37,7 +50,7 @@ class SmartHomeConfigurationRepository(ABC):
     """
 
     @abstractmethod
-    async def get_all_exposed_entities_ids(self)-> List[str]:
+    async def get_all_exposed_entities_ids(self) -> List[str]:
         """
         Get all Smart Home Entities Ids
         """
@@ -49,6 +62,7 @@ class SmartHomeConfigurationRepository(ABC):
         Get entity aliases
         """
         pass
+
 
 class SmartHomeClimateRepository(ABC):
     """
@@ -74,6 +88,7 @@ class SmartHomeClimateRepository(ABC):
     @abstractmethod
     async def turn_off(self, command: ClimateTurnOff) -> dict:
         pass
+
 
 class SmartHomeSensorRepository(ABC):
     """

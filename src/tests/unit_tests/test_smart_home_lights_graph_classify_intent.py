@@ -53,8 +53,8 @@ def _configure_cleaned_output(graph: SmartHomeLightsGraph, cleaned_str: str) -> 
 # Bug — eval() raises NameError on JSON 'null'
 # ===========================================================================
 
-class TestClassifyIntentJsonParsing:
 
+class TestClassifyIntentJsonParsing:
     def test_classify_intent__llm_returns_json_with_null__parses_without_error(self):
         """
         Bug: eval('{"intents": ["turn_on"], "turn_off": null}') raises
@@ -63,7 +63,9 @@ class TestClassifyIntentJsonParsing:
         the intents list without raising any exception.
         """
         graph = _make_graph()
-        json_with_null = '{"intents": ["turn_on"], "turn_off": null, "turn_on": "luz da sala"}'
+        json_with_null = (
+            '{"intents": ["turn_on"], "turn_off": null, "turn_on": "luz da sala"}'
+        )
         _configure_cleaned_output(graph, json_with_null)
 
         # Must not raise NameError
@@ -73,7 +75,9 @@ class TestClassifyIntentJsonParsing:
             f"Expected 'turn_on' in intent list, got: {result['intent']}"
         )
 
-    def test_classify_intent__llm_returns_json_with_true_false__parses_without_error(self):
+    def test_classify_intent__llm_returns_json_with_true_false__parses_without_error(
+        self,
+    ):
         """
         Bug: eval('{"intents": ["turn_on"], "active": true}') raises
         NameError: name 'true' is not defined.

@@ -5,6 +5,7 @@ from domain.entities import User
 from domain.interfaces.data_repository import UserRepository
 from infra.data.sqlite.sqlite_base_repository import SqliteBaseRepository
 
+
 class SqliteUserRepository(SqliteBaseRepository, UserRepository):
     """
     User Sqlite implementation repository
@@ -41,7 +42,7 @@ class SqliteUserRepository(SqliteBaseRepository, UserRepository):
         with self.conn:
             self.conn.execute(
                 "INSERT INTO users (id, external_id, name, summary, when_created) VALUES (?, ?, ?, ?, ?)",
-                (user.id, user.external_id, user.name, user.summary, user.when_created)
+                (user.id, user.external_id, user.name, user.summary, user.when_created),
             )
 
     def get_by_id(self, user_id: str) -> Optional[User]:
@@ -58,10 +59,12 @@ class SqliteUserRepository(SqliteBaseRepository, UserRepository):
                 users 
             WHERE 
                 id = ?
-            """, (user_id,))
+            """,
+            (user_id,),
+        )
         row = cursor.fetchone()
         return self._map_user(row) if row else None
-    
+
     def get_by_external_id(self, external_id: str) -> Optional[User]:
         cursor = self.conn.execute(
             """SELECT 
@@ -76,7 +79,9 @@ class SqliteUserRepository(SqliteBaseRepository, UserRepository):
                 users 
             WHERE 
                 external_id = ?
-            """, (external_id,))
+            """,
+            (external_id,),
+        )
         row = cursor.fetchone()
         return self._map_user(row) if row else None
 
@@ -89,7 +94,7 @@ class SqliteUserRepository(SqliteBaseRepository, UserRepository):
                         external_id = ? 
                     WHERE id = ?
                 """,
-                (user.name, user.summary, user.external_id, user.id)
+                (user.name, user.summary, user.external_id, user.id),
             )
 
     def delete(self, user_id: str):
@@ -118,7 +123,8 @@ class SqliteUserRepository(SqliteBaseRepository, UserRepository):
             summary=row["summary"],
             when_created=row["when_created"],
             when_updated=row["when_updated"],
-            when_deleted=row["when_deleted"])
+            when_deleted=row["when_deleted"],
+        )
 
     def close(self):
         self.conn.close()

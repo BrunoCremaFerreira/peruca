@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 
-
 # =====================================
 # User
 # =====================================
@@ -11,6 +10,7 @@ class UserAdd:
     name: str = ""
     external_id: str = ""
     summary: str = ""
+
 
 @dataclass
 class UserUpdate:
@@ -25,14 +25,15 @@ class UserUpdate:
 # =====================================
 @dataclass
 class ShoppingListItemAdd:
-    name : str = ""
-    quantity : float = 1
+    name: str = ""
+    quantity: float = 1
+
 
 @dataclass
 class ShoppingListItemUpdate:
     id: str = ""
-    name : str = ""
-    quantity : float = 1
+    name: str = ""
+    quantity: float = 1
 
 
 # =====================================
@@ -87,6 +88,7 @@ class LightTurnOn:
     effect: Optional[str] = None
     profile: Optional[str] = None
 
+
 # =====================================
 # Smart Home - Climate Commands
 # =====================================
@@ -95,18 +97,22 @@ class ClimateSetTemperature:
     entity_id: str
     temperature: float
 
+
 @dataclass
 class ClimateSetHvacMode:
     entity_id: str
     hvac_mode: str
 
+
 @dataclass
 class ClimateTurnOn:
     entity_id: str
 
+
 @dataclass
 class ClimateTurnOff:
     entity_id: str
+
 
 # =====================================
 # Smart Home - Sensor Commands
@@ -115,6 +121,7 @@ class ClimateTurnOff:
 class SensorQueryCurrent:
     sensor_type: str
     location: Optional[str] = None
+
 
 @dataclass
 class SensorQueryHistory:

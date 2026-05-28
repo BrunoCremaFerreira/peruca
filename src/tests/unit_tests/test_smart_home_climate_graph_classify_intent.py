@@ -21,6 +21,7 @@ from domain.entities import SmartHomeEntityAlias
 
 try:
     from application.graphs.smart_home_climate_graph import SmartHomeClimateGraph
+
     _GRAPH_AVAILABLE = True
 except ImportError:
     SmartHomeClimateGraph = None  # type: ignore[assignment,misc]
@@ -35,6 +36,7 @@ _SKIP_IF_NOT_IMPLEMENTED = pytest.mark.skipif(
 # ===========================================================================
 # Helpers
 # ===========================================================================
+
 
 def _make_graph():
     """
@@ -76,9 +78,9 @@ def _set_llm_response(graph, json_str: str) -> None:
 # TestClassifyIntentJsonParsing — parsing behaviour
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestClassifyIntentJsonParsing:
-
     def test_classify_intent__valid_json_turn_on__returns_turn_on_intent(self):
         """
         A well-formed JSON response with intents=["turn_on"] must produce
@@ -95,7 +97,9 @@ class TestClassifyIntentJsonParsing:
 
         assert result["intent"] == ["turn_on"]
 
-    def test_classify_intent__valid_json_set_temperature__returns_set_temperature_intent(self):
+    def test_classify_intent__valid_json_set_temperature__returns_set_temperature_intent(
+        self,
+    ):
         """
         A well-formed JSON response with intents=["set_temperature"] must produce
         result["intent"] == ["set_temperature"].
@@ -171,7 +175,9 @@ class TestClassifyIntentJsonParsing:
 
         assert result["intent"] == ["not_recognized"]
 
-    def test_classify_intent__json_missing_intents_field__falls_back_to_not_recognized(self):
+    def test_classify_intent__json_missing_intents_field__falls_back_to_not_recognized(
+        self,
+    ):
         """
         A valid JSON object that does not contain the 'intents' key must produce
         result["intent"] == ["not_recognized"] rather than raising a KeyError.
@@ -188,9 +194,9 @@ class TestClassifyIntentJsonParsing:
 # TestClassifyIntentOutputFields — field extraction
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestClassifyIntentOutputFields:
-
     def test_classify_intent__turn_on_field__populated_in_output_turn_on(self):
         """The 'turn_on' JSON field must be mapped to result['output_turn_on']."""
         graph = _make_graph()
@@ -217,7 +223,9 @@ class TestClassifyIntentOutputFields:
 
         assert result["output_turn_off"] == "ar do quarto"
 
-    def test_classify_intent__set_temperature_field__populated_in_output_set_temperature(self):
+    def test_classify_intent__set_temperature_field__populated_in_output_set_temperature(
+        self,
+    ):
         """The 'set_temperature' JSON field must be mapped to result['output_set_temperature']."""
         graph = _make_graph()
         _set_llm_response(
@@ -230,7 +238,9 @@ class TestClassifyIntentOutputFields:
 
         assert result["output_set_temperature"] == "ar da sala, 22"
 
-    def test_classify_intent__set_hvac_mode_field__populated_in_output_set_hvac_mode(self):
+    def test_classify_intent__set_hvac_mode_field__populated_in_output_set_hvac_mode(
+        self,
+    ):
         """The 'set_hvac_mode' JSON field must be mapped to result['output_set_hvac_mode']."""
         graph = _make_graph()
         _set_llm_response(
@@ -252,11 +262,15 @@ class TestClassifyIntentOutputFields:
             ' "set_temperature": "", "set_hvac_mode": "", "query_state": "ar da sala", "not_recognized": ""}',
         )
 
-        result = graph._classify_intent({"input": "qual é a temperatura do ar da sala?"})
+        result = graph._classify_intent(
+            {"input": "qual é a temperatura do ar da sala?"}
+        )
 
         assert result["output_query_state"] == "ar da sala"
 
-    def test_classify_intent__not_recognized_field__populated_in_output_not_recognized(self):
+    def test_classify_intent__not_recognized_field__populated_in_output_not_recognized(
+        self,
+    ):
         """The 'not_recognized' JSON field must be mapped to result['output_not_recognized']."""
         graph = _make_graph()
         _set_llm_response(
@@ -274,9 +288,9 @@ class TestClassifyIntentOutputFields:
 # TestClassifyIntentEntityAliasResolution — alias repository integration
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestClassifyIntentEntityAliasResolution:
-
     def test_classify_intent__loads_climate_aliases_with_correct_prefix(self):
         """
         The alias repository must be queried with entity_id_starts_with="climate.",
@@ -323,7 +337,9 @@ class TestClassifyIntentEntityAliasResolution:
         No exception must propagate to the caller.
         """
         graph = _make_graph()
-        graph.smart_home_entity_alias_repository.get_all.side_effect = RuntimeError("DB error")
+        graph.smart_home_entity_alias_repository.get_all.side_effect = RuntimeError(
+            "DB error"
+        )
         _set_llm_response(
             graph,
             '{"intents": ["turn_on"], "turn_on": "ar da sala", "turn_off": "",'
@@ -357,9 +373,9 @@ class TestClassifyIntentEntityAliasResolution:
 # TestClassifyIntentMultipleIntents — multi-intent support
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestClassifyIntentMultipleIntents:
-
     def test_classify_intent__multiple_intents__all_returned(self):
         """
         When the LLM returns more than one intent (e.g. turn_on + set_temperature),

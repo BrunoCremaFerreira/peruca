@@ -27,6 +27,7 @@ Covers the following behaviour changes (TDD — written before implementation):
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_graph() -> ShoppingListGraph:
     """
     Build a ShoppingListGraph with all external dependencies mocked.
@@ -47,15 +48,17 @@ def _make_graph() -> ShoppingListGraph:
 
 
 def _sample_item(name="Leite", quantity=1.0) -> ShoppingListItem:
-    return ShoppingListItem(id=str(uuid.uuid4()), name=name, quantity=quantity, checked=False)
+    return ShoppingListItem(
+        id=str(uuid.uuid4()), name=name, quantity=quantity, checked=False
+    )
 
 
 # ---------------------------------------------------------------------------
 # Mudanca 1 — _handle_add_item returns Portuguese string with "Adicionado:"
 # ---------------------------------------------------------------------------
 
-class TestHandleAddItemOutputLanguage:
 
+class TestHandleAddItemOutputLanguage:
     def test_handle_add_item__single_item__output_contains_adicionado(self):
         graph = _make_graph()
         # "leite,1" is the pipe-delimited format parsed by _parse_shopping_list_add
@@ -104,7 +107,9 @@ class TestHandleAddItemOutputLanguage:
 
     def test_handle_add_item__validation_error__returns_error_in_output(self):
         graph = _make_graph()
-        graph.shopping_list_service.add.side_effect = ValidationError(errors=["Name is required"])
+        graph.shopping_list_service.add.side_effect = ValidationError(
+            errors=["Name is required"]
+        )
         state = {"output_add_item": "leite,1"}
 
         result = graph._handle_add_item(state)
@@ -117,8 +122,8 @@ class TestHandleAddItemOutputLanguage:
 # Mudanca 2 — _handle_delete_item returns Portuguese string with "Removido:"
 # ---------------------------------------------------------------------------
 
-class TestHandleDeleteItemOutputLanguage:
 
+class TestHandleDeleteItemOutputLanguage:
     def test_handle_delete_item__existing_item__output_contains_removido(self):
         graph = _make_graph()
         item = _sample_item(name="leite")
@@ -182,8 +187,8 @@ class TestHandleDeleteItemOutputLanguage:
 # Mudanca 3 — _handle_clear_items returns a Portuguese string
 # ---------------------------------------------------------------------------
 
-class TestHandleClearItemsOutputLanguage:
 
+class TestHandleClearItemsOutputLanguage:
     def test_handle_clear_items__calls_service_clear(self):
         graph = _make_graph()
 
@@ -199,7 +204,14 @@ class TestHandleClearItemsOutputLanguage:
         output = result.get("output_clear_items", "")
         assert isinstance(output, str)
         # Must contain at least one Portuguese keyword
-        portuguese_keywords = ["lista", "itens", "removidos", "limpa", "apagados", "vazia"]
+        portuguese_keywords = [
+            "lista",
+            "itens",
+            "removidos",
+            "limpa",
+            "apagados",
+            "vazia",
+        ]
         assert any(kw in output.lower() for kw in portuguese_keywords), (
             f"Expected a Portuguese string, got: {output!r}"
         )
@@ -220,8 +232,8 @@ class TestHandleClearItemsOutputLanguage:
 # Mudanca 4 — _handle_check_item lookup by name, calls service.check(), Portuguese output
 # ---------------------------------------------------------------------------
 
-class TestHandleCheckItemOutput:
 
+class TestHandleCheckItemOutput:
     def test_handle_check_item__single_item_name__calls_service_get_all(self):
         # Arrange
         graph = _make_graph()
@@ -232,7 +244,9 @@ class TestHandleCheckItemOutput:
         # Assert
         graph.shopping_list_service.get_all.assert_called_once()
 
-    def test_handle_check_item__item_found_by_name__calls_service_check_with_item_id(self):
+    def test_handle_check_item__item_found_by_name__calls_service_check_with_item_id(
+        self,
+    ):
         # Arrange
         graph = _make_graph()
         item = _sample_item(name="leite")
@@ -255,9 +269,7 @@ class TestHandleCheckItemOutput:
         result = graph._handle_check_item(state)
         # Assert
         output = result.get("output_check_item", "")
-        assert "Marcado" in output, (
-            f"Expected 'Marcado' in output, got: {output!r}"
-        )
+        assert "Marcado" in output, f"Expected 'Marcado' in output, got: {output!r}"
 
     def test_handle_check_item__item_found__output_contains_item_name(self):
         # Arrange
@@ -306,8 +318,12 @@ class TestHandleCheckItemOutput:
         # Arrange
         graph = _make_graph()
         item_leite = _sample_item(name="leite")
-        item_ovos = ShoppingListItem(id="ovos-id", name="ovos", quantity=1.0, checked=False)
-        graph.shopping_list_service.get_all = MagicMock(return_value=[item_leite, item_ovos])
+        item_ovos = ShoppingListItem(
+            id="ovos-id", name="ovos", quantity=1.0, checked=False
+        )
+        graph.shopping_list_service.get_all = MagicMock(
+            return_value=[item_leite, item_ovos]
+        )
         graph.shopping_list_service.check = MagicMock()
         state = {"output_check_item": "leite|ovos"}
         # Act
@@ -334,9 +350,11 @@ class TestHandleCheckItemOutput:
 # Mudanca 5 — _handle_uncheck_item lookup by name, calls service.uncheck(), Portuguese output
 # ---------------------------------------------------------------------------
 
-class TestHandleUncheckItemOutput:
 
-    def test_handle_uncheck_item__item_found_by_name__calls_service_uncheck_with_item_id(self):
+class TestHandleUncheckItemOutput:
+    def test_handle_uncheck_item__item_found_by_name__calls_service_uncheck_with_item_id(
+        self,
+    ):
         # Arrange
         graph = _make_graph()
         item = _sample_item(name="leite")
@@ -410,8 +428,12 @@ class TestHandleUncheckItemOutput:
         # Arrange
         graph = _make_graph()
         item_leite = _sample_item(name="leite")
-        item_ovos = ShoppingListItem(id="ovos-id", name="ovos", quantity=1.0, checked=True)
-        graph.shopping_list_service.get_all = MagicMock(return_value=[item_leite, item_ovos])
+        item_ovos = ShoppingListItem(
+            id="ovos-id", name="ovos", quantity=1.0, checked=True
+        )
+        graph.shopping_list_service.get_all = MagicMock(
+            return_value=[item_leite, item_ovos]
+        )
         graph.shopping_list_service.uncheck = MagicMock()
         state = {"output_uncheck_item": "leite|ovos"}
         # Act
@@ -442,9 +464,11 @@ class TestHandleUncheckItemOutput:
 # spaces around "|" cause the name comparison to fail and items are never deleted.
 # ---------------------------------------------------------------------------
 
-class TestHandleDeleteItemWhitespaceTolerance:
 
-    def test_handle_delete_item__payload_with_spaces_around_pipe__both_items_deleted(self):
+class TestHandleDeleteItemWhitespaceTolerance:
+    def test_handle_delete_item__payload_with_spaces_around_pipe__both_items_deleted(
+        self,
+    ):
         """
         Payload "cerveja,1 | carvão,1" — spaces surround the pipe separator.
         After splitting by "|" the fragments are "cerveja,1 " and " carvão,1".
@@ -457,8 +481,12 @@ class TestHandleDeleteItemWhitespaceTolerance:
         # Arrange
         graph = _make_graph()
         item_cerveja = _sample_item(name="cerveja")
-        item_carvao = ShoppingListItem(id="carvao-id", name="carvão", quantity=1.0, checked=False)
-        graph.shopping_list_service.get_all = MagicMock(return_value=[item_cerveja, item_carvao])
+        item_carvao = ShoppingListItem(
+            id="carvao-id", name="carvão", quantity=1.0, checked=False
+        )
+        graph.shopping_list_service.get_all = MagicMock(
+            return_value=[item_cerveja, item_carvao]
+        )
         graph.shopping_list_service.delete = MagicMock()
         state = {"output_delete_item": "cerveja,1 | carvão,1"}
         # Act
@@ -471,7 +499,9 @@ class TestHandleDeleteItemWhitespaceTolerance:
         graph.shopping_list_service.delete.assert_any_call(item_cerveja.id)
         graph.shopping_list_service.delete.assert_any_call(item_carvao.id)
 
-    def test_handle_delete_item__payload_with_leading_space_in_name__item_matched_and_deleted(self):
+    def test_handle_delete_item__payload_with_leading_space_in_name__item_matched_and_deleted(
+        self,
+    ):
         """
         Payload " leite,1" — leading space before the item name.
         Without .strip() on the name extracted after split(",", 1)[0], the

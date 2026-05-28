@@ -1,4 +1,3 @@
-
 import asyncio
 import json
 from typing import List, Optional, TypedDict
@@ -7,7 +6,12 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.language_models.chat_models import BaseChatModel
 from langgraph.graph import StateGraph, START, END
 from langchain_core.runnables import RunnableLambda
-from domain.commands import ClimateSetTemperature, ClimateSetHvacMode, ClimateTurnOn, ClimateTurnOff
+from domain.commands import (
+    ClimateSetTemperature,
+    ClimateSetHvacMode,
+    ClimateTurnOn,
+    ClimateTurnOff,
+)
 from domain.entities import GraphInvokeRequest, SmartHomeClimate, SmartHomeEntityAlias
 from domain.interfaces.data_repository import SmartHomeEntityAliasRepository
 from domain.services.smart_home_service import SmartHomeService
@@ -19,6 +23,7 @@ HVAC_MODE_MAP = {
     "ventilacao": "fan_only",
     "dry": "dry",
 }
+
 
 class SmartHomeClimateGraphState(TypedDict):
     input: str
@@ -32,15 +37,18 @@ class SmartHomeClimateGraphState(TypedDict):
     available_entities: Optional[dict]
     output: Optional[str]
 
+
 class SmartHomeClimateGraph(Graph):
     """
     Smart Home Climate Graph
     """
 
-    def __init__(self,
-                 llm_chat: BaseChatModel,
-                 smart_home_service: SmartHomeService,
-                 smart_home_entity_alias_repository: SmartHomeEntityAliasRepository):
+    def __init__(
+        self,
+        llm_chat: BaseChatModel,
+        smart_home_service: SmartHomeService,
+        smart_home_entity_alias_repository: SmartHomeEntityAliasRepository,
+    ):
         self.llm_chat = llm_chat
         self.smart_home_service = smart_home_service
         self.smart_home_entity_alias_repository = smart_home_entity_alias_repository
@@ -68,11 +76,14 @@ class SmartHomeClimateGraph(Graph):
                 parsed = {}
             intents = parsed.get("intents", ["not_recognized"])
 
-            entity_alias_list: List[SmartHomeEntityAlias] = \
-                self.smart_home_entity_alias_repository \
-                    .get_all(entity_id_starts_with="climate.")
-            entity_alias_dict = \
-                {item.alias: item.entity_id for item in entity_alias_list}
+            entity_alias_list: List[SmartHomeEntityAlias] = (
+                self.smart_home_entity_alias_repository.get_all(
+                    entity_id_starts_with="climate."
+                )
+            )
+            entity_alias_dict = {
+                item.alias: item.entity_id for item in entity_alias_list
+            }
 
         except Exception as e:
             print(f"[SmartHomeClimateGraph._classify_intent][ERROR]: {e}")
@@ -101,16 +112,18 @@ class SmartHomeClimateGraph(Graph):
 
         entity_ids: List[str] = self._find_entity_ids(
             entity_alias_delimited_str=devices,
-            available_entities=data.get("available_entities", {})
+            available_entities=data.get("available_entities", {}),
         )
 
         if not entity_ids:
             return {"output_turn_on": "Device not found"}
 
         for entity_id in entity_ids:
-            asyncio.run(self.smart_home_service.climate_turn_on(
-                command=ClimateTurnOn(entity_id=entity_id)
-            ))
+            asyncio.run(
+                self.smart_home_service.climate_turn_on(
+                    command=ClimateTurnOn(entity_id=entity_id)
+                )
+            )
 
         return {"output_turn_on": devices}
 
@@ -123,16 +136,18 @@ class SmartHomeClimateGraph(Graph):
 
         entity_ids: List[str] = self._find_entity_ids(
             entity_alias_delimited_str=devices,
-            available_entities=data.get("available_entities", {})
+            available_entities=data.get("available_entities", {}),
         )
 
         if not entity_ids:
             return {"output_turn_off": "Device not found"}
 
         for entity_id in entity_ids:
-            asyncio.run(self.smart_home_service.climate_turn_off(
-                command=ClimateTurnOff(entity_id=entity_id)
-            ))
+            asyncio.run(
+                self.smart_home_service.climate_turn_off(
+                    command=ClimateTurnOff(entity_id=entity_id)
+                )
+            )
 
         return {"output_turn_off": devices}
 
@@ -154,7 +169,7 @@ class SmartHomeClimateGraph(Graph):
 
             entity_ids = self._find_entity_ids(
                 entity_alias_delimited_str=device_str,
-                available_entities=available_entities
+                available_entities=available_entities,
             )
 
             try:
@@ -163,9 +178,13 @@ class SmartHomeClimateGraph(Graph):
                 continue
 
             for entity_id in entity_ids:
-                asyncio.run(self.smart_home_service.climate_set_temperature(
-                    command=ClimateSetTemperature(entity_id=entity_id, temperature=temperature)
-                ))
+                asyncio.run(
+                    self.smart_home_service.climate_set_temperature(
+                        command=ClimateSetTemperature(
+                            entity_id=entity_id, temperature=temperature
+                        )
+                    )
+                )
 
         return {"output_set_temperature": raw}
 
@@ -189,13 +208,17 @@ class SmartHomeClimateGraph(Graph):
 
             entity_ids = self._find_entity_ids(
                 entity_alias_delimited_str=device_str,
-                available_entities=available_entities
+                available_entities=available_entities,
             )
 
             for entity_id in entity_ids:
-                asyncio.run(self.smart_home_service.climate_set_hvac_mode(
-                    command=ClimateSetHvacMode(entity_id=entity_id, hvac_mode=ha_mode)
-                ))
+                asyncio.run(
+                    self.smart_home_service.climate_set_hvac_mode(
+                        command=ClimateSetHvacMode(
+                            entity_id=entity_id, hvac_mode=ha_mode
+                        )
+                    )
+                )
 
         return {"output_set_hvac_mode": raw}
 
@@ -214,7 +237,7 @@ class SmartHomeClimateGraph(Graph):
             device_str = device_str.strip()
             entity_ids = self._find_entity_ids(
                 entity_alias_delimited_str=device_str,
-                available_entities=available_entities
+                available_entities=available_entities,
             )
 
             for entity_id in entity_ids:
@@ -229,7 +252,9 @@ class SmartHomeClimateGraph(Graph):
                     if state.target_temperature is not None:
                         parts.append(f"temperatura alvo {state.target_temperature}°C")
                     if state.hvac_mode is not None:
-                        parts.append(f"modo {state.hvac_mode.value if hasattr(state.hvac_mode, 'value') else state.hvac_mode}")
+                        parts.append(
+                            f"modo {state.hvac_mode.value if hasattr(state.hvac_mode, 'value') else state.hvac_mode}"
+                        )
                     lines.append(f"{device_str}: {', '.join(parts)}")
                 except Exception as e:
                     print(f"[SmartHomeClimateGraph._handle_query_state][ERROR]: {e}")
@@ -242,7 +267,9 @@ class SmartHomeClimateGraph(Graph):
         return {"output_not_recognized": "Not Recognized Triggered"}
 
     def _handle_final_response(self, data):
-        print(f"[SmartHomeClimateGraph._handle_final_response]: Aggregating response...")
+        print(
+            f"[SmartHomeClimateGraph._handle_final_response]: Aggregating response..."
+        )
         parts = []
         if data.get("output_turn_on"):
             parts.append(f"Ligado: {data['output_turn_on']}")
@@ -268,7 +295,9 @@ class SmartHomeClimateGraph(Graph):
         workflow.add_node("classify", RunnableLambda(self._classify_intent))
         workflow.add_node("turn_on", RunnableLambda(self._handle_turn_on))
         workflow.add_node("turn_off", RunnableLambda(self._handle_turn_off))
-        workflow.add_node("set_temperature", RunnableLambda(self._handle_set_temperature))
+        workflow.add_node(
+            "set_temperature", RunnableLambda(self._handle_set_temperature)
+        )
         workflow.add_node("set_hvac_mode", RunnableLambda(self._handle_set_hvac_mode))
         workflow.add_node("query_state", RunnableLambda(self._handle_query_state))
         workflow.add_node("not_recognized", RunnableLambda(self._handle_not_recognized))
@@ -281,8 +310,12 @@ class SmartHomeClimateGraph(Graph):
         workflow.add_conditional_edges("classify", intent_router)
 
         nodes = [
-            "turn_on", "turn_off", "set_temperature",
-            "set_hvac_mode", "query_state", "not_recognized"
+            "turn_on",
+            "turn_off",
+            "set_temperature",
+            "set_hvac_mode",
+            "query_state",
+            "not_recognized",
         ]
         for node in nodes:
             workflow.add_edge(node, "final_response")
@@ -291,21 +324,21 @@ class SmartHomeClimateGraph(Graph):
 
         return workflow.compile()
 
-    def _find_entity_ids(self, entity_alias_delimited_str: str, available_entities) -> List[str]:
+    def _find_entity_ids(
+        self, entity_alias_delimited_str: str, available_entities
+    ) -> List[str]:
         parser_template = ChatPromptTemplate.from_template(
             self.load_prompt("smart_home_climate_graph_id_parser_by_alias.md")
         )
 
         prompt = parser_template.format(
-            input=entity_alias_delimited_str,
-            available_entities=str(available_entities)
+            input=entity_alias_delimited_str, available_entities=str(available_entities)
         )
 
         async def _invoke_with_timeout():
             try:
                 response = await asyncio.wait_for(
-                    self.llm_chat.ainvoke(prompt),
-                    timeout=15
+                    self.llm_chat.ainvoke(prompt), timeout=15
                 )
                 return self._remove_thinking_tag(response.content).strip()
             except asyncio.TimeoutError:

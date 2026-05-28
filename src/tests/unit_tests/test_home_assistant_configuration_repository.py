@@ -30,6 +30,7 @@ Covers Bug #6:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_connection_closed() -> ConnectionClosed:
     """Return a ConnectionClosed exception that simulates a server-side close."""
     return ConnectionClosed(Close(1001, "server going away"), None)
@@ -70,41 +71,42 @@ def _make_repo() -> HomeAssistantSmartHomeConfigurationRepository:
 # Bug #6 — get_all_exposed_entities_ids: ConnectionClosed → reconnect + retry
 # ---------------------------------------------------------------------------
 
-class TestGetAllExposedEntitiesIdsReconnectOnConnectionClosed:
 
-    def test_get_all_exposed_entities_ids__connection_closed__reconnects_and_retries(self):
+class TestGetAllExposedEntitiesIdsReconnectOnConnectionClosed:
+    def test_get_all_exposed_entities_ids__connection_closed__reconnects_and_retries(
+        self,
+    ):
         """
         Bug: self._ws is not None after the first connect, but the server later
         closes the socket. The next recv() inside _send() raises ConnectionClosed.
         The repository must catch it, call _connect() again, and retry, returning
         the result from the second attempt instead of propagating the exception.
         """
-        entity_list_response = json.dumps({
-            "id": 1,
-            "type": "result",
-            "success": True,
-            "result": [
-                {
-                    "entity_id": "light.sala",
-                    "options": {"conversation": {"should_expose": True}},
-                },
-            ],
-        })
+        entity_list_response = json.dumps(
+            {
+                "id": 1,
+                "type": "result",
+                "success": True,
+                "result": [
+                    {
+                        "entity_id": "light.sala",
+                        "options": {"conversation": {"should_expose": True}},
+                    },
+                ],
+            }
+        )
 
         # First WebSocket: auth succeeds, then recv() in _send() raises ConnectionClosed
         first_ws = _make_mock_ws(
             recv_responses=(
                 _make_auth_sequence_responses()  # two auth messages
-                + [_make_connection_closed()]      # connection drops on first data recv
+                + [_make_connection_closed()]  # connection drops on first data recv
             )
         )
 
         # Second WebSocket (after reconnect): auth succeeds, then the real response
         second_ws = _make_mock_ws(
-            recv_responses=(
-                _make_auth_sequence_responses()
-                + [entity_list_response]
-            )
+            recv_responses=(_make_auth_sequence_responses() + [entity_list_response])
         )
 
         repo = _make_repo()
@@ -138,36 +140,34 @@ class TestGetAllExposedEntitiesIdsReconnectOnConnectionClosed:
 # Bug #6 — get_aliases_by_entity_id: ConnectionClosed → reconnect + retry
 # ---------------------------------------------------------------------------
 
-class TestGetAliasesByEntityIdReconnectOnConnectionClosed:
 
+class TestGetAliasesByEntityIdReconnectOnConnectionClosed:
     def test_get_aliases_by_entity_id__connection_closed__reconnects_and_retries(self):
         """
         Bug: same as above but for get_aliases_by_entity_id. A ConnectionClosed
         raised while waiting for the alias response must trigger a reconnect and
         a single retry that returns the correct alias list.
         """
-        aliases_response = json.dumps({
-            "id": 1,
-            "type": "result",
-            "success": True,
-            "result": {
-                "entity_id": "light.quarto",
-                "aliases": ["Quarto Principal", "Quarto"],
-            },
-        })
+        aliases_response = json.dumps(
+            {
+                "id": 1,
+                "type": "result",
+                "success": True,
+                "result": {
+                    "entity_id": "light.quarto",
+                    "aliases": ["Quarto Principal", "Quarto"],
+                },
+            }
+        )
 
         first_ws = _make_mock_ws(
             recv_responses=(
-                _make_auth_sequence_responses()
-                + [_make_connection_closed()]
+                _make_auth_sequence_responses() + [_make_connection_closed()]
             )
         )
 
         second_ws = _make_mock_ws(
-            recv_responses=(
-                _make_auth_sequence_responses()
-                + [aliases_response]
-            )
+            recv_responses=(_make_auth_sequence_responses() + [aliases_response])
         )
 
         repo = _make_repo()

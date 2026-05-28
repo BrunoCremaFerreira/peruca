@@ -105,13 +105,17 @@ class HomeAssistantSmartHomeSensorRepository(SmartHomeSensorRepository):
         for entry in data[0]:
             attributes = entry.get("attributes", {})
             device_class = attributes.get("device_class", "")
-            readings.append(SensorReading(
-                entity_id=entry.get("entity_id", entity_id),
-                sensor_type=self._map_sensor_type(device_class),
-                state=entry["state"],
-                unit=attributes.get("unit_of_measurement"),
-                friendly_name=attributes.get("friendly_name"),
-                last_changed=self._parse_last_changed(entry.get("last_changed", "")),
-            ))
+            readings.append(
+                SensorReading(
+                    entity_id=entry.get("entity_id", entity_id),
+                    sensor_type=self._map_sensor_type(device_class),
+                    state=entry["state"],
+                    unit=attributes.get("unit_of_measurement"),
+                    friendly_name=attributes.get("friendly_name"),
+                    last_changed=self._parse_last_changed(
+                        entry.get("last_changed", "")
+                    ),
+                )
+            )
 
         return readings

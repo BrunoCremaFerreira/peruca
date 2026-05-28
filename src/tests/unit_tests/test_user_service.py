@@ -19,7 +19,6 @@ def _sample_user(name="Alice", summary="test summary") -> User:
 
 
 class TestUserServiceAdd:
-
     def test_add_valid_user_returns_uuid(self, user_repo_mock):
         # Arrange
         service = UserService(user_repository=user_repo_mock)
@@ -46,7 +45,9 @@ class TestUserServiceAdd:
         user_id = service.add(UserAdd(name="Carla", summary="no ext_id"))
         # Assert
         added_user: User = user_repo_mock.add.call_args[1]["user"]
-        assert added_user.external_id == user_id  # external_id defaults to the generated id
+        assert (
+            added_user.external_id == user_id
+        )  # external_id defaults to the generated id
 
     def test_add_raises_when_name_too_short(self, user_repo_mock):
         # Arrange
@@ -64,7 +65,9 @@ class TestUserServiceAdd:
             service.add(UserAdd(name="Ali3e", summary="bad name"))
         assert "letters" in str(exc.value.errors)
 
-    def test_add_raises_when_id_already_exists(self, user_repo_mock, sample_user_entity):
+    def test_add_raises_when_id_already_exists(
+        self, user_repo_mock, sample_user_entity
+    ):
         # Arrange
         user_repo_mock.get_by_id.return_value = sample_user_entity
         service = UserService(user_repository=user_repo_mock)
@@ -73,14 +76,22 @@ class TestUserServiceAdd:
             service.add(UserAdd(name="Alice", summary="dup"))
         assert "already exist" in str(exc.value.errors)
 
-    def test_add_raises_when_external_id_already_exists(self, user_repo_mock, sample_user_entity):
+    def test_add_raises_when_external_id_already_exists(
+        self, user_repo_mock, sample_user_entity
+    ):
         # Arrange
         user_repo_mock.get_by_id.return_value = None
         user_repo_mock.get_by_external_id.return_value = sample_user_entity
         service = UserService(user_repository=user_repo_mock)
         # Act / Assert
         with pytest.raises(ValidationError) as exc:
-            service.add(UserAdd(name="Diana", external_id=sample_user_entity.external_id, summary="dup ext"))
+            service.add(
+                UserAdd(
+                    name="Diana",
+                    external_id=sample_user_entity.external_id,
+                    summary="dup ext",
+                )
+            )
         assert "already exist" in str(exc.value.errors)
 
     def test_add_raises_when_summary_too_long(self, user_repo_mock):
@@ -93,14 +104,19 @@ class TestUserServiceAdd:
 
 
 class TestUserServiceUpdate:
-
-    def test_update_valid_user_calls_repository(self, user_repo_mock, sample_user_entity):
+    def test_update_valid_user_calls_repository(
+        self, user_repo_mock, sample_user_entity
+    ):
         # Arrange
         user_repo_mock.get_by_id.return_value = sample_user_entity
         user_repo_mock.get_by_external_id.return_value = None
         service = UserService(user_repository=user_repo_mock)
-        cmd = UserUpdate(id=sample_user_entity.id, external_id=sample_user_entity.external_id,
-                         name="Alice", summary="updated summary")
+        cmd = UserUpdate(
+            id=sample_user_entity.id,
+            external_id=sample_user_entity.external_id,
+            name="Alice",
+            summary="updated summary",
+        )
         # Act
         service.update(cmd)
         # Assert
@@ -110,8 +126,12 @@ class TestUserServiceUpdate:
         # Arrange
         user_repo_mock.get_by_id.return_value = None
         service = UserService(user_repository=user_repo_mock)
-        cmd = UserUpdate(id=str(uuid.uuid4()), external_id=str(uuid.uuid4()),
-                         name="Ghost", summary="none")
+        cmd = UserUpdate(
+            id=str(uuid.uuid4()),
+            external_id=str(uuid.uuid4()),
+            name="Ghost",
+            summary="none",
+        )
         # Act / Assert
         with pytest.raises(ValidationError) as exc:
             service.update(cmd)
@@ -120,8 +140,12 @@ class TestUserServiceUpdate:
     def test_update_raises_when_name_is_invalid(self, user_repo_mock):
         # Arrange
         service = UserService(user_repository=user_repo_mock)
-        cmd = UserUpdate(id=str(uuid.uuid4()), external_id=str(uuid.uuid4()),
-                         name="1nv@lid", summary="bad name")
+        cmd = UserUpdate(
+            id=str(uuid.uuid4()),
+            external_id=str(uuid.uuid4()),
+            name="1nv@lid",
+            summary="bad name",
+        )
         # Act / Assert
         with pytest.raises(ValidationError) as exc:
             service.update(cmd)
@@ -132,23 +156,35 @@ class TestUserServiceUpdate:
         existing_user = _sample_user(name="Alice")
         other_user = _sample_user(name="Bob")
         user_repo_mock.get_by_id.return_value = existing_user
-        user_repo_mock.get_by_external_id.return_value = other_user  # different user owns that ext id
+        user_repo_mock.get_by_external_id.return_value = (
+            other_user  # different user owns that ext id
+        )
         service = UserService(user_repository=user_repo_mock)
-        cmd = UserUpdate(id=existing_user.id, external_id=other_user.external_id,
-                         name="Alice", summary="steal ext id")
+        cmd = UserUpdate(
+            id=existing_user.id,
+            external_id=other_user.external_id,
+            name="Alice",
+            summary="steal ext id",
+        )
         # Act / Assert
         with pytest.raises(ValidationError) as exc:
             service.update(cmd)
         assert "already exist" in str(exc.value.errors)
 
-    def test_update_allows_same_external_id_for_same_user(self, user_repo_mock, sample_user_entity):
+    def test_update_allows_same_external_id_for_same_user(
+        self, user_repo_mock, sample_user_entity
+    ):
         # Arrange
         user_repo_mock.get_by_id.return_value = sample_user_entity
         # Returning the same user (same id) – this is allowed
         user_repo_mock.get_by_external_id.return_value = sample_user_entity
         service = UserService(user_repository=user_repo_mock)
-        cmd = UserUpdate(id=sample_user_entity.id, external_id=sample_user_entity.external_id,
-                         name="Alice", summary="same ext id is fine")
+        cmd = UserUpdate(
+            id=sample_user_entity.id,
+            external_id=sample_user_entity.external_id,
+            name="Alice",
+            summary="same ext id is fine",
+        )
         # Act
         service.update(cmd)
         # Assert
@@ -156,8 +192,9 @@ class TestUserServiceUpdate:
 
 
 class TestUserServiceDelete:
-
-    def test_delete_existing_user_calls_repository(self, user_repo_mock, sample_user_entity):
+    def test_delete_existing_user_calls_repository(
+        self, user_repo_mock, sample_user_entity
+    ):
         # Arrange
         user_repo_mock.get_by_id.return_value = sample_user_entity
         service = UserService(user_repository=user_repo_mock)

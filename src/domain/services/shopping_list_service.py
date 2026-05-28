@@ -21,17 +21,17 @@ class ShoppingListService:
         """
         Add a new Item on Shopping List
         """
-        
-        ShoppingListItemValidator() \
-            .validate_name(item_add.name) \
-            .validate_quantity(item_add.quantity) \
-            .validate()
 
-        db_item = self.shopping_list_repository \
-            .get_by_name(item_name=item_add.name)
-        
+        ShoppingListItemValidator().validate_name(item_add.name).validate_quantity(
+            item_add.quantity
+        ).validate()
+
+        db_item = self.shopping_list_repository.get_by_name(item_name=item_add.name)
+
         if db_item:
-            raise ValidationError([f"The item '{item_add.name}' is already in the shopping list"])
+            raise ValidationError(
+                [f"The item '{item_add.name}' is already in the shopping list"]
+            )
 
         item = auto_map(item_add, ShoppingListItem)
         item.id = str(uuid.uuid4())
@@ -50,33 +50,31 @@ class ShoppingListService:
         """
         Update a Shopping List Item
         """
-        
-        ShoppingListItemValidator() \
-            .validate_id(item.id) \
-            .validate_quantity(item.quantity) \
-            .validate()
-        
-        db_item = self.shopping_list_repository \
-            .get_by_id(item_id=item.id)
-        
+
+        ShoppingListItemValidator().validate_id(item.id).validate_quantity(
+            item.quantity
+        ).validate()
+
+        db_item = self.shopping_list_repository.get_by_id(item_id=item.id)
+
         if not db_item:
-            raise ValidationError([f"The item with id '{item.id}' was not found in the shopping list"])
-        
+            raise ValidationError(
+                [f"The item with id '{item.id}' was not found in the shopping list"]
+            )
+
         db_item.quantity = item.quantity
-        self.shopping_list_repository \
-            .update(item=db_item)
+        self.shopping_list_repository.update(item=db_item)
 
     def delete(self, item_id: str):
         """
         Delete a Shopping List Item
         """
 
-        ShoppingListItemValidator() \
-            .validate_id(item_id)
+        ShoppingListItemValidator().validate_id(item_id)
 
         self.shopping_list_repository.delete(item_id=item_id)
 
-    def clear(self): 
+    def clear(self):
         """
         Remove all Shopping List Items
         """
@@ -88,35 +86,31 @@ class ShoppingListService:
         Check an Item from Shopping List
         """
 
-        ShoppingListItemValidator() \
-            .validate_id(item_id) \
-            .validate()
+        ShoppingListItemValidator().validate_id(item_id).validate()
 
-        db_item = self.shopping_list_repository \
-            .get_by_id(item_id=item_id)
+        db_item = self.shopping_list_repository.get_by_id(item_id=item_id)
 
         if not db_item:
-            raise ValidationError([f"The item with id '{item_id}' was not found in the shopping list"])
+            raise ValidationError(
+                [f"The item with id '{item_id}' was not found in the shopping list"]
+            )
 
         db_item.checked = True
-        self.shopping_list_repository \
-            .update(item=db_item)
+        self.shopping_list_repository.update(item=db_item)
 
     def uncheck(self, item_id: str):
         """
         Uncheck an Shopping List Item
         """
 
-        ShoppingListItemValidator() \
-            .validate_id(item_id) \
-            .validate()
-        
-        db_item = self.shopping_list_repository \
-            .get_by_id(item_id=item_id)
-        
+        ShoppingListItemValidator().validate_id(item_id).validate()
+
+        db_item = self.shopping_list_repository.get_by_id(item_id=item_id)
+
         if not db_item:
-            raise ValidationError([f"The item with id '{item_id}' was not found in the shopping list"])
-        
+            raise ValidationError(
+                [f"The item with id '{item_id}' was not found in the shopping list"]
+            )
+
         db_item.checked = False
-        self.shopping_list_repository \
-            .update(item=db_item)
+        self.shopping_list_repository.update(item=db_item)

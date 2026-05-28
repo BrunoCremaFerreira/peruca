@@ -10,7 +10,6 @@ UserValidator Unit Tests
 
 
 class TestUserValidatorId:
-
     def test_validate_id_valid_uuid4_passes(self):
         # Arrange
         valid_uuid = "550e8400-e29b-41d4-a716-446655440000"
@@ -45,7 +44,6 @@ class TestUserValidatorId:
 
 
 class TestUserValidatorExternalId:
-
     def test_validate_external_id_short_value_passes(self):
         # Arrange
         validator = UserValidator()
@@ -82,7 +80,6 @@ class TestUserValidatorExternalId:
 
 
 class TestUserValidatorName:
-
     def test_validate_name_valid_passes(self):
         # Arrange
         validator = UserValidator()
@@ -133,7 +130,6 @@ class TestUserValidatorName:
 
 
 class TestUserValidatorSummary:
-
     def test_validate_summary_valid_passes(self):
         # Arrange
         validator = UserValidator()
@@ -170,20 +166,13 @@ class TestUserValidatorSummary:
 
 
 class TestUserValidatorChaining:
-
     def test_multiple_errors_are_collected(self):
         # Arrange / Act
         with pytest.raises(ValidationError) as exc:
-            UserValidator() \
-                .validate_name("Jo") \
-                .validate_summary("x" * 10001) \
-                .validate()
+            UserValidator().validate_name("Jo").validate_summary("x" * 10001).validate()
         # Assert
         assert len(exc.value.errors) >= 2
 
     def test_validate_raises_only_when_errors_exist(self):
         # Arrange / Act / Assert – no exception
-        UserValidator() \
-            .validate_name("Carlos") \
-            .validate_summary("ok") \
-            .validate()
+        UserValidator().validate_name("Carlos").validate_summary("ok").validate()

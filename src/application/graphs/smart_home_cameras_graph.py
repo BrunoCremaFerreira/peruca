@@ -29,10 +29,12 @@ class SmartHomeCamerasGraph(Graph):
     Smart Home Cameras Graph — handles camera snapshot requests and status checks.
     """
 
-    def __init__(self,
-                 llm_chat: BaseChatModel,
-                 smart_home_service: SmartHomeService,
-                 smart_home_entity_alias_repository: SmartHomeEntityAliasRepository):
+    def __init__(
+        self,
+        llm_chat: BaseChatModel,
+        smart_home_service: SmartHomeService,
+        smart_home_entity_alias_repository: SmartHomeEntityAliasRepository,
+    ):
         self.llm_chat = llm_chat
         self.smart_home_service = smart_home_service
         self.smart_home_entity_alias_repository = smart_home_entity_alias_repository
@@ -55,7 +57,9 @@ class SmartHomeCamerasGraph(Graph):
 
         try:
             try:
-                parsed = json.loads(cleaned) if isinstance(cleaned, str) and cleaned else {}
+                parsed = (
+                    json.loads(cleaned) if isinstance(cleaned, str) and cleaned else {}
+                )
             except (json.JSONDecodeError, ValueError):
                 parsed = {}
 
@@ -133,13 +137,19 @@ class SmartHomeCamerasGraph(Graph):
 
     def _handle_not_recognized(self, data):
         print(f"[SmartHomeCamerasGraph._handle_not_recognized]: Triggered...")
-        return {"output_not_recognized": "Não consegui identificar qual câmera você quer consultar."}
+        return {
+            "output_not_recognized": "Não consegui identificar qual câmera você quer consultar."
+        }
 
     def _handle_final_response(self, data):
-        print(f"[SmartHomeCamerasGraph._handle_final_response]: Aggregating response...")
+        print(
+            f"[SmartHomeCamerasGraph._handle_final_response]: Aggregating response..."
+        )
 
         if data.get("output_not_recognized"):
-            return {"output": "Não consegui identificar qual câmera você quer consultar."}
+            return {
+                "output": "Não consegui identificar qual câmera você quer consultar."
+            }
 
         parts = []
         if data.get("output_show_snapshot"):
@@ -176,21 +186,21 @@ class SmartHomeCamerasGraph(Graph):
 
         return workflow.compile()
 
-    def _find_entity_ids(self, entity_alias_delimited_str: str, available_entities: dict) -> List[str]:
+    def _find_entity_ids(
+        self, entity_alias_delimited_str: str, available_entities: dict
+    ) -> List[str]:
         parser_template = ChatPromptTemplate.from_template(
             self.load_prompt("smart_home_cameras_graph_id_parser_by_alias.md")
         )
 
         prompt = parser_template.format(
-            input=entity_alias_delimited_str,
-            available_entities=str(available_entities)
+            input=entity_alias_delimited_str, available_entities=str(available_entities)
         )
 
         async def _invoke_with_timeout():
             try:
                 response = await asyncio.wait_for(
-                    self.llm_chat.ainvoke(prompt),
-                    timeout=15
+                    self.llm_chat.ainvoke(prompt), timeout=15
                 )
                 return self._remove_thinking_tag(response.content).strip()
             except asyncio.TimeoutError:

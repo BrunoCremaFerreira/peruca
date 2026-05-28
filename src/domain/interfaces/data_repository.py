@@ -4,9 +4,10 @@ from typing import List, Optional
 from domain.commands import LightTurnOn
 from domain.entities import ShoppingListItem, SmartHomeEntityAlias, SmartHomeLight, User
 
-#=====================================
+
+# =====================================
 # Data Repository
-#=====================================
+# =====================================
 class UserRepository(ABC):
     """
     User Repository
@@ -123,9 +124,10 @@ class ShoppingListRepository(ABC):
         """
         pass
 
-#=====================================
+
+# =====================================
 # Temp Data Repository
-#=====================================
+# =====================================
 class ContextRepository(ABC):
     """
     Interface for LLM Context operations.
@@ -159,9 +161,10 @@ class ContextRepository(ABC):
         """
         pass
 
-#=====================================
+
+# =====================================
 # Smart Home Etity Data Repository
-#=====================================
+# =====================================
 class SmartHomeEntityAliasRepository(ABC):
     """
     Interface for Smart Home Entity  Data Repository

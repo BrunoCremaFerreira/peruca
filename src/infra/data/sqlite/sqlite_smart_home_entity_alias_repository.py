@@ -4,8 +4,9 @@ from domain.interfaces.data_repository import SmartHomeEntityAliasRepository
 from infra.data.sqlite.sqlite_base_repository import SqliteBaseRepository
 
 
-class SqliteSmartHomeEntityAliasRepository(SqliteBaseRepository, SmartHomeEntityAliasRepository):
-    
+class SqliteSmartHomeEntityAliasRepository(
+    SqliteBaseRepository, SmartHomeEntityAliasRepository
+):
     def __init__(self, db_path: str):
         super().__init__(db_path=db_path)
 
@@ -25,7 +26,7 @@ class SqliteSmartHomeEntityAliasRepository(SqliteBaseRepository, SmartHomeEntity
                     when_deleted TIMESTAMP DEFAULT NULL
                 )
             """)
-    
+
     def add(self, entity_alias: SmartHomeEntityAlias):
         """
         Add Smart Home Entity Alias
@@ -33,7 +34,12 @@ class SqliteSmartHomeEntityAliasRepository(SqliteBaseRepository, SmartHomeEntity
         with self.conn:
             self.conn.execute(
                 "INSERT INTO smart_home_entity_alias (id, entity_id, alias, when_created) VALUES (?, ?, ?, ?)",
-                (entity_alias.id, entity_alias.entity_id, entity_alias.alias, entity_alias.when_created)
+                (
+                    entity_alias.id,
+                    entity_alias.entity_id,
+                    entity_alias.alias,
+                    entity_alias.when_created,
+                ),
             )
 
     def get_by_entity_id(self, entity_id: str) -> Optional[SmartHomeEntityAlias]:
@@ -52,7 +58,9 @@ class SqliteSmartHomeEntityAliasRepository(SqliteBaseRepository, SmartHomeEntity
                 smart_home_entity_alias
             WHERE 
                 entity_id = ?
-            """, (entity_id,))
+            """,
+            (entity_id,),
+        )
         row = cursor.fetchone()
         return self._map_smart_home_entity_alias(row) if row else None
 
@@ -72,15 +80,17 @@ class SqliteSmartHomeEntityAliasRepository(SqliteBaseRepository, SmartHomeEntity
                 smart_home_entity_alias
             WHERE 
                 alias like ?
-            """, (f"%{alias}%",))
-        
+            """,
+            (f"%{alias}%",),
+        )
+
         return [self._map_smart_home_entity_alias(row) for row in cursor.fetchall()]
 
     def get_all(self, entity_id_starts_with: str = "") -> List[SmartHomeEntityAlias]:
         """
         Retrieve all SmartHomeEntityAlias records from the database.
         """
-        
+
         base_query = """
             SELECT 
                 id, 
@@ -118,4 +128,5 @@ class SqliteSmartHomeEntityAliasRepository(SqliteBaseRepository, SmartHomeEntity
             alias=row["alias"],
             when_created=row["when_created"],
             when_updated=row["when_updated"],
-            when_deleted=row["when_deleted"])
+            when_deleted=row["when_deleted"],
+        )

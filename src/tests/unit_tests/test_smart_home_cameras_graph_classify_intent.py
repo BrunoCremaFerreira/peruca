@@ -24,6 +24,7 @@ from domain.entities import SmartHomeEntityAlias
 
 try:
     from application.graphs.smart_home_cameras_graph import SmartHomeCamerasGraph
+
     _GRAPH_AVAILABLE = True
 except ImportError:
     SmartHomeCamerasGraph = None  # type: ignore[assignment,misc]
@@ -38,6 +39,7 @@ _SKIP_IF_NOT_IMPLEMENTED = pytest.mark.skipif(
 # ===========================================================================
 # Helpers
 # ===========================================================================
+
 
 def _make_graph() -> "SmartHomeCamerasGraph":
     """
@@ -77,9 +79,9 @@ def _configure_cleaned_output(graph: "SmartHomeCamerasGraph", cleaned_str: str) 
 # TestSmartHomeCamerasGraphClassifyIntentShowSnapshot
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestSmartHomeCamerasGraphClassifyIntentShowSnapshot:
-
     def test_classify_show_snapshot__cozinha__intent_and_field_populated(self):
         """
         JSON with intents=["show_snapshot"] and show_snapshot="cozinha" must produce:
@@ -135,7 +137,9 @@ class TestSmartHomeCamerasGraphClassifyIntentShowSnapshot:
             f"Expected 'portao' in output_show_snapshot, got {result['output_show_snapshot']!r}"
         )
 
-    def test_classify_show_snapshot__multiple_cameras_pipe_delimited__all_in_output(self):
+    def test_classify_show_snapshot__multiple_cameras_pipe_delimited__all_in_output(
+        self,
+    ):
         """
         When the LLM returns pipe-delimited camera locations (e.g. 'cozinha|portao'),
         both must be present in output_show_snapshot.
@@ -162,9 +166,9 @@ class TestSmartHomeCamerasGraphClassifyIntentShowSnapshot:
 # TestSmartHomeCamerasGraphClassifyIntentCheckStatus
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestSmartHomeCamerasGraphClassifyIntentCheckStatus:
-
     def test_classify_check_status__sala__intent_and_field_populated(self):
         """
         JSON with intents=["check_status"] and check_status="sala" must produce:
@@ -196,7 +200,9 @@ class TestSmartHomeCamerasGraphClassifyIntentCheckStatus:
             ' "check_status": "quarto", "not_recognized": ""}',
         )
 
-        result = graph._classify_intent({"input": "a camera do quarto esta funcionando?"})
+        result = graph._classify_intent(
+            {"input": "a camera do quarto esta funcionando?"}
+        )
 
         assert isinstance(result["intent"], list)
         assert "check_status" in result["intent"]
@@ -221,9 +227,9 @@ class TestSmartHomeCamerasGraphClassifyIntentCheckStatus:
 # TestSmartHomeCamerasGraphClassifyIntentNotRecognized
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestSmartHomeCamerasGraphClassifyIntentNotRecognized:
-
     def test_classify_not_recognized__unrelated_input__intent_is_not_recognized(self):
         """
         Input unrelated to cameras must produce result["intent"] == ["not_recognized"].
@@ -265,9 +271,9 @@ class TestSmartHomeCamerasGraphClassifyIntentNotRecognized:
 # TestSmartHomeCamerasGraphClassifyIntentMultipleIntents
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestSmartHomeCamerasGraphClassifyIntentMultipleIntents:
-
     def test_classify__both_intents__show_snapshot_and_check_status__all_returned(self):
         """
         When the LLM returns both show_snapshot and check_status, both must
@@ -280,9 +286,9 @@ class TestSmartHomeCamerasGraphClassifyIntentMultipleIntents:
             ' "show_snapshot": "cozinha", "check_status": "sala", "not_recognized": ""}',
         )
 
-        result = graph._classify_intent({
-            "input": "mostre a cozinha e diga o status da sala"
-        })
+        result = graph._classify_intent(
+            {"input": "mostre a cozinha e diga o status da sala"}
+        )
 
         assert result["intent"] == ["show_snapshot", "check_status"], (
             f"Expected both intents in order, got {result['intent']!r}"
@@ -299,9 +305,9 @@ class TestSmartHomeCamerasGraphClassifyIntentMultipleIntents:
 # TestSmartHomeCamerasGraphClassifyIntentRobustness
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestSmartHomeCamerasGraphClassifyIntentRobustness:
-
     def test_classify__handles_null_values_in_json(self):
         """
         JSON with null in optional fields must parse correctly without raising
@@ -363,7 +369,9 @@ class TestSmartHomeCamerasGraphClassifyIntentRobustness:
         No exception must propagate.
         """
         graph = _make_graph()
-        _configure_cleaned_output(graph, "Desculpe, nao entendi o comando sobre cameras.")
+        _configure_cleaned_output(
+            graph, "Desculpe, nao entendi o comando sobre cameras."
+        )
 
         result = graph._classify_intent({"input": "algum input"})
 
@@ -422,9 +430,9 @@ class TestSmartHomeCamerasGraphClassifyIntentRobustness:
 # TestSmartHomeCamerasGraphClassifyIntentEntityAliasResolution
 # ===========================================================================
 
+
 @_SKIP_IF_NOT_IMPLEMENTED
 class TestSmartHomeCamerasGraphClassifyIntentEntityAliasResolution:
-
     def test_classify__alias_repo_queried_with_camera_prefix(self):
         """
         The alias repository must be queried for camera entities
@@ -501,7 +509,9 @@ class TestSmartHomeCamerasGraphClassifyIntentEntityAliasResolution:
         fall back gracefully: intent=["not_recognized"], available_entities={}.
         """
         graph = _make_graph()
-        graph.smart_home_entity_alias_repository.get_all.side_effect = RuntimeError("DB error")
+        graph.smart_home_entity_alias_repository.get_all.side_effect = RuntimeError(
+            "DB error"
+        )
         _configure_cleaned_output(
             graph,
             '{"intents": ["show_snapshot"], "show_snapshot": "cozinha",'
