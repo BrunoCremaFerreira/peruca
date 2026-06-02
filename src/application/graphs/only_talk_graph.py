@@ -14,7 +14,8 @@ class OnlyTalkGraph(Graph):
 
     _context_memory_store: dict[str, InMemoryChatMessageHistory] = {}
 
-    def __init__(self, llm_chat: BaseChatModel):
+    def __init__(self, llm_chat: BaseChatModel, provider: str = "OLLAMA"):
+        super().__init__(provider)
         self.llm_chat = llm_chat
 
     def invoke(self, invoke_request: GraphInvokeRequest) -> str:

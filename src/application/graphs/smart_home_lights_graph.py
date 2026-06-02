@@ -50,7 +50,9 @@ class SmartHomeLightsGraph(Graph):
         smart_home_service: SmartHomeService,
         smart_home_entity_alias_repository: SmartHomeEntityAliasRepository,
         smart_home_area_repository: Optional[SmartHomeAreaRepository] = None,
+        provider: str = "OLLAMA",
     ):
+        super().__init__(provider)
         self.llm_chat = llm_chat
         self.smart_home_service = smart_home_service
         self.smart_home_entity_alias_repository = smart_home_entity_alias_repository

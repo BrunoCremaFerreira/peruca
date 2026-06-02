@@ -35,7 +35,9 @@ class MainGraph(Graph):
         smart_home_climate_graph: SmartHomeClimateGraph,
         smart_home_sensors_graph: SmartHomeSensorsGraph,
         smart_home_cameras_graph: SmartHomeCamerasGraph = None,
+        provider: str = "OLLAMA",
     ):
+        super().__init__(provider)
         self.llm_chat = llm_chat
         self.only_talk_graph = only_talk_graph
         self.shopping_list_graph = shopping_list_graph

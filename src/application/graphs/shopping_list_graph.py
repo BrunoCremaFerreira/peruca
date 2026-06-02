@@ -30,8 +30,12 @@ class ShoppingListGraph(Graph):
     """
 
     def __init__(
-        self, llm_chat: BaseChatModel, shopping_list_service: ShoppingListService
+        self,
+        llm_chat: BaseChatModel,
+        shopping_list_service: ShoppingListService,
+        provider: str = "OLLAMA",
     ):
+        super().__init__(provider)
         self.llm_chat = llm_chat
         self.shopping_list_service = shopping_list_service
         self.classification_prompt = ChatPromptTemplate.from_template(

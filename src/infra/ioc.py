@@ -42,6 +42,7 @@ from infra.data.external.smart_home.home_assistant.home_assistant_smart_home_cam
 )
 from infra.data.sqlite.context_repository_redis import RedisContextRepository
 from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
 from langchain_core.language_models.chat_models import BaseChatModel
 from infra.data.sqlite.sqlite_shopping_list_repository import (
     SqliteShoppingListRepository,
@@ -87,6 +88,7 @@ def get_main_graph() -> MainGraph:
         smart_home_climate_graph=smart_home_climate_graph,
         smart_home_sensors_graph=smart_home_sensors_graph,
         smart_home_cameras_graph=smart_home_cameras_graph,
+        provider=settings.llm_provider_type,
     )
 
 
@@ -103,7 +105,7 @@ def get_only_talk_graph() -> OnlyTalkGraph:
         temperature=settings.llm_only_talk_graph_chat_temperature,
     )
 
-    return OnlyTalkGraph(llm_chat=llm_chat)
+    return OnlyTalkGraph(llm_chat=llm_chat, provider=settings.llm_provider_type)
 
 
 def get_shopping_list_graph() -> ShoppingListGraph:
@@ -122,7 +124,9 @@ def get_shopping_list_graph() -> ShoppingListGraph:
     shopping_list_service = get_shopping_list_service()
 
     return ShoppingListGraph(
-        llm_chat=llm_chat, shopping_list_service=shopping_list_service
+        llm_chat=llm_chat,
+        shopping_list_service=shopping_list_service,
+        provider=settings.llm_provider_type,
     )
 
 
@@ -148,6 +152,7 @@ def get_smart_home_lights_graph() -> SmartHomeLightsGraph:
         smart_home_service=smart_home_service,
         smart_home_entity_alias_repository=smart_home_entity_alias_repository,
         smart_home_area_repository=smart_home_area_repository,
+        provider=settings.llm_provider_type,
     )
 
 
@@ -170,6 +175,7 @@ def get_smart_home_climate_graph() -> SmartHomeClimateGraph:
         llm_chat=llm_chat,
         smart_home_service=smart_home_service,
         smart_home_entity_alias_repository=smart_home_entity_alias_repository,
+        provider=settings.llm_provider_type,
     )
 
 
@@ -192,6 +198,7 @@ def get_smart_home_sensors_graph() -> SmartHomeSensorsGraph:
         llm_chat=llm_chat,
         smart_home_service=smart_home_service,
         smart_home_entity_alias_repository=smart_home_entity_alias_repository,
+        provider=settings.llm_provider_type,
     )
 
 
@@ -214,6 +221,7 @@ def get_smart_home_cameras_graph() -> SmartHomeCamerasGraph:
         llm_chat=llm_chat,
         smart_home_service=smart_home_service,
         smart_home_entity_alias_repository=smart_home_entity_alias_repository,
+        provider=settings.llm_provider_type,
     )
 
 
@@ -428,11 +436,14 @@ def get_llm_chat(model: str, temperature: float) -> BaseChatModel:
     provider_type = settings.llm_provider_type.upper()
 
     if provider_type == "OPENAI":
-        raise ValueError("Open Ai not supported yet!")
-
+        return ChatOpenAI(
+            model=model,
+            temperature=temperature,
+            api_key=settings.llm_provider_api_key,
+        )
     elif provider_type == "OLLAMA":
         return ChatOllama(
             base_url=settings.llm_provider_url, model=model, temperature=temperature
         )
     else:
-        raise ValueError("Invalid provider type")
+        raise ValueError(f"Invalid provider type: {provider_type!r}")
