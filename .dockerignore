@@ -8,5 +8,7 @@ src/.env
 src/peruca.db
 docs/
 scripts/
-*.md
+**/*.md
 !src/infra/prompts/*.md
+src/tests/
+src/pytest.ini

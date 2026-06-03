@@ -32,6 +32,12 @@ from infra.ioc import (
 
 router = APIRouter()
 
+
+@router.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
 # =====================================
 # LLM Routes
 # =====================================
