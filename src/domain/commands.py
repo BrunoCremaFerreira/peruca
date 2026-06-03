@@ -20,6 +20,12 @@ class UserUpdate:
     summary: str = ""
 
 
+@dataclass
+class UserMemoryAdd:
+    user_id: str = ""
+    content: str = ""
+
+
 # =====================================
 # Shopping List
 # =====================================

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional, Tuple
@@ -25,6 +25,12 @@ class User(BaseEntity):
     external_id: str = ""
     name: str = ""
     summary: str = ""
+
+
+@dataclass
+class UserMemory(BaseEntity):
+    user_id: str = ""
+    content: str = ""
 
 
 # ====================================
@@ -78,6 +84,7 @@ class GraphInvokeRequest:
 
     message: str
     user: User
+    memories: list[str] = field(default_factory=list)
 
 
 # ====================================

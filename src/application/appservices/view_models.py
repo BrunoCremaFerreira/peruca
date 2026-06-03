@@ -31,6 +31,16 @@ class UserResponse:
 
 
 # =====================================
+# User Memory
+# =====================================
+@dataclass
+class UserMemoryResponse:
+    id: str = ""
+    user_id: str = ""
+    content: str = ""
+
+
+# =====================================
 # Shopping List
 # =====================================
 @dataclass

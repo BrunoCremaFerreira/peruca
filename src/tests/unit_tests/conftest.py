@@ -35,6 +35,14 @@ def shopping_list_repo_mock():
 
 
 @pytest.fixture
+def user_memory_repo_mock():
+    repo = MagicMock()
+    repo.get_all_by_user_id.return_value = []
+    repo.get_by_id.return_value = None
+    return repo
+
+
+@pytest.fixture
 def sqlite_db_path():
     if os.path.exists(DB_PATH):
         os.remove(DB_PATH)

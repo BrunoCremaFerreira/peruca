@@ -8,6 +8,7 @@ from domain.entities import (
     SmartHomeEntityAlias,
     SmartHomeLight,
     User,
+    UserMemory,
 )
 
 
@@ -58,6 +59,47 @@ class UserRepository(ABC):
     def delete(self, user_id: str):
         """
         Delete User
+        """
+        pass
+
+
+class UserMemoryRepository(ABC):
+    """
+    UserMemory Repository
+    """
+
+    @abstractmethod
+    def add(self, memory: UserMemory):
+        """
+        Add UserMemory
+        """
+        pass
+
+    @abstractmethod
+    def get_by_id(self, memory_id: str) -> Optional[UserMemory]:
+        """
+        Get UserMemory By Id
+        """
+        pass
+
+    @abstractmethod
+    def get_all_by_user_id(self, user_id: str) -> List[UserMemory]:
+        """
+        Get all UserMemory by user_id
+        """
+        pass
+
+    @abstractmethod
+    def delete(self, memory_id: str):
+        """
+        Delete UserMemory
+        """
+        pass
+
+    @abstractmethod
+    def delete_all_by_user_id(self, user_id: str):
+        """
+        Delete all UserMemory by user_id
         """
         pass
 

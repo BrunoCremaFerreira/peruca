@@ -1,8 +1,11 @@
 from application.appservices.llm_app_service import LlmAppService
+from application.appservices.memory_app_service import MemoryAppService
 from application.appservices.shopping_list_app_service import ShoppingListAppService
 from application.appservices.smart_home_app_service import SmartHomeAppService
 from application.appservices.user_app_service import UserAppService
+from application.appservices.user_memory_app_service import UserMemoryAppService
 from application.graphs.main_graph import MainGraph
+from application.graphs.memory_graph import MemoryGraph
 from application.graphs.only_talk_graph import OnlyTalkGraph
 from application.graphs.shopping_list_graph import ShoppingListGraph
 from application.graphs.smart_home_lights_graph import SmartHomeLightsGraph
@@ -14,6 +17,7 @@ from domain.interfaces.data_repository import (
     ShoppingListRepository,
     SmartHomeAreaRepository,
     SmartHomeEntityAliasRepository,
+    UserMemoryRepository,
     UserRepository,
 )
 from domain.interfaces.smart_home_repository import (
@@ -24,6 +28,7 @@ from domain.interfaces.smart_home_repository import (
 )
 from domain.services.shopping_list_service import ShoppingListService
 from domain.services.smart_home_service import SmartHomeService
+from domain.services.user_memory_service import UserMemoryService
 from domain.services.user_service import UserService
 from infra.data.external.smart_home.home_assistant.home_assistant_smart_home_configuration_repository import (
     HomeAssistantSmartHomeConfigurationRepository,
@@ -52,6 +57,9 @@ from infra.data.sqlite.sqlite_smart_home_area_repository import (
 )
 from infra.data.sqlite.sqlite_smart_home_entity_alias_repository import (
     SqliteSmartHomeEntityAliasRepository,
+)
+from infra.data.sqlite.sqlite_user_memory_repository import (
+    SqliteUserMemoryRepository,
 )
 from infra.data.sqlite.sqlite_user_repository import SqliteUserRepository
 from infra.settings import Settings
@@ -90,6 +98,21 @@ def get_main_graph() -> MainGraph:
         smart_home_cameras_graph=smart_home_cameras_graph,
         provider=settings.llm_provider_type,
     )
+
+
+def get_memory_graph() -> MemoryGraph:
+    """
+    IOC for Memory Graph
+    """
+
+    settings = Settings()
+
+    llm_chat = get_llm_chat(
+        model=settings.llm_memory_graph_chat_model,
+        temperature=settings.llm_memory_graph_chat_temperature,
+    )
+
+    return MemoryGraph(llm_chat=llm_chat, provider=settings.llm_provider_type)
 
 
 def get_only_talk_graph() -> OnlyTalkGraph:
@@ -238,7 +261,28 @@ def get_llm_app_service() -> LlmAppService:
         main_graph=get_main_graph(),
         context_repository=get_context_repository(),
         user_repository=get_user_repository(),
+        user_memory_service=get_user_memory_service(),
     )
+
+
+def get_memory_app_service() -> MemoryAppService:
+    """
+    IOC for MemoryAppService class
+    """
+
+    return MemoryAppService(
+        memory_graph=get_memory_graph(),
+        user_repository=get_user_repository(),
+        user_memory_repository_factory=get_user_memory_repository,
+    )
+
+
+def get_user_memory_app_service() -> UserMemoryAppService:
+    """
+    IOC for UserMemoryAppService class
+    """
+
+    return UserMemoryAppService(user_memory_service=get_user_memory_service())
 
 
 def get_user_app_service() -> UserAppService:
@@ -284,6 +328,16 @@ def get_user_service() -> UserService:
     """
 
     return UserService(user_repository=get_user_repository())
+
+
+def get_user_memory_service() -> UserMemoryService:
+    """
+    IOC for User Memory Service
+    """
+
+    return UserMemoryService(
+        user_memory_repository=get_user_memory_repository()
+    )
 
 
 def get_shopping_list_service() -> ShoppingListRepository:
@@ -333,6 +387,15 @@ def get_user_repository() -> UserRepository:
 
     settings = Settings()
     return SqliteUserRepository(db_path=settings.peruca_db_connection_string)
+
+
+def get_user_memory_repository() -> UserMemoryRepository:
+    """
+    User Memory Repository
+    """
+
+    settings = Settings()
+    return SqliteUserMemoryRepository(db_path=settings.peruca_db_connection_string)
 
 
 def get_shopping_list_repository() -> ShoppingListRepository:

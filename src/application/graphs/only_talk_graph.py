@@ -21,9 +21,19 @@ class OnlyTalkGraph(Graph):
     def invoke(self, invoke_request: GraphInvokeRequest) -> str:
         user = invoke_request.user
 
+        if invoke_request.memories:
+            user_memories = "\n".join(
+                f"- {memory}" for memory in invoke_request.memories
+            )
+        else:
+            user_memories = (
+                "(você ainda não tem memórias registradas sobre esta pessoa)"
+            )
+
         formatted_system_message = self.load_prompt("only_talk_graph.md").format(
             user_name=user.name,
             user_summary=user.summary,
+            user_memories=user_memories,
             current_datetime=datetime.now().strftime("%d/%m/%Y %H:%M"),
         )
 

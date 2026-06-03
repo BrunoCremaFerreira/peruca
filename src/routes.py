@@ -1,14 +1,17 @@
 from typing import List
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from application.appservices.llm_app_service import LlmAppService
+from application.appservices.memory_app_service import MemoryAppService
 from application.appservices.shopping_list_app_service import ShoppingListAppService
 from application.appservices.smart_home_app_service import SmartHomeAppService
 from application.appservices.user_app_service import UserAppService
+from application.appservices.user_memory_app_service import UserMemoryAppService
 from application.appservices.view_models import (
     ChatRequest,
     ChatResponse,
     ShoppingListCleanType,
     ShoppingListItemResponse,
+    UserMemoryResponse,
     UserResponse,
 )
 from domain.commands import (
@@ -20,9 +23,11 @@ from domain.commands import (
 from domain.entities import SmartHomeEntityAlias
 from infra.ioc import (
     get_llm_app_service,
+    get_memory_app_service,
     get_shopping_list_app_service,
     get_smart_home_app_service,
     get_user_app_service,
+    get_user_memory_app_service,
 )
 
 router = APIRouter()
@@ -35,11 +40,20 @@ router = APIRouter()
 @router.post("/llm/chat", tags=["LLM"])
 def chat(
     request: ChatRequest,
+    background_tasks: BackgroundTasks,
     llm_app_service: LlmAppService = Depends(get_llm_app_service),
+    memory_app_service: MemoryAppService = Depends(get_memory_app_service),
 ) -> ChatResponse:
-    response_str = llm_app_service.chat(request)
+    result = llm_app_service.chat(request)
+    output = result["output"] if isinstance(result, dict) else result
+    background_tasks.add_task(
+        memory_app_service.learn_from_message,
+        request.external_user_id,
+        request.message,
+        output,
+    )
     response = ChatResponse(
-        response=response_str,
+        response=result,
         chat_id=request.chat_id,
         external_user_id=request.external_user_id,
     )
@@ -86,6 +100,36 @@ def user_update(
     user_app_service: UserAppService = Depends(get_user_app_service),
 ) -> None:
     user_app_service.update(user_update=request)
+
+
+# =====================================
+# User Memory Routes
+# =====================================
+
+
+@router.get("/user/{id}/memory", tags=["User Memory"])
+def user_memory_get_all(
+    id: str,
+    svc: UserMemoryAppService = Depends(get_user_memory_app_service),
+) -> List[UserMemoryResponse]:
+    return svc.get_all_by_user(user_id=id)
+
+
+@router.delete("/user/{id}/memory/{memory_id}", tags=["User Memory"])
+def user_memory_delete(
+    id: str,
+    memory_id: str,
+    svc: UserMemoryAppService = Depends(get_user_memory_app_service),
+) -> None:
+    svc.delete(memory_id=memory_id)
+
+
+@router.delete("/user/{id}/memory", tags=["User Memory"])
+def user_memory_clear(
+    id: str,
+    svc: UserMemoryAppService = Depends(get_user_memory_app_service),
+) -> None:
+    svc.clear_by_user(user_id=id)
 
 
 # =====================================

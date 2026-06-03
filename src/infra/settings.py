@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     llm_smart_home_cameras_graph_chat_model: str = "qwen3:14b"
     llm_smart_home_cameras_graph_chat_temperature: float = 0.1
 
+    llm_memory_graph_chat_model: str = "qwen3:14b"
+    llm_memory_graph_chat_temperature: float = 0.1
+
     # ===============================
     # NLP Models config
     # ===============================

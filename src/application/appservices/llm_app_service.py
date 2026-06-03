@@ -3,6 +3,7 @@ from application.graphs.main_graph import MainGraph
 from domain.entities import GraphInvokeRequest, User
 from domain.exceptions import EmptyParamValidationError, NofFoundValidationError
 from domain.interfaces.data_repository import ContextRepository, UserRepository
+from domain.services.user_memory_service import UserMemoryService
 from infra.utils import is_null_or_whitespace
 
 
@@ -16,10 +17,12 @@ class LlmAppService:
         main_graph: MainGraph,
         context_repository: ContextRepository,
         user_repository: UserRepository,
+        user_memory_service: UserMemoryService,
     ) -> None:
         self.main_graph = main_graph
         self.context_repository = context_repository
         self.user_repository = user_repository
+        self.user_memory_service = user_memory_service
 
     # ===============================================
     # Public Methods
@@ -42,7 +45,12 @@ class LlmAppService:
                 value=chat_request.external_user_id,
             )
 
-        invoke_request = GraphInvokeRequest(message=chat_request.message, user=user)
+        memories = self.user_memory_service.get_all_by_user(user.id)
+        memory_contents = [memory.content for memory in memories]
+
+        invoke_request = GraphInvokeRequest(
+            message=chat_request.message, user=user, memories=memory_contents
+        )
         result = self.main_graph.invoke(invoke_request=invoke_request)
         output = result.get("output")
         intents = result.get("intent")
