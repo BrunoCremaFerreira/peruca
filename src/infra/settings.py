@@ -63,6 +63,15 @@ class Settings(BaseSettings):
     home_assistant_token: str = ""
 
     # ===============================
+    # Music Assistant Config
+    # ===============================
+
+    music_assistant_url: str = "http://localhost:8095"
+    music_assistant_token: str = ""
+    llm_music_graph_chat_model: str = "qwen3:14b"
+    llm_music_graph_chat_temperature: float = 0.3
+
+    # ===============================
     # Databases Config
     # ===============================
 

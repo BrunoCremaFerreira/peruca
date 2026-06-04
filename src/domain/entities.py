@@ -85,6 +85,7 @@ class GraphInvokeRequest:
     message: str
     user: User
     memories: list[str] = field(default_factory=list)
+    context_hints: dict = field(default_factory=dict)
 
 
 # ====================================
@@ -254,3 +255,25 @@ class SmartHomeCameraSnapshot:
     entity_id: str
     image_bytes: bytes
     content_type: str = "image/jpeg"
+
+
+# ====================================
+# Music Related Classes
+# ====================================
+
+
+@dataclass
+class MusicPlayer:
+    player_id: str
+    name: str
+    state: str
+    volume_level: Optional[float] = None
+    current_track: Optional[str] = None
+
+
+@dataclass
+class MusicSearchResult:
+    media_id: str
+    media_type: str
+    name: str
+    artist: Optional[str] = None

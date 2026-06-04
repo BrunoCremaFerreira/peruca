@@ -6,6 +6,7 @@ from application.appservices.user_app_service import UserAppService
 from application.appservices.user_memory_app_service import UserMemoryAppService
 from application.graphs.main_graph import MainGraph
 from application.graphs.memory_graph import MemoryGraph
+from application.graphs.music_graph import MusicGraph
 from application.graphs.only_talk_graph import OnlyTalkGraph
 from application.graphs.shopping_list_graph import ShoppingListGraph
 from application.graphs.smart_home_lights_graph import SmartHomeLightsGraph
@@ -20,16 +21,21 @@ from domain.interfaces.data_repository import (
     UserMemoryRepository,
     UserRepository,
 )
+from domain.interfaces.music_repository import MusicRepository
 from domain.interfaces.smart_home_repository import (
     SmartHomeLightRepository,
     SmartHomeClimateRepository,
     SmartHomeSensorRepository,
     SmartHomeCameraRepository,
 )
+from domain.services.music_service import MusicService
 from domain.services.shopping_list_service import ShoppingListService
 from domain.services.smart_home_service import SmartHomeService
 from domain.services.user_memory_service import UserMemoryService
 from domain.services.user_service import UserService
+from infra.data.external.music.music_assistant.music_assistant_music_repository import (
+    MusicAssistantMusicRepository,
+)
 from infra.data.external.smart_home.home_assistant.home_assistant_smart_home_configuration_repository import (
     HomeAssistantSmartHomeConfigurationRepository,
 )
@@ -87,6 +93,7 @@ def get_main_graph() -> MainGraph:
     smart_home_climate_graph = get_smart_home_climate_graph()
     smart_home_sensors_graph = get_smart_home_sensors_graph()
     smart_home_cameras_graph = get_smart_home_cameras_graph()
+    music_graph = get_music_graph()
 
     return MainGraph(
         llm_chat=llm_chat,
@@ -96,6 +103,7 @@ def get_main_graph() -> MainGraph:
         smart_home_climate_graph=smart_home_climate_graph,
         smart_home_sensors_graph=smart_home_sensors_graph,
         smart_home_cameras_graph=smart_home_cameras_graph,
+        music_graph=music_graph,
         provider=settings.llm_provider_type,
     )
 
@@ -248,6 +256,25 @@ def get_smart_home_cameras_graph() -> SmartHomeCamerasGraph:
     )
 
 
+def get_music_graph() -> MusicGraph:
+    """
+    IOC for Music Graph
+    """
+
+    settings = Settings()
+
+    llm_chat = get_llm_chat(
+        model=settings.llm_music_graph_chat_model,
+        temperature=settings.llm_music_graph_chat_temperature,
+    )
+
+    return MusicGraph(
+        llm_chat=llm_chat,
+        music_service=get_music_service(),
+        provider=settings.llm_provider_type,
+    )
+
+
 # ====================================
 # App Services
 # ====================================
@@ -262,6 +289,7 @@ def get_llm_app_service() -> LlmAppService:
         context_repository=get_context_repository(),
         user_repository=get_user_repository(),
         user_memory_service=get_user_memory_service(),
+        music_service=get_music_service(),
     )
 
 
@@ -322,6 +350,28 @@ def get_smart_home_app_service() -> SmartHomeAppService:
 # ====================================
 # Domain Services
 # ====================================
+
+
+def get_music_repository() -> MusicRepository:
+    """
+    IOC for Music Repository
+    """
+
+    settings = Settings()
+    return MusicAssistantMusicRepository(
+        base_url=settings.music_assistant_url,
+        token=settings.music_assistant_token,
+    )
+
+
+def get_music_service() -> MusicService:
+    """
+    IOC for Music Service
+    """
+
+    return MusicService(music_repository=get_music_repository())
+
+
 def get_user_service() -> UserService:
     """
     IOC for User Service
