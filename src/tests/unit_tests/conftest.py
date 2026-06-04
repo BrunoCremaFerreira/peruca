@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from infra.ioc import get_user_app_service, get_user_repository
+import application.graphs.graph as _graph_module
 
 
 DB_PATH = "/home/brn/tests/data/tests.db"
@@ -16,6 +17,13 @@ def fresh_event_loop():
     yield
     loop.close()
     asyncio.set_event_loop(None)
+
+
+@pytest.fixture(autouse=True)
+def clear_prompt_cache():
+    _graph_module._prompt_cache.clear()
+    yield
+    _graph_module._prompt_cache.clear()
 
 
 @pytest.fixture

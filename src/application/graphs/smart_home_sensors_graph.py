@@ -104,23 +104,27 @@ class SmartHomeSensorsGraph(Graph):
         available_entities = data.get("available_entities", {})
         entity_ids = self._find_entity_ids(raw, available_entities)
 
-        lines = []
-        for entity_id in entity_ids:
-            try:
-                reading: SensorReading = asyncio.run(
-                    self.smart_home_service.sensor_get_state(entity_id)
-                )
-                name = reading.friendly_name or reading.entity_id
-                value = (
-                    f"{reading.state} {reading.unit}" if reading.unit else reading.state
-                )
-                lines.append(f"{name}: {value}")
-            except Exception as exc:
-                print(
-                    f"[SmartHomeSensorsGraph._handle_query_current_state][ERROR]: {exc}"
-                )
-                lines.append(f"{entity_id}: estado indisponível")
+        async def _fetch_states(ids):
+            results = await asyncio.gather(
+                *[self.smart_home_service.sensor_get_state(eid) for eid in ids],
+                return_exceptions=True,
+            )
+            fetched = []
+            for eid, reading in zip(ids, results):
+                if isinstance(reading, Exception):
+                    print(
+                        f"[SmartHomeSensorsGraph._handle_query_current_state][ERROR]: {reading}"
+                    )
+                    fetched.append(f"{eid}: estado indisponível")
+                else:
+                    name = reading.friendly_name or reading.entity_id
+                    value = (
+                        f"{reading.state} {reading.unit}" if reading.unit else reading.state
+                    )
+                    fetched.append(f"{name}: {value}")
+            return fetched
 
+        lines = asyncio.run(_fetch_states(entity_ids))
         return {"output_query_current_state": "\n".join(lines) if lines else ""}
 
     def _handle_query_history(self, data):
@@ -140,13 +144,17 @@ class SmartHomeSensorsGraph(Graph):
             f"{sensor_type}|{location}", available_entities
         )
 
-        lines = []
-        for entity_id in entity_ids:
-            try:
-                history: List[SensorReading] = asyncio.run(
-                    self.smart_home_service.sensor_get_history(entity_id, hours_back)
-                )
-                if history:
+        async def _fetch_histories(ids, back):
+            results = await asyncio.gather(
+                *[self.smart_home_service.sensor_get_history(eid, back) for eid in ids],
+                return_exceptions=True,
+            )
+            fetched = []
+            for eid, history in zip(ids, results):
+                if isinstance(history, Exception):
+                    print(f"[SmartHomeSensorsGraph._handle_query_history][ERROR]: {history}")
+                    fetched.append(f"{eid}: histórico indisponível")
+                elif history:
                     entries = []
                     for reading in history:
                         time_str = (
@@ -155,14 +163,13 @@ class SmartHomeSensorsGraph(Graph):
                             else "?"
                         )
                         entries.append(f"{time_str}: {reading.state}")
-                    name = history[0].friendly_name or entity_id
-                    lines.append(f"{name}: {' | '.join(entries)}")
+                    name = history[0].friendly_name or eid
+                    fetched.append(f"{name}: {' | '.join(entries)}")
                 else:
-                    lines.append(f"{entity_id}: sem histórico")
-            except Exception as exc:
-                print(f"[SmartHomeSensorsGraph._handle_query_history][ERROR]: {exc}")
-                lines.append(f"{entity_id}: histórico indisponível")
+                    fetched.append(f"{eid}: sem histórico")
+            return fetched
 
+        lines = asyncio.run(_fetch_histories(entity_ids, hours_back))
         return {"output_query_history": "\n".join(lines) if lines else ""}
 
     def _handle_not_recognized(self, data):
@@ -262,5 +269,7 @@ class SmartHomeSensorsGraph(Graph):
     # ===============================================
 
     def invoke(self, invoke_request: GraphInvokeRequest) -> dict:
-        app = self._compile()
+        if self._compiled_graph is None:
+            self._compiled_graph = self._compile()
+        app = self._compiled_graph
         return app.invoke({"input": invoke_request})

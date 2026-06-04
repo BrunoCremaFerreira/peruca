@@ -34,12 +34,18 @@ class MusicAssistantMusicRepository(MusicRepository):
     def __init__(self, base_url: str, token: str = "") -> None:
         self.base_url = base_url.rstrip("/")
         self.token = token
+        self._session: aiohttp.ClientSession | None = None
 
     def _headers(self) -> dict:
         headers = {"Content-Type": "application/json"}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
         return headers
+
+    def _get_session(self) -> aiohttp.ClientSession:
+        if self._session is None:
+            self._session = aiohttp.ClientSession(headers=self._headers())
+        return self._session
 
     async def get_players(self) -> List[MusicPlayer]:
         url = f"{self.base_url}/api/players"

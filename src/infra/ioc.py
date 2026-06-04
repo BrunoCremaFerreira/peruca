@@ -68,7 +68,36 @@ from infra.data.sqlite.sqlite_user_memory_repository import (
     SqliteUserMemoryRepository,
 )
 from infra.data.sqlite.sqlite_user_repository import SqliteUserRepository
+import hashlib
+import os
+
 from infra.settings import Settings
+
+_real_settings = None
+_settings_cls = None
+_settings_env_snapshot = None
+_repo_cache: dict = {}
+
+
+def _env_snapshot() -> str:
+    return hashlib.md5(str(sorted(os.environ.items())).encode()).hexdigest()
+
+
+def _get_settings() -> Settings:
+    global _real_settings, _settings_cls, _settings_env_snapshot
+    current_snapshot = _env_snapshot()
+    if _settings_cls is not Settings or _settings_env_snapshot != current_snapshot:
+        _real_settings = Settings()
+        _settings_cls = Settings
+        _settings_env_snapshot = current_snapshot
+        _repo_cache.clear()
+    return _real_settings
+
+
+def __getattr__(name: str):
+    if name == "_settings":
+        return _get_settings()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 # ====================================
@@ -79,7 +108,7 @@ def get_main_graph() -> MainGraph:
     IOC for Main Graph
     """
 
-    settings = Settings()
+    settings = _get_settings()
 
     # Instancing LLM Provider
     llm_chat = get_llm_chat(
@@ -113,7 +142,7 @@ def get_memory_graph() -> MemoryGraph:
     IOC for Memory Graph
     """
 
-    settings = Settings()
+    settings = _get_settings()
 
     llm_chat = get_llm_chat(
         model=settings.llm_memory_graph_chat_model,
@@ -128,7 +157,7 @@ def get_only_talk_graph() -> OnlyTalkGraph:
     IOC for Only Talk Graph
     """
 
-    settings = Settings()
+    settings = _get_settings()
 
     # Instancing LLM Provider
     llm_chat = get_llm_chat(
@@ -144,7 +173,7 @@ def get_shopping_list_graph() -> ShoppingListGraph:
     IOC for Shopping List Graph
     """
 
-    settings = Settings()
+    settings = _get_settings()
 
     # Instancing LLM Provider
     llm_chat = get_llm_chat(
@@ -166,7 +195,7 @@ def get_smart_home_lights_graph() -> SmartHomeLightsGraph:
     IOC for Smart Home Lights Graph
     """
 
-    settings = Settings()
+    settings = _get_settings()
 
     # Instancing LLM Provider
     llm_chat = get_llm_chat(
@@ -192,7 +221,7 @@ def get_smart_home_climate_graph() -> SmartHomeClimateGraph:
     IOC for Smart Home Climate Graph
     """
 
-    settings = Settings()
+    settings = _get_settings()
 
     llm_chat = get_llm_chat(
         model=settings.llm_smart_home_climate_graph_chat_model,
@@ -215,7 +244,7 @@ def get_smart_home_sensors_graph() -> SmartHomeSensorsGraph:
     IOC for Smart Home Sensors Graph
     """
 
-    settings = Settings()
+    settings = _get_settings()
 
     llm_chat = get_llm_chat(
         model=settings.llm_smart_home_sensors_graph_chat_model,
@@ -238,7 +267,7 @@ def get_smart_home_cameras_graph() -> SmartHomeCamerasGraph:
     IOC for Smart Home Cameras Graph
     """
 
-    settings = Settings()
+    settings = _get_settings()
 
     llm_chat = get_llm_chat(
         model=settings.llm_smart_home_cameras_graph_chat_model,
@@ -261,7 +290,7 @@ def get_music_graph() -> MusicGraph:
     IOC for Music Graph
     """
 
-    settings = Settings()
+    settings = _get_settings()
 
     llm_chat = get_llm_chat(
         model=settings.llm_music_graph_chat_model,
@@ -357,11 +386,14 @@ def get_music_repository() -> MusicRepository:
     IOC for Music Repository
     """
 
-    settings = Settings()
-    return MusicAssistantMusicRepository(
-        base_url=settings.music_assistant_url,
-        token=settings.music_assistant_token,
-    )
+    settings = _get_settings()
+    cache_key = ("music", settings.music_assistant_url, settings.music_assistant_token)
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = MusicAssistantMusicRepository(
+            base_url=settings.music_assistant_url,
+            token=settings.music_assistant_token,
+        )
+    return _repo_cache[cache_key]
 
 
 def get_music_service() -> MusicService:
@@ -424,7 +456,7 @@ def get_context_repository() -> ContextRepository:
     IOC for Cache Repository
     """
 
-    settings = Settings()
+    settings = _get_settings()
     connection_string = settings.cache_db_connection_string
 
     return RedisContextRepository(connection_string)
@@ -435,7 +467,7 @@ def get_user_repository() -> UserRepository:
     User Repository
     """
 
-    settings = Settings()
+    settings = _get_settings()
     return SqliteUserRepository(db_path=settings.peruca_db_connection_string)
 
 
@@ -444,7 +476,7 @@ def get_user_memory_repository() -> UserMemoryRepository:
     User Memory Repository
     """
 
-    settings = Settings()
+    settings = _get_settings()
     return SqliteUserMemoryRepository(db_path=settings.peruca_db_connection_string)
 
 
@@ -453,7 +485,7 @@ def get_shopping_list_repository() -> ShoppingListRepository:
     Shopping List Repository
     """
 
-    settings = Settings()
+    settings = _get_settings()
     return SqliteShoppingListRepository(db_path=settings.peruca_db_connection_string)
 
 
@@ -461,7 +493,7 @@ def get_smart_home_entity_alias_repository() -> SmartHomeEntityAliasRepository:
     """
     Smart Home Entity Alias Repository
     """
-    settings = Settings()
+    settings = _get_settings()
     return SqliteSmartHomeEntityAliasRepository(
         db_path=settings.peruca_db_connection_string
     )
@@ -471,7 +503,7 @@ def get_smart_home_area_repository() -> SmartHomeAreaRepository:
     """
     Smart Home Area Repository
     """
-    settings = Settings()
+    settings = _get_settings()
     return SqliteSmartHomeAreaRepository(db_path=settings.peruca_db_connection_string)
 
 
@@ -483,10 +515,13 @@ def get_smart_home_light_repository() -> SmartHomeLightRepository:
     Smart Home Light Repository
     """
 
-    settings = Settings()
-    return HomeAssistantSmartHomeLightRepository(
-        base_url=settings.home_assistant_url, token=settings.home_assistant_token
-    )
+    settings = _get_settings()
+    cache_key = ("light", settings.home_assistant_url, settings.home_assistant_token)
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = HomeAssistantSmartHomeLightRepository(
+            base_url=settings.home_assistant_url, token=settings.home_assistant_token
+        )
+    return _repo_cache[cache_key]
 
 
 def get_smart_home_climate_repository() -> SmartHomeClimateRepository:
@@ -494,10 +529,13 @@ def get_smart_home_climate_repository() -> SmartHomeClimateRepository:
     Smart Home Climate Repository
     """
 
-    settings = Settings()
-    return HomeAssistantSmartHomeClimateRepository(
-        base_url=settings.home_assistant_url, token=settings.home_assistant_token
-    )
+    settings = _get_settings()
+    cache_key = ("climate", settings.home_assistant_url, settings.home_assistant_token)
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = HomeAssistantSmartHomeClimateRepository(
+            base_url=settings.home_assistant_url, token=settings.home_assistant_token
+        )
+    return _repo_cache[cache_key]
 
 
 def get_smart_home_sensor_repository() -> SmartHomeSensorRepository:
@@ -505,10 +543,13 @@ def get_smart_home_sensor_repository() -> SmartHomeSensorRepository:
     Smart Home Sensor Repository
     """
 
-    settings = Settings()
-    return HomeAssistantSmartHomeSensorRepository(
-        base_url=settings.home_assistant_url, token=settings.home_assistant_token
-    )
+    settings = _get_settings()
+    cache_key = ("sensor", settings.home_assistant_url, settings.home_assistant_token)
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = HomeAssistantSmartHomeSensorRepository(
+            base_url=settings.home_assistant_url, token=settings.home_assistant_token
+        )
+    return _repo_cache[cache_key]
 
 
 def get_smart_home_camera_repository() -> SmartHomeCameraRepository:
@@ -516,10 +557,13 @@ def get_smart_home_camera_repository() -> SmartHomeCameraRepository:
     Smart Home Camera Repository
     """
 
-    settings = Settings()
-    return HomeAssistantSmartHomeCameraRepository(
-        base_url=settings.home_assistant_url, token=settings.home_assistant_token
-    )
+    settings = _get_settings()
+    cache_key = ("camera", settings.home_assistant_url, settings.home_assistant_token)
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = HomeAssistantSmartHomeCameraRepository(
+            base_url=settings.home_assistant_url, token=settings.home_assistant_token
+        )
+    return _repo_cache[cache_key]
 
 
 def get_home_assistant_smart_home_configuration_repository() -> (
@@ -529,10 +573,13 @@ def get_home_assistant_smart_home_configuration_repository() -> (
     Smart Configurations Repository
     """
 
-    settings = Settings()
-    return HomeAssistantSmartHomeConfigurationRepository(
-        websocket_url=settings.home_assistant_url, token=settings.home_assistant_token
-    )
+    settings = _get_settings()
+    cache_key = ("ha_config", settings.home_assistant_url, settings.home_assistant_token)
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = HomeAssistantSmartHomeConfigurationRepository(
+            websocket_url=settings.home_assistant_url, token=settings.home_assistant_token
+        )
+    return _repo_cache[cache_key]
 
 
 # ====================================

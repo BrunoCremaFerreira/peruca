@@ -27,6 +27,12 @@ class HomeAssistantSmartHomeClimateRepository(SmartHomeClimateRepository):
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",
         }
+        self._session: aiohttp.ClientSession | None = None
+
+    def _get_session(self) -> aiohttp.ClientSession:
+        if self._session is None:
+            self._session = aiohttp.ClientSession(headers=self.headers)
+        return self._session
 
     async def get_state(self, entity_id: str) -> SmartHomeClimate:
         """

@@ -11,7 +11,10 @@ class RedisContextRepository(ContextRepository):
 
     def __init__(self, connection_string: str):
         self._connection_string = connection_string
-        self._client: Redis
+        self._client: Redis = from_url(self._connection_string)
+
+    def _get_client(self) -> Redis:
+        return self._client
 
     def connect(self):
         self._client = from_url(self._connection_string)
@@ -20,16 +23,16 @@ class RedisContextRepository(ContextRepository):
         """
         Stores a value associated with a key.
         """
-        return await self._client.set(key, value)
+        return await self._get_client().set(key, value)
 
     async def get_key(self, key: str) -> str:
         """
         Retrieves the value associated with a key.
         """
-        return str(await self._client.get(key))
+        return str(await self._get_client().get(key))
 
     async def delete_key(self, key: str) -> bool:
         """
         Deletes a key from the cache.
         """
-        return await self._client.delete(key)
+        return await self._get_client().delete(key)

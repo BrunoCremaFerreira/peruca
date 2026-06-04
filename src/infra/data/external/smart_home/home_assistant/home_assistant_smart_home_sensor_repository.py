@@ -36,6 +36,12 @@ class HomeAssistantSmartHomeSensorRepository(SmartHomeSensorRepository):
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",
         }
+        self._session: aiohttp.ClientSession | None = None
+
+    def _get_session(self) -> aiohttp.ClientSession:
+        if self._session is None:
+            self._session = aiohttp.ClientSession(headers=self.headers)
+        return self._session
 
     def _map_sensor_type(self, device_class: str) -> SensorType:
         return DEVICE_CLASS_TO_SENSOR_TYPE.get(device_class, SensorType.UNKNOWN)

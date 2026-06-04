@@ -120,12 +120,12 @@ class SmartHomeClimateGraph(Graph):
         if not entity_ids:
             return {"output_turn_on": "Device not found"}
 
-        for entity_id in entity_ids:
-            asyncio.run(
-                self.smart_home_service.climate_turn_on(
-                    command=ClimateTurnOn(entity_id=entity_id)
-                )
-            )
+        async def _run():
+            await asyncio.gather(*[
+                self.smart_home_service.climate_turn_on(command=ClimateTurnOn(entity_id=eid))
+                for eid in entity_ids
+            ])
+        asyncio.run(_run())
 
         return {"output_turn_on": devices}
 
@@ -144,12 +144,12 @@ class SmartHomeClimateGraph(Graph):
         if not entity_ids:
             return {"output_turn_off": "Device not found"}
 
-        for entity_id in entity_ids:
-            asyncio.run(
-                self.smart_home_service.climate_turn_off(
-                    command=ClimateTurnOff(entity_id=entity_id)
-                )
-            )
+        async def _run():
+            await asyncio.gather(*[
+                self.smart_home_service.climate_turn_off(command=ClimateTurnOff(entity_id=eid))
+                for eid in entity_ids
+            ])
+        asyncio.run(_run())
 
         return {"output_turn_off": devices}
 
@@ -179,14 +179,14 @@ class SmartHomeClimateGraph(Graph):
             except ValueError:
                 continue
 
-            for entity_id in entity_ids:
-                asyncio.run(
+            async def _run():
+                await asyncio.gather(*[
                     self.smart_home_service.climate_set_temperature(
-                        command=ClimateSetTemperature(
-                            entity_id=entity_id, temperature=temperature
-                        )
+                        command=ClimateSetTemperature(entity_id=eid, temperature=temperature)
                     )
-                )
+                    for eid in entity_ids
+                ])
+            asyncio.run(_run())
 
         return {"output_set_temperature": raw}
 
@@ -213,14 +213,14 @@ class SmartHomeClimateGraph(Graph):
                 available_entities=available_entities,
             )
 
-            for entity_id in entity_ids:
-                asyncio.run(
+            async def _run():
+                await asyncio.gather(*[
                     self.smart_home_service.climate_set_hvac_mode(
-                        command=ClimateSetHvacMode(
-                            entity_id=entity_id, hvac_mode=ha_mode
-                        )
+                        command=ClimateSetHvacMode(entity_id=eid, hvac_mode=ha_mode)
                     )
-                )
+                    for eid in entity_ids
+                ])
+            asyncio.run(_run())
 
         return {"output_set_hvac_mode": raw}
 
@@ -242,25 +242,31 @@ class SmartHomeClimateGraph(Graph):
                 available_entities=available_entities,
             )
 
-            for entity_id in entity_ids:
-                try:
-                    state: SmartHomeClimate = asyncio.run(
-                        self.smart_home_service.climate_get_state(entity_id=entity_id)
-                    )
-                    status = "ligado" if state.is_on else "desligado"
-                    parts = [status]
-                    if state.current_temperature is not None:
-                        parts.append(f"temperatura atual {state.current_temperature}°C")
-                    if state.target_temperature is not None:
-                        parts.append(f"temperatura alvo {state.target_temperature}°C")
-                    if state.hvac_mode is not None:
-                        parts.append(
-                            f"modo {state.hvac_mode.value if hasattr(state.hvac_mode, 'value') else state.hvac_mode}"
-                        )
-                    lines.append(f"{device_str}: {', '.join(parts)}")
-                except Exception as e:
-                    print(f"[SmartHomeClimateGraph._handle_query_state][ERROR]: {e}")
-                    lines.append(f"{device_str}: estado indisponível")
+            async def _fetch_states(ids, label):
+                results = await asyncio.gather(
+                    *[self.smart_home_service.climate_get_state(entity_id=eid) for eid in ids],
+                    return_exceptions=True,
+                )
+                fetched = []
+                for state in results:
+                    if isinstance(state, Exception):
+                        print(f"[SmartHomeClimateGraph._handle_query_state][ERROR]: {state}")
+                        fetched.append(f"{label}: estado indisponível")
+                    else:
+                        status = "ligado" if state.is_on else "desligado"
+                        state_parts = [status]
+                        if state.current_temperature is not None:
+                            state_parts.append(f"temperatura atual {state.current_temperature}°C")
+                        if state.target_temperature is not None:
+                            state_parts.append(f"temperatura alvo {state.target_temperature}°C")
+                        if state.hvac_mode is not None:
+                            state_parts.append(
+                                f"modo {state.hvac_mode.value if hasattr(state.hvac_mode, 'value') else state.hvac_mode}"
+                            )
+                        fetched.append(f"{label}: {', '.join(state_parts)}")
+                return fetched
+
+            lines.extend(asyncio.run(_fetch_states(entity_ids, device_str)))
 
         return {"output_query_state": "\n".join(lines) if lines else ""}
 
@@ -359,5 +365,7 @@ class SmartHomeClimateGraph(Graph):
     # ===============================================
 
     def invoke(self, invoke_request: GraphInvokeRequest) -> dict:
-        app = self._compile()
+        if self._compiled_graph is None:
+            self._compiled_graph = self._compile()
+        app = self._compiled_graph
         return app.invoke({"input": invoke_request})

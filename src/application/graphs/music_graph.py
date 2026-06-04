@@ -289,5 +289,7 @@ class MusicGraph(Graph):
     # ===============================================
 
     def invoke(self, invoke_request: GraphInvokeRequest) -> dict:
-        app = self._compile()
+        if self._compiled_graph is None:
+            self._compiled_graph = self._compile()
+        app = self._compiled_graph
         return app.invoke({"input": invoke_request})

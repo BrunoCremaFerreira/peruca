@@ -148,11 +148,12 @@ class SmartHomeLightsGraph(Graph):
         if not entity_ids:
             return {"output_turn_on": "Dispositivo nao encontrado"}
 
-        for entity_id in entity_ids:
-            turn_on_command = LightTurnOn(entity_id=entity_id)
-            asyncio.run(
-                self.smart_home_service.light_turn_on(turn_on_command=turn_on_command)
-            )
+        async def _run():
+            await asyncio.gather(*[
+                self.smart_home_service.light_turn_on(turn_on_command=LightTurnOn(entity_id=eid))
+                for eid in entity_ids
+            ])
+        asyncio.run(_run())
 
         return {"output_turn_on": devices}
 
@@ -171,8 +172,12 @@ class SmartHomeLightsGraph(Graph):
         if not entity_ids:
             return {"output_turn_off": "Dispositivo nao encontrado"}
 
-        for entity_id in entity_ids:
-            asyncio.run(self.smart_home_service.light_turn_off(entity_id=entity_id))
+        async def _run():
+            await asyncio.gather(*[
+                self.smart_home_service.light_turn_off(entity_id=eid)
+                for eid in entity_ids
+            ])
+        asyncio.run(_run())
 
         return {"output_turn_off": devices}
 
@@ -342,15 +347,14 @@ class SmartHomeLightsGraph(Graph):
                 not_found.append(alias_str)
                 continue
 
-            for entity_id in entity_ids:
-                turn_on_command = LightTurnOn(
-                    entity_id=entity_id, brightness_pct=brightness_pct
-                )
-                asyncio.run(
+            async def _run():
+                await asyncio.gather(*[
                     self.smart_home_service.light_turn_on(
-                        turn_on_command=turn_on_command
+                        turn_on_command=LightTurnOn(entity_id=eid, brightness_pct=brightness_pct)
                     )
-                )
+                    for eid in entity_ids
+                ])
+            asyncio.run(_run())
 
             found_aliases.append(alias_str)
 
@@ -560,5 +564,7 @@ class SmartHomeLightsGraph(Graph):
     # ===============================================
 
     def invoke(self, invoke_request: GraphInvokeRequest) -> dict:
-        app = self._compile()
+        if self._compiled_graph is None:
+            self._compiled_graph = self._compile()
+        app = self._compiled_graph
         return app.invoke({"input": invoke_request})
