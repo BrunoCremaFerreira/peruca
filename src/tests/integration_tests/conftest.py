@@ -10,7 +10,10 @@ from infra.ioc import (
 )
 
 
-DB_PATH = "/home/brn/tests/data/tests.db"
+# Each pytest-xdist worker gets an isolated SQLite file so parallel runs do not
+# delete each other's database. Serial runs (no xdist) keep the original path.
+_worker = os.environ.get("PYTEST_XDIST_WORKER", "")
+DB_PATH = f"/home/brn/tests/data/tests{('_' + _worker) if _worker else ''}.db"
 
 INTEGRATION_ENV = {
     "CORS_ORIGIN": "http://localhost:3000",
@@ -18,7 +21,7 @@ INTEGRATION_ENV = {
     "LLM_PROVIDER_URL": "http://unix.rtx-server:11434",
     "LLM_PROVIDER_API_KEY": "fake-api-key",
     "LLM_MAIN_GRAPH_CHAT_MODEL": "qwen3:14b",
-    "LLM_MAIN_GRAPH_CHAT_TEMPERATURE": "0.5",
+    "LLM_MAIN_GRAPH_CHAT_TEMPERATURE": "0.1",
     "LLM_ONLY_TALK_GRAPH_CHAT_MODEL": "qwen3:14b",
     "LLM_ONLY_TALK_GRAPH_CHAT_TEMPERATURE": "0.5",
     "LLM_SHOPPING_LIST_GRAPH_CHAT_MODEL": "qwen3:14b",

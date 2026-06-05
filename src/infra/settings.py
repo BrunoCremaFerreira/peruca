@@ -27,7 +27,10 @@ class Settings(BaseSettings):
     # ===============================
 
     llm_main_graph_chat_model: str = "qwen3:14b"
-    llm_main_graph_chat_temperature: float = 0.5
+    # Intent classification must be near-deterministic — keep it low like the
+    # other classifier graphs (sensors/cameras at 0.1). Higher values made
+    # borderline commands flap between runs.
+    llm_main_graph_chat_temperature: float = 0.1
 
     llm_only_talk_graph_chat_model: str = "qwen3:14b"
     llm_only_talk_graph_chat_temperature: float = 0.5

@@ -72,6 +72,16 @@ class MainGraph(Graph):
         except Exception:
             response = chain.invoke({"input": data["input"].message, "music_is_playing": hint_str})
         cleaned = self._remove_thinking_tag(response.content)
+        if isinstance(cleaned, str):
+            # Qwen3 mimics the prompt examples and may emit smart/curly quotes,
+            # which eval() rejects. Normalize them so the classification is not
+            # silently lost and collapsed into "only_talking".
+            cleaned = (
+                cleaned.replace("“", '"')
+                .replace("”", '"')
+                .replace("‘", "'")
+                .replace("’", "'")
+            )
         try:
             intents = eval(cleaned) if isinstance(cleaned, str) else []
             if isinstance(intents, str):
@@ -116,6 +126,10 @@ class MainGraph(Graph):
                 {"input": data["input"].message, "responses": responses}
             )
             response = self._remove_thinking_tag(llm_response.content)
+            # The merge LLM occasionally returns an empty string; never surface
+            # an empty output — fall back to the raw sub-graph responses.
+            if not response or not response.strip():
+                response = "\n\n".join(outputs)
 
         return {"output": response}
 

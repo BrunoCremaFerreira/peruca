@@ -1,3 +1,4 @@
+import re
 from typing import List, Optional, TypedDict
 from langchain_core.runnables import RunnableLambda
 from langgraph.graph import StateGraph, START, END
@@ -277,14 +278,19 @@ class ShoppingListGraph(Graph):
             return items
 
         for pair in input_str.split("|"):
-            try:
-                name, quantity = pair.split(",", 1)
-                item = ShoppingListItemAdd(
-                    name=name.strip(), quantity=float(quantity.strip())
-                )
-                items.append(item)
-            except ValueError:
+            if not pair.strip():
+                continue
+            name, _, quantity_raw = pair.partition(",")
+            name = name.strip()
+            if not name:
                 print(f"Warning: Item ignored: '{pair}'")
+                continue
+            # The LLM may emit quantities with units ("2 kg") or words
+            # ("a gosto"). Extract the leading number; default to 1.0 so the
+            # item is never dropped just because the quantity is non-numeric.
+            match = re.search(r"\d+(?:[.,]\d+)?", quantity_raw)
+            quantity = float(match.group().replace(",", ".")) if match else 1.0
+            items.append(ShoppingListItemAdd(name=name, quantity=quantity))
         return items
 
     # ===============================================

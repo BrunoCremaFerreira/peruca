@@ -1,6 +1,6 @@
 import asyncio
 import json
-from typing import List, Optional, TypedDict
+from typing import Annotated, List, Optional, TypedDict
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
@@ -10,6 +10,16 @@ from langgraph.graph import END, START, StateGraph
 from application.graphs.graph import Graph
 from domain.entities import GraphInvokeRequest
 from domain.services.music_service import MusicService
+
+
+def _merge_output(existing: Optional[str], new: Optional[str]) -> Optional[str]:
+    """
+    Reducer for the 'output' channel. Multiple action nodes may write 'output'
+    in the same super-step when classify returns more than one intent (e.g.
+    play_media + select_player). Without a reducer LangGraph raises
+    InvalidUpdateError. Keep the latest non-empty value.
+    """
+    return new if new else existing
 
 
 class MusicGraphState(TypedDict):
@@ -23,7 +33,7 @@ class MusicGraphState(TypedDict):
     now_playing_value: Optional[str]
     player_name: Optional[str]
     player_id: Optional[str]
-    output: Optional[str]
+    output: Annotated[Optional[str], _merge_output]
 
 
 class MusicGraph(Graph):
