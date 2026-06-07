@@ -1,5 +1,5 @@
 """
-MemoryAppService Unit Tests (TDD - RED phase)
+MemoryAppService Unit Tests
 
 MemoryAppService.learn_from_message(external_user_id, message, assistant_output)
 is SYNCHRONOUS (it has no notion of background tasks) and its entire body is
@@ -8,29 +8,15 @@ wrapped in try/except so failures NEVER propagate.
 Constructor contract:
     MemoryAppService(memory_graph, user_repository,
                      user_memory_repository_factory)
-where user_memory_repository_factory is a callable returning a repository with
-its OWN connection (thread-safety for the background threadpool).
-
-Flow inside learn_from_message:
-    repo = factory()
-    try:
-        user = user_repository.get_by_external_id(external_user_id)
-        if not user: return
-        existing = UserMemoryService(repo).get_all_by_user(user.id)
-        extracted = memory_graph.invoke(GraphInvokeRequest(message, user, existing))
-        for fact in extracted["memories"]:
-            UserMemoryService(repo).add(UserMemoryAdd(user.id, fact))
-    finally:
-        repo.close()
+where user_memory_repository_factory is a callable returning a shared cached
+repository. The caller must NOT close the repo — lifecycle is managed by the IoC
+container.
 
 Test strategy:
   - Persistence/dedup assertions PATCH
     `application.appservices.memory_app_service.UserMemoryService` with a mock
     service so we can assert .add was called per fact deterministically, without
     depending on the service's internal dedup logic.
-  - The repo.close() / error-swallowing tests use the real factory mock repo.
-
-Expected to FAIL with ImportError until the app service exists.
 """
 
 import uuid
@@ -139,20 +125,20 @@ class TestMemoryAppServiceResilience:
         service.learn_from_message("ext-unknown", "msg", "resp")
         memory_graph.invoke.assert_not_called()
 
-    def test_learn_from_message__closes_repo_in_finally_even_on_error(self):
-        # Arrange
+    def test_learn_from_message__does_not_close_shared_repo_on_error(self):
+        # Arrange — repo is a cached singleton; caller must never close it
         user = _sample_user()
         service, _, _, _, repo = _make_service(user=user, graph_raises=True)
         # Act
         service.learn_from_message("ext-1", "msg", "resp")
         # Assert
-        repo.close.assert_called()
+        repo.close.assert_not_called()
 
-    def test_learn_from_message__closes_repo_on_success(self):
-        # Arrange
+    def test_learn_from_message__does_not_close_shared_repo_on_success(self):
+        # Arrange — repo is a cached singleton; caller must never close it
         user = _sample_user()
         service, _, _, _, repo = _make_service(user=user, extracted=["fato A"])
         # Act
         service.learn_from_message("ext-1", "msg", "resp")
         # Assert
-        repo.close.assert_called()
+        repo.close.assert_not_called()

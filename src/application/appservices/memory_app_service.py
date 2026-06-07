@@ -52,6 +52,3 @@ class MemoryAppService:
                 service.add(UserMemoryAdd(user_id=user.id, content=fact))
         except Exception as e:
             print(f"[MemoryAppService.learn_from_message][ERROR]: {e}")
-        finally:
-            if repo is not None:
-                repo.close()
