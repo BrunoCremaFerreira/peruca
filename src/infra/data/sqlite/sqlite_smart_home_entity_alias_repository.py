@@ -1,4 +1,5 @@
-from typing import List, Optional
+import time
+from typing import Dict, List, Optional, Tuple
 from domain.entities import SmartHomeEntityAlias
 from domain.interfaces.data_repository import SmartHomeEntityAliasRepository
 from infra.data.sqlite.sqlite_base_repository import SqliteBaseRepository
@@ -7,7 +8,9 @@ from infra.data.sqlite.sqlite_base_repository import SqliteBaseRepository
 class SqliteSmartHomeEntityAliasRepository(
     SqliteBaseRepository, SmartHomeEntityAliasRepository
 ):
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, aliases_cache_ttl: float = 60.0):
+        self.aliases_cache_ttl = aliases_cache_ttl
+        self._aliases_cache: Dict[str, Tuple[float, List[SmartHomeEntityAlias]]] = {}
         super().__init__(db_path=db_path)
 
     def _startup(self) -> None:
@@ -61,6 +64,7 @@ class SqliteSmartHomeEntityAliasRepository(
                     entity_alias.when_created,
                 ),
             )
+        self._aliases_cache.clear()
 
     def get_by_entity_id(self, entity_id: str) -> Optional[SmartHomeEntityAlias]:
         """
@@ -112,6 +116,12 @@ class SqliteSmartHomeEntityAliasRepository(
         """
         Retrieve all SmartHomeEntityAlias records from the database.
         """
+        now = time.monotonic()
+        cache_entry = self._aliases_cache.get(entity_id_starts_with)
+        if cache_entry is not None:
+            cached_at, cached_result = cache_entry
+            if now - cached_at < self.aliases_cache_ttl:
+                return cached_result
 
         base_query = """
             SELECT
@@ -135,7 +145,9 @@ class SqliteSmartHomeEntityAliasRepository(
             cursor = conn.execute(base_query, params or ())
             rows = cursor.fetchall()
 
-        return [self._map_smart_home_entity_alias(row) for row in rows]
+        result = [self._map_smart_home_entity_alias(row) for row in rows]
+        self._aliases_cache[entity_id_starts_with] = (time.monotonic(), result)
+        return result
 
     def delete_all(self) -> None:
         """
@@ -143,6 +155,7 @@ class SqliteSmartHomeEntityAliasRepository(
         """
         with self.conn:
             self.conn.execute("DELETE FROM smart_home_entity_alias")
+        self._aliases_cache.clear()
 
     def _map_smart_home_entity_alias(self, row):
         return SmartHomeEntityAlias(

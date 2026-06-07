@@ -505,7 +505,10 @@ def get_user_repository() -> UserRepository:
     """
 
     settings = _get_settings()
-    return SqliteUserRepository(db_path=settings.peruca_db_connection_string)
+    cache_key = ("sqlite_user", settings.peruca_db_connection_string)
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = SqliteUserRepository(db_path=settings.peruca_db_connection_string)
+    return _repo_cache[cache_key]
 
 
 def get_user_memory_repository() -> UserMemoryRepository:
@@ -514,7 +517,10 @@ def get_user_memory_repository() -> UserMemoryRepository:
     """
 
     settings = _get_settings()
-    return SqliteUserMemoryRepository(db_path=settings.peruca_db_connection_string)
+    cache_key = ("sqlite_user_memory", settings.peruca_db_connection_string)
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = SqliteUserMemoryRepository(db_path=settings.peruca_db_connection_string)
+    return _repo_cache[cache_key]
 
 
 def get_shopping_list_repository() -> ShoppingListRepository:
@@ -523,7 +529,10 @@ def get_shopping_list_repository() -> ShoppingListRepository:
     """
 
     settings = _get_settings()
-    return SqliteShoppingListRepository(db_path=settings.peruca_db_connection_string)
+    cache_key = ("sqlite_shopping_list", settings.peruca_db_connection_string)
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = SqliteShoppingListRepository(db_path=settings.peruca_db_connection_string)
+    return _repo_cache[cache_key]
 
 
 def get_smart_home_entity_alias_repository() -> SmartHomeEntityAliasRepository:
@@ -531,9 +540,12 @@ def get_smart_home_entity_alias_repository() -> SmartHomeEntityAliasRepository:
     Smart Home Entity Alias Repository
     """
     settings = _get_settings()
-    return SqliteSmartHomeEntityAliasRepository(
-        db_path=settings.peruca_db_connection_string
-    )
+    cache_key = ("sqlite_entity_alias", settings.peruca_db_connection_string)
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = SqliteSmartHomeEntityAliasRepository(
+            db_path=settings.peruca_db_connection_string
+        )
+    return _repo_cache[cache_key]
 
 
 def get_smart_home_area_repository() -> SmartHomeAreaRepository:
@@ -541,7 +553,10 @@ def get_smart_home_area_repository() -> SmartHomeAreaRepository:
     Smart Home Area Repository
     """
     settings = _get_settings()
-    return SqliteSmartHomeAreaRepository(db_path=settings.peruca_db_connection_string)
+    cache_key = ("sqlite_area", settings.peruca_db_connection_string)
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = SqliteSmartHomeAreaRepository(db_path=settings.peruca_db_connection_string)
+    return _repo_cache[cache_key]
 
 
 # ====================================
