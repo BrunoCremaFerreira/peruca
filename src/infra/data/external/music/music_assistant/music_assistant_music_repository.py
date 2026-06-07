@@ -6,6 +6,9 @@ from domain.entities import MusicPlayer, MusicSearchResult
 from domain.interfaces.music_repository import MusicRepository
 
 
+_DEFAULT_TIMEOUT = aiohttp.ClientTimeout(connect=5, total=30)
+
+
 def _extract_current_track(item: dict) -> Optional[str]:
     title = item.get("current_media", {}).get("title")
     if title:
@@ -44,7 +47,9 @@ class MusicAssistantMusicRepository(MusicRepository):
 
     def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None:
-            self._session = aiohttp.ClientSession(headers=self._headers())
+            self._session = aiohttp.ClientSession(
+                headers=self._headers(), timeout=_DEFAULT_TIMEOUT
+            )
         return self._session
 
     async def get_players(self) -> List[MusicPlayer]:

@@ -3,6 +3,9 @@ from domain.entities import SmartHomeCamera, SmartHomeCameraSnapshot
 from domain.interfaces.smart_home_repository import SmartHomeCameraRepository
 
 
+_DEFAULT_TIMEOUT = aiohttp.ClientTimeout(connect=5, total=30)
+
+
 class HomeAssistantSmartHomeCameraRepository(SmartHomeCameraRepository):
     """
     Implementation of SmartHomeCameraRepository for Home Assistant using the REST API.
@@ -18,7 +21,9 @@ class HomeAssistantSmartHomeCameraRepository(SmartHomeCameraRepository):
 
     def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None:
-            self._session = aiohttp.ClientSession(headers=self._headers)
+            self._session = aiohttp.ClientSession(
+                headers=self._headers, timeout=_DEFAULT_TIMEOUT
+            )
         return self._session
 
     async def get_state(self, entity_id: str) -> SmartHomeCamera:

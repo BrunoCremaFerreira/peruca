@@ -1,3 +1,4 @@
+import asyncio
 from infra import async_runner
 from typing import Optional
 
@@ -8,6 +9,9 @@ from domain.exceptions import EmptyParamValidationError, NofFoundValidationError
 from domain.interfaces.data_repository import ContextRepository, UserRepository
 from domain.services.user_memory_service import UserMemoryService
 from infra.utils import is_null_or_whitespace
+
+
+_MUSIC_PROBE_TIMEOUT = 2.0
 
 
 class LlmAppService:
@@ -56,7 +60,12 @@ class LlmAppService:
         context_hints: dict = {}
         if self.music_service is not None:
             try:
-                players = async_runner.run(self.music_service.get_players())
+                players = async_runner.run(
+                    asyncio.wait_for(
+                        self.music_service.get_players(),
+                        timeout=_MUSIC_PROBE_TIMEOUT,
+                    )
+                )
                 music_is_playing = any(p.state == "playing" for p in players)
             except Exception:
                 music_is_playing = False

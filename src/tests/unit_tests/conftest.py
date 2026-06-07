@@ -7,7 +7,10 @@ from infra.ioc import get_user_app_service, get_user_repository
 import application.graphs.graph as _graph_module
 
 
-DB_PATH = "/home/brn/tests/data/tests.db"
+# Per-worker SQLite file (in tmpfs) so pytest-xdist runs do not share a single
+# DB and trip over each other's writes. Serial runs use a single file.
+_worker = os.environ.get("PYTEST_XDIST_WORKER", "")
+DB_PATH = f"/dev/shm/peruca_unit_tests{('_' + _worker) if _worker else ''}.db"
 
 
 @pytest.fixture(autouse=True)

@@ -6,6 +6,9 @@ from domain.entities import SensorReading, SensorType
 from domain.interfaces.smart_home_repository import SmartHomeSensorRepository
 
 
+_DEFAULT_TIMEOUT = aiohttp.ClientTimeout(connect=5, total=30)
+
+
 DEVICE_CLASS_TO_SENSOR_TYPE = {
     "temperature": SensorType.TEMPERATURE,
     "door": SensorType.DOOR,
@@ -40,7 +43,9 @@ class HomeAssistantSmartHomeSensorRepository(SmartHomeSensorRepository):
 
     def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None:
-            self._session = aiohttp.ClientSession(headers=self.headers)
+            self._session = aiohttp.ClientSession(
+                headers=self.headers, timeout=_DEFAULT_TIMEOUT
+            )
         return self._session
 
     def _map_sensor_type(self, device_class: str) -> SensorType:

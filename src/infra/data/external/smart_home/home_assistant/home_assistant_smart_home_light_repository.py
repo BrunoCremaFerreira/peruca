@@ -6,6 +6,9 @@ from domain.entities import SmartHomeLight
 from domain.interfaces.smart_home_repository import SmartHomeLightRepository
 
 
+_DEFAULT_TIMEOUT = aiohttp.ClientTimeout(connect=5, total=30)
+
+
 class HomeAssistantSmartHomeLightRepository(SmartHomeLightRepository):
     """
     Implementation of SmartHomeLightRepository for Home Assistant using the REST API.
@@ -28,7 +31,9 @@ class HomeAssistantSmartHomeLightRepository(SmartHomeLightRepository):
 
     def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None:
-            self._session = aiohttp.ClientSession(headers=self.headers)
+            self._session = aiohttp.ClientSession(
+                headers=self.headers, timeout=_DEFAULT_TIMEOUT
+            )
         return self._session
 
     async def get_state(self, entity_id: str) -> "SmartHomeLight":

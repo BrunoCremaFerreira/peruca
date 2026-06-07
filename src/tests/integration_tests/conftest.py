@@ -11,9 +11,11 @@ from infra.ioc import (
 
 
 # Each pytest-xdist worker gets an isolated SQLite file so parallel runs do not
-# delete each other's database. Serial runs (no xdist) keep the original path.
+# delete each other's database. Serial runs (no xdist) keep a single file.
+# The DB lives in tmpfs (/dev/shm) so the per-test remove/recreate cycle does
+# not pay real disk latency between tests (the GPU sits idle during setup).
 _worker = os.environ.get("PYTEST_XDIST_WORKER", "")
-DB_PATH = f"/home/brn/tests/data/tests{('_' + _worker) if _worker else ''}.db"
+DB_PATH = f"/dev/shm/peruca_tests{('_' + _worker) if _worker else ''}.db"
 
 INTEGRATION_ENV = {
     "CORS_ORIGIN": "http://localhost:3000",
