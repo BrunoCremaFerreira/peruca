@@ -18,7 +18,10 @@ class Graph(ABC):
         pass
 
     def _remove_thinking_tag(self, input_str: str) -> str:
-        cleaned = input_str.replace("<think>\n\n</think>\n\n", "").strip()
+        cleaned = re.sub(
+            r"<think>.*?</think>", "", input_str, flags=re.DOTALL
+        )
+        cleaned = cleaned.replace("<think>\n\n</think>\n\n", "").strip()
         if cleaned.startswith("```"):
             lines = cleaned.splitlines()
             cleaned = "\n".join(lines[1:-1]).strip()

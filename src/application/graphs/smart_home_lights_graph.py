@@ -2,6 +2,7 @@ import asyncio
 import json
 from typing import List, Optional, TypedDict
 from application.graphs.graph import Graph
+from application.graphs.markers import DEVICE_NOT_RECOGNIZED, NO_ACTION_PERFORMED
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.language_models.chat_models import BaseChatModel
 from langgraph.graph import StateGraph, START, END
@@ -397,14 +398,14 @@ class SmartHomeLightsGraph(Graph):
         if data.get("output_change_mode"):
             parts.append(f"Modo alterado: {data['output_change_mode']}")
         if data.get("output_not_recognized"):
-            parts.append("Dispositivo nao reconhecido")
+            parts.append(DEVICE_NOT_RECOGNIZED)
         if not parts:
-            return {"output": "Nenhuma acao executada"}
+            return {"output": NO_ACTION_PERFORMED}
         return {"output": "\n".join(parts)}
 
     def _handle_not_recognized(self, data):
         print(f"[SmartHomeLightsGraph.handle_not_recognized]: Triggered...")
-        return {"output_not_recognized": "Dispositivo nao reconhecido"}
+        return {"output_not_recognized": DEVICE_NOT_RECOGNIZED}
 
     # ===============================================
     # Private Methods

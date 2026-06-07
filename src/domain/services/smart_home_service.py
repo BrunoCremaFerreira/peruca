@@ -33,6 +33,17 @@ from domain.interfaces.smart_home_repository import (
 
 _UNASSIGNED_AREA_LABEL = "Sem cômodo"
 
+_ALIAS_STOPWORDS = {"do", "da", "de", "o", "a", "no", "na"}
+
+_CLIMATE_EQUIPMENT_TOKENS = {
+    "ar",
+    "condicionado",
+    "ar-condicionado",
+    "climatizador",
+    "split",
+    "ac",
+}
+
 
 def _normalize(value: Optional[str]) -> str:
     """
@@ -264,6 +275,55 @@ class SmartHomeService:
             seen.add(alias.entity_id)
             entity_ids.append(alias.entity_id)
         return entity_ids
+
+    def find_entity_ids_by_alias(
+        self, query_alias: str, available_entities: dict
+    ) -> List[str]:
+        """
+        Resolve a single device query against an {alias: entity_id} catalog
+        deterministically, without any LLM call or repository access.
+
+        Matching is by location tokens: equipment synonyms (ar, climatizador,
+        split, ...) and stopwords (do, da, de, ...) are stripped from both the
+        query and each alias, then the remaining location tokens are compared
+        by subset containment. Returns [entity_id] on a single match, [] on no
+        match, and [] when the query is ambiguous (matches more than one alias).
+        """
+        if not available_entities:
+            return []
+
+        query_tokens = self._location_tokens(query_alias)
+        if not query_tokens:
+            return []
+
+        matches: List[str] = []
+        for alias, entity_id in available_entities.items():
+            alias_tokens = self._location_tokens(alias)
+            if not alias_tokens:
+                continue
+            if query_tokens <= alias_tokens or alias_tokens <= query_tokens:
+                matches.append(entity_id)
+
+        if len(matches) == 1:
+            return matches
+        return []
+
+    @staticmethod
+    def _location_tokens(value: str) -> set:
+        """
+        Break a device alias/query into its location tokens: normalize accents
+        and case, split on whitespace and hyphens, then drop stopwords and
+        climate equipment synonyms.
+        """
+        normalized = _normalize(value).replace("-", " ")
+        tokens = normalized.split()
+        return {
+            token
+            for token in tokens
+            if token
+            and token not in _ALIAS_STOPWORDS
+            and token not in _CLIMATE_EQUIPMENT_TOKENS
+        }
 
     def _require_area_repository(self, method_name: str) -> None:
         if self.smart_home_area_repository is None:

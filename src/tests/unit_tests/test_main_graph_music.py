@@ -73,7 +73,15 @@ def _make_main_graph(music_graph=None) -> MainGraph:
     smart_home_sensors_graph = MagicMock()
     smart_home_sensors_graph.invoke.return_value = {"output": "sensor ok"}
 
-    with patch.object(MainGraph, "load_prompt", return_value="{input} {music_is_playing}"):
+    def _load_prompt_stub(name):
+        # The final-response prompt does not use the music hint; return a
+        # template matching each prompt's real variables so the mock mirrors
+        # production instead of forcing an unused variable into the code.
+        if name == "main_graph_final_response.md":
+            return "{input} {responses}"
+        return "{input} {music_is_playing}"
+
+    with patch.object(MainGraph, "load_prompt", side_effect=_load_prompt_stub):
         graph = MainGraph(
             llm_chat=llm_chat,
             only_talk_graph=only_talk_graph,

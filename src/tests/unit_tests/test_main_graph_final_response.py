@@ -89,3 +89,56 @@ class TestFinalResponseEmptyMergeFallback:
         result = graph._handle_final_response(data)
 
         assert result["output"] == "Pronto, adicionei o leite."
+
+
+class TestFinalResponseEmptySubGraphOutputFiltering:
+    """
+    Hardening of the output filter in _handle_final_response.
+
+    Today the filter keeps every value where ``e is not None``. A sub-graph that
+    returns an empty/whitespace string (e.g. ``output_climate == ""``) therefore
+    leaks into the numbered ``responses`` payload handed to the merge LLM,
+    polluting the prompt with empty bullet points. The filter must also drop
+    empty/whitespace strings (``e is not None and e.strip()``).
+    """
+
+    def test_empty_string_subgraph_output__is_not_passed_to_merge(self):
+        graph = _make_main_graph(merge_content="Luz da sala acesa.")
+        data = {
+            "input": _request("acende a luz da sala"),
+            "intent": ["smart_home_lights", "smart_home_climate"],
+            "output_lights": "Ligado: luz da sala",
+            "output_climate": "",  # empty sub-graph output must be filtered
+        }
+
+        graph._handle_final_response(data)
+
+        # The merge prompt template renders {responses}; the chain feeds the
+        # resulting ChatPromptValue to llm_chat.__call__. With only one
+        # non-empty output, the rendered payload must contain "1." but never a
+        # "2." for the empty string.
+        call_args = graph.llm_chat.call_args
+        rendered = str(call_args.args[0])
+        assert "luz da sala" in rendered
+        assert "2." not in rendered, (
+            f"Empty sub-graph output leaked into merge payload: {rendered!r}"
+        )
+
+    def test_whitespace_string_subgraph_output__is_not_passed_to_merge(self):
+        graph = _make_main_graph(merge_content="Luz da sala acesa.")
+        data = {
+            "input": _request("acende a luz da sala"),
+            "intent": ["smart_home_lights", "smart_home_climate"],
+            "output_lights": "Ligado: luz da sala",
+            "output_climate": "   \n  ",  # whitespace-only must be filtered
+        }
+
+        graph._handle_final_response(data)
+
+        call_args = graph.llm_chat.call_args
+        rendered = str(call_args.args[0])
+        assert "luz da sala" in rendered
+        assert "2." not in rendered, (
+            f"Whitespace-only sub-graph output leaked into merge payload: "
+            f"{rendered!r}"
+        )

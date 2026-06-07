@@ -2,6 +2,7 @@ import asyncio
 import json
 from typing import List, Optional, TypedDict
 from application.graphs.graph import Graph
+from application.graphs.markers import DEVICE_NOT_RECOGNIZED, NO_ACTION_PERFORMED
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.language_models.chat_models import BaseChatModel
 from langgraph.graph import StateGraph, START, END
@@ -118,7 +119,7 @@ class SmartHomeClimateGraph(Graph):
         )
 
         if not entity_ids:
-            return {"output_turn_on": "Device not found"}
+            return {"output_turn_on": DEVICE_NOT_RECOGNIZED}
 
         async def _run():
             await asyncio.gather(*[
@@ -142,7 +143,7 @@ class SmartHomeClimateGraph(Graph):
         )
 
         if not entity_ids:
-            return {"output_turn_off": "Device not found"}
+            return {"output_turn_off": DEVICE_NOT_RECOGNIZED}
 
         async def _run():
             await asyncio.gather(*[
@@ -163,6 +164,7 @@ class SmartHomeClimateGraph(Graph):
         available_entities = data.get("available_entities", {})
         entries = raw.split("|")
 
+        resolved_any = False
         for entry in entries:
             parts = entry.split(", ", 1)
             if len(parts) != 2:
@@ -179,6 +181,11 @@ class SmartHomeClimateGraph(Graph):
             except ValueError:
                 continue
 
+            if not entity_ids:
+                continue
+
+            resolved_any = True
+
             async def _run():
                 await asyncio.gather(*[
                     self.smart_home_service.climate_set_temperature(
@@ -187,6 +194,9 @@ class SmartHomeClimateGraph(Graph):
                     for eid in entity_ids
                 ])
             asyncio.run(_run())
+
+        if not resolved_any:
+            return {"output_set_temperature": DEVICE_NOT_RECOGNIZED}
 
         return {"output_set_temperature": raw}
 
@@ -200,6 +210,7 @@ class SmartHomeClimateGraph(Graph):
         available_entities = data.get("available_entities", {})
         entries = raw.split("|")
 
+        resolved_any = False
         for entry in entries:
             parts = entry.split(", ", 1)
             if len(parts) != 2:
@@ -213,6 +224,11 @@ class SmartHomeClimateGraph(Graph):
                 available_entities=available_entities,
             )
 
+            if not entity_ids:
+                continue
+
+            resolved_any = True
+
             async def _run():
                 await asyncio.gather(*[
                     self.smart_home_service.climate_set_hvac_mode(
@@ -221,6 +237,9 @@ class SmartHomeClimateGraph(Graph):
                     for eid in entity_ids
                 ])
             asyncio.run(_run())
+
+        if not resolved_any:
+            return {"output_set_hvac_mode": DEVICE_NOT_RECOGNIZED}
 
         return {"output_set_hvac_mode": raw}
 
@@ -241,6 +260,10 @@ class SmartHomeClimateGraph(Graph):
                 entity_alias_delimited_str=device_str,
                 available_entities=available_entities,
             )
+
+            if not entity_ids:
+                lines.append(f"{device_str}: {DEVICE_NOT_RECOGNIZED}")
+                continue
 
             async def _fetch_states(ids, label):
                 results = await asyncio.gather(
@@ -291,7 +314,7 @@ class SmartHomeClimateGraph(Graph):
             parts.append(data["output_query_state"])
         if data.get("output_not_recognized"):
             parts.append("Comando de climatização não reconhecido.")
-        return {"output": "\n".join(parts) if parts else ""}
+        return {"output": "\n".join(parts) if parts else NO_ACTION_PERFORMED}
 
     # ===============================================
     # Private Methods
@@ -335,6 +358,13 @@ class SmartHomeClimateGraph(Graph):
     def _find_entity_ids(
         self, entity_alias_delimited_str: str, available_entities
     ) -> List[str]:
+        deterministic = self.smart_home_service.find_entity_ids_by_alias(
+            query_alias=entity_alias_delimited_str,
+            available_entities=available_entities or {},
+        )
+        if deterministic:
+            return deterministic
+
         parser_template = ChatPromptTemplate.from_template(
             self.load_prompt("smart_home_climate_graph_id_parser_by_alias.md")
         )

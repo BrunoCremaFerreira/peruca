@@ -51,6 +51,9 @@ class MainGraph(Graph):
         self.classification_prompt = ChatPromptTemplate.from_template(
             self.load_prompt("main_graph.md")
         )
+        self.final_response_prompt = ChatPromptTemplate.from_template(
+            self.load_prompt("main_graph_final_response.md")
+        )
 
     # ===============================================
     # Graph Nodes
@@ -107,7 +110,7 @@ class MainGraph(Graph):
                 data.get("output_sensors"),
                 data.get("output_music"),
             ]
-            if e is not None
+            if e is not None and e.strip()
         ]
 
         intents = data.get("intent", [])
@@ -118,10 +121,7 @@ class MainGraph(Graph):
         else:
             # Merging multiple cathegory responses into a friendly response
             responses = "\n\n".join([f"{i + 1}. {s}" for i, s in enumerate(outputs)])
-            final_response_prompt = ChatPromptTemplate.from_template(
-                self.load_prompt("main_graph_final_response.md")
-            )
-            final_reponse_chain = final_response_prompt | self.llm_chat
+            final_reponse_chain = self.final_response_prompt | self.llm_chat
             llm_response = final_reponse_chain.invoke(
                 {"input": data["input"].message, "responses": responses}
             )

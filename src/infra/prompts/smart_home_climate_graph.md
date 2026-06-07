@@ -21,11 +21,19 @@ Sua tarefa é **classificar o comando do usuário** e extrair os dispositivos e 
 - "ventilacao" → modo só ventilador, sem temperatura
 - "dry" → modo dessecante/desumidificador
 
+## Regras de extração de dispositivos:
+- Extraia o dispositivo EXATAMENTE como o usuário falou (mesmas palavras de local/tipo). Não normalize, não complete, não invente cômodos não mencionados.
+- Não distribua um dispositivo para uma intent que o usuário não pediu para ele.
+- Se o usuário não nomear o dispositivo (ex.: "liga o ar" sem cômodo), repasse o texto literal ("ar"); a resolução de qual dispositivo é feita em outra etapa.
+- Em comandos coletivos ("liga todos os ares", "desliga tudo"), use o valor literal "todos" como dispositivo, sem listar cômodos que não foram ditos.
+- Quando a intent for `not_recognized`, TODOS os outros campos devem ficar `""`.
+
 ## Formato de resposta:
 Responda SEMPRE em JSON válido no formato abaixo.
 - Dispositivos múltiplos para a mesma intent são separados por `|`.
 - Dentro de cada dispositivo, o separador de parâmetro interno é `, ` (vírgula espaço).
 - Campos de intents não presentes na mensagem devem ter valor `""`.
+- Não use blocos de código markdown nem texto antes/depois. Responda apenas com o JSON, sem raciocínio.
 
 (caractere abre chave)
   "intents": ["turn_on", "set_temperature"],
