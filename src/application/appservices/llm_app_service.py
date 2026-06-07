@@ -1,4 +1,4 @@
-import asyncio
+from infra import async_runner
 from typing import Optional
 
 from application.appservices.view_models import ChatRequest
@@ -56,7 +56,7 @@ class LlmAppService:
         context_hints: dict = {}
         if self.music_service is not None:
             try:
-                players = asyncio.run(self.music_service.get_players())
+                players = async_runner.run(self.music_service.get_players())
                 music_is_playing = any(p.state == "playing" for p in players)
             except Exception:
                 music_is_playing = False

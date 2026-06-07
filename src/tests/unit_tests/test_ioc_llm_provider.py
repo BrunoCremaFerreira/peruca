@@ -50,12 +50,13 @@ class TestGetLlmChatOllama:
             # Act
             result = get_llm_chat(model="qwen3:14b", temperature=0.5)
 
-        # Assert
-        mock_chat_ollama.assert_called_once_with(
-            base_url="http://ollama-host:11434",
-            model="qwen3:14b",
-            temperature=0.5,
-        )
+        # Assert — ChatOllama must be built once with the correct core kwargs.
+        # Extra tuning kwargs (keep_alive / num_ctx / num_predict) are tolerated.
+        mock_chat_ollama.assert_called_once()
+        kwargs = mock_chat_ollama.call_args.kwargs
+        assert kwargs["base_url"] == "http://ollama-host:11434"
+        assert kwargs["model"] == "qwen3:14b"
+        assert kwargs["temperature"] == 0.5
         assert result is mock_chat_ollama.return_value
 
     def test_get_llm_chat__ollama_provider__does_not_call_chat_openai(self):

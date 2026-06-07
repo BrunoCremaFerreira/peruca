@@ -1,4 +1,5 @@
 import asyncio
+from infra import async_runner
 import json
 from typing import List, Optional, TypedDict
 from application.graphs.graph import Graph
@@ -154,7 +155,7 @@ class SmartHomeLightsGraph(Graph):
                 self.smart_home_service.light_turn_on(turn_on_command=LightTurnOn(entity_id=eid))
                 for eid in entity_ids
             ])
-        asyncio.run(_run())
+        async_runner.run(_run())
 
         return {"output_turn_on": devices}
 
@@ -178,7 +179,7 @@ class SmartHomeLightsGraph(Graph):
                 self.smart_home_service.light_turn_off(entity_id=eid)
                 for eid in entity_ids
             ])
-        asyncio.run(_run())
+        async_runner.run(_run())
 
         return {"output_turn_off": devices}
 
@@ -195,7 +196,7 @@ class SmartHomeLightsGraph(Graph):
                 await self.smart_home_service.turn_on_by_area(area_alias=area)
 
         try:
-            asyncio.run(_run_all())
+            async_runner.run(_run_all())
         except ValidationError as error:
             print(f"[SmartHomeLightsGraph._handle_turn_on_by_area][ERROR]: {error}")
             return {
@@ -226,7 +227,7 @@ class SmartHomeLightsGraph(Graph):
                 await self.smart_home_service.turn_off_by_area(area_alias=area)
 
         try:
-            asyncio.run(_run_all())
+            async_runner.run(_run_all())
         except ValidationError as error:
             print(f"[SmartHomeLightsGraph._handle_turn_off_by_area][ERROR]: {error}")
             return {
@@ -252,7 +253,7 @@ class SmartHomeLightsGraph(Graph):
             return {}
 
         try:
-            asyncio.run(self.smart_home_service.turn_on_all_house())
+            async_runner.run(self.smart_home_service.turn_on_all_house())
         except Exception as error:
             print(f"[SmartHomeLightsGraph._handle_turn_on_all][ERROR]: {error}")
             return {"output_turn_on_all": "Falha ao ligar todas as luzes"}
@@ -267,7 +268,7 @@ class SmartHomeLightsGraph(Graph):
             return {}
 
         try:
-            asyncio.run(self.smart_home_service.turn_off_all_house())
+            async_runner.run(self.smart_home_service.turn_off_all_house())
         except Exception as error:
             print(f"[SmartHomeLightsGraph._handle_turn_off_all][ERROR]: {error}")
             return {"output_turn_off_all": "Falha ao desligar todas as luzes"}
@@ -282,7 +283,7 @@ class SmartHomeLightsGraph(Graph):
             return {}
 
         try:
-            grouped = asyncio.run(
+            grouped = async_runner.run(
                 self.smart_home_service.list_lights_grouped_by_area()
             )
         except Exception as error:
@@ -355,7 +356,7 @@ class SmartHomeLightsGraph(Graph):
                     )
                     for eid in entity_ids
                 ])
-            asyncio.run(_run())
+            async_runner.run(_run())
 
             found_aliases.append(alias_str)
 
@@ -535,6 +536,13 @@ class SmartHomeLightsGraph(Graph):
     def _find_entity_ids(
         self, entity_alias_delimited_str: str, available_entities
     ) -> List[str]:
+        deterministic = self.smart_home_service.find_entity_ids_by_alias(
+            query_alias=entity_alias_delimited_str,
+            available_entities=available_entities or {},
+        )
+        if deterministic:
+            return deterministic
+
         parser_template = ChatPromptTemplate.from_template(
             self.load_prompt("smart_home_lights_graph_id_parser_by_alias.md")
         )
@@ -553,7 +561,7 @@ class SmartHomeLightsGraph(Graph):
                 print("[_find_entity_ids][ERROR]: Timeout")
                 return "None"
 
-        entity_ids_delimited_str = asyncio.run(_invoke_with_timeout())
+        entity_ids_delimited_str = async_runner.run(_invoke_with_timeout())
 
         entity_ids = entity_ids_delimited_str.split("|")
         entity_ids = [e for e in entity_ids if e.upper() != "NONE" and e.strip() != ""]

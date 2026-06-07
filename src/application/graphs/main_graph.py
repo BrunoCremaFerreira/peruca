@@ -113,11 +113,10 @@ class MainGraph(Graph):
             if e is not None and e.strip()
         ]
 
-        intents = data.get("intent", [])
-
-        if len(intents) == 1 and "only_talking" in intents:
-            # Only_talking
-            response = outputs[0]
+        if len(outputs) <= 1:
+            # A single (or zero) sub-graph output needs no merge — the LLM call
+            # is only meaningful to blend 2+ responses. Return it verbatim.
+            response = outputs[0] if outputs else ""
         else:
             # Merging multiple cathegory responses into a friendly response
             responses = "\n\n".join([f"{i + 1}. {s}" for i, s in enumerate(outputs)])

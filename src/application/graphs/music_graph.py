@@ -1,4 +1,4 @@
-import asyncio
+from infra import async_runner
 import json
 from typing import Annotated, List, Optional, TypedDict
 
@@ -63,7 +63,7 @@ class MusicGraph(Graph):
         print(f"[MusicGraph._classify_intent]: input={invoke_request.message!r}")
 
         try:
-            players = asyncio.run(self.music_service.get_players())
+            players = async_runner.run(self.music_service.get_players())
         except Exception as error:
             print(f"[MusicGraph._classify_intent][ERROR][get_players]: {error}")
             players = []
@@ -151,7 +151,7 @@ class MusicGraph(Graph):
             return {"output": "Nenhuma música especificada."}
 
         try:
-            result = asyncio.run(
+            result = async_runner.run(
                 self.music_service.search_and_play(
                     query=query, media_type=media_type, player_id=player_id
                 )
@@ -173,7 +173,7 @@ class MusicGraph(Graph):
             return {"output": "Nenhum comando especificado."}
 
         try:
-            result = asyncio.run(
+            result = async_runner.run(
                 self.music_service.send_player_command(
                     player_id=player_id, command=command
                 )
@@ -202,7 +202,7 @@ class MusicGraph(Graph):
             else:
                 return {"output": "Não foi possível determinar o volume desejado."}
 
-            result = asyncio.run(
+            result = async_runner.run(
                 self.music_service.set_volume(player_id=player_id, volume=volume)
             )
             return {"output": result}
@@ -215,7 +215,7 @@ class MusicGraph(Graph):
         print(f"[MusicGraph._handle_now_playing]: player_id={player_id!r}")
 
         try:
-            result = asyncio.run(
+            result = async_runner.run(
                 self.music_service.get_now_playing(player_id=player_id)
             )
             return {"output": result}
@@ -226,7 +226,7 @@ class MusicGraph(Graph):
     def _handle_select_player(self, data: dict) -> dict:
         print(f"[MusicGraph._handle_select_player]: Requesting player selection...")
         try:
-            players = asyncio.run(self.music_service.get_players())
+            players = async_runner.run(self.music_service.get_players())
             names = ", ".join(p.name for p in players if p.name)
             return {
                 "output": (

@@ -63,10 +63,10 @@ class HomeAssistantSmartHomeSensorRepository(SmartHomeSensorRepository):
             SensorReading instance populated with the current state.
         """
         url = f"{self.base_url}/api/states/{entity_id}"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=self.headers, ssl=self._ssl) as resp:
-                resp.raise_for_status()
-                data = await resp.json()
+        session = self._get_session()
+        async with session.get(url, headers=self.headers, ssl=self._ssl) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
 
         attributes = data.get("attributes", {})
         device_class = attributes.get("device_class", "")
@@ -99,10 +99,10 @@ class HomeAssistantSmartHomeSensorRepository(SmartHomeSensorRepository):
             f"?filter_entity_id={entity_id}&end_time={end_time.isoformat()}"
         )
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=self.headers, ssl=self._ssl) as resp:
-                resp.raise_for_status()
-                data = await resp.json()
+        session = self._get_session()
+        async with session.get(url, headers=self.headers, ssl=self._ssl) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
 
         if not data or not data[0]:
             return []

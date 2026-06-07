@@ -110,31 +110,34 @@ def get_main_graph() -> MainGraph:
 
     settings = _get_settings()
 
-    # Instancing LLM Provider
-    llm_chat = get_llm_chat(
-        model=settings.llm_main_graph_chat_model,
-        temperature=settings.llm_main_graph_chat_temperature,
-    )
+    cache_key = ("graph", "main")
+    if cache_key not in _repo_cache:
+        # Instancing LLM Provider
+        llm_chat = get_llm_chat(
+            model=settings.llm_main_graph_chat_model,
+            temperature=settings.llm_main_graph_chat_temperature,
+        )
 
-    only_talk_graph = get_only_talk_graph()
-    shopping_list_graph = get_shopping_list_graph()
-    smart_home_lights_graph = get_smart_home_lights_graph()
-    smart_home_climate_graph = get_smart_home_climate_graph()
-    smart_home_sensors_graph = get_smart_home_sensors_graph()
-    smart_home_cameras_graph = get_smart_home_cameras_graph()
-    music_graph = get_music_graph()
+        only_talk_graph = get_only_talk_graph()
+        shopping_list_graph = get_shopping_list_graph()
+        smart_home_lights_graph = get_smart_home_lights_graph()
+        smart_home_climate_graph = get_smart_home_climate_graph()
+        smart_home_sensors_graph = get_smart_home_sensors_graph()
+        smart_home_cameras_graph = get_smart_home_cameras_graph()
+        music_graph = get_music_graph()
 
-    return MainGraph(
-        llm_chat=llm_chat,
-        only_talk_graph=only_talk_graph,
-        shopping_list_graph=shopping_list_graph,
-        smart_home_lights_graph=smart_home_lights_graph,
-        smart_home_climate_graph=smart_home_climate_graph,
-        smart_home_sensors_graph=smart_home_sensors_graph,
-        smart_home_cameras_graph=smart_home_cameras_graph,
-        music_graph=music_graph,
-        provider=settings.llm_provider_type,
-    )
+        _repo_cache[cache_key] = MainGraph(
+            llm_chat=llm_chat,
+            only_talk_graph=only_talk_graph,
+            shopping_list_graph=shopping_list_graph,
+            smart_home_lights_graph=smart_home_lights_graph,
+            smart_home_climate_graph=smart_home_climate_graph,
+            smart_home_sensors_graph=smart_home_sensors_graph,
+            smart_home_cameras_graph=smart_home_cameras_graph,
+            music_graph=music_graph,
+            provider=settings.llm_provider_type,
+        )
+    return _repo_cache[cache_key]
 
 
 def get_memory_graph() -> MemoryGraph:
@@ -144,12 +147,17 @@ def get_memory_graph() -> MemoryGraph:
 
     settings = _get_settings()
 
-    llm_chat = get_llm_chat(
-        model=settings.llm_memory_graph_chat_model,
-        temperature=settings.llm_memory_graph_chat_temperature,
-    )
+    cache_key = ("graph", "memory")
+    if cache_key not in _repo_cache:
+        llm_chat = get_llm_chat(
+            model=settings.llm_memory_graph_chat_model,
+            temperature=settings.llm_memory_graph_chat_temperature,
+        )
 
-    return MemoryGraph(llm_chat=llm_chat, provider=settings.llm_provider_type)
+        _repo_cache[cache_key] = MemoryGraph(
+            llm_chat=llm_chat, provider=settings.llm_provider_type
+        )
+    return _repo_cache[cache_key]
 
 
 def get_only_talk_graph() -> OnlyTalkGraph:
@@ -159,13 +167,18 @@ def get_only_talk_graph() -> OnlyTalkGraph:
 
     settings = _get_settings()
 
-    # Instancing LLM Provider
-    llm_chat = get_llm_chat(
-        model=settings.llm_only_talk_graph_chat_model,
-        temperature=settings.llm_only_talk_graph_chat_temperature,
-    )
+    cache_key = ("graph", "only_talk")
+    if cache_key not in _repo_cache:
+        # Instancing LLM Provider
+        llm_chat = get_llm_chat(
+            model=settings.llm_only_talk_graph_chat_model,
+            temperature=settings.llm_only_talk_graph_chat_temperature,
+        )
 
-    return OnlyTalkGraph(llm_chat=llm_chat, provider=settings.llm_provider_type)
+        _repo_cache[cache_key] = OnlyTalkGraph(
+            llm_chat=llm_chat, provider=settings.llm_provider_type
+        )
+    return _repo_cache[cache_key]
 
 
 def get_shopping_list_graph() -> ShoppingListGraph:
@@ -175,19 +188,22 @@ def get_shopping_list_graph() -> ShoppingListGraph:
 
     settings = _get_settings()
 
-    # Instancing LLM Provider
-    llm_chat = get_llm_chat(
-        model=settings.llm_shopping_list_graph_chat_model,
-        temperature=settings.llm_shopping_list_graph_chat_temperature,
-    )
+    cache_key = ("graph", "shopping_list")
+    if cache_key not in _repo_cache:
+        # Instancing LLM Provider
+        llm_chat = get_llm_chat(
+            model=settings.llm_shopping_list_graph_chat_model,
+            temperature=settings.llm_shopping_list_graph_chat_temperature,
+        )
 
-    shopping_list_service = get_shopping_list_service()
+        shopping_list_service = get_shopping_list_service()
 
-    return ShoppingListGraph(
-        llm_chat=llm_chat,
-        shopping_list_service=shopping_list_service,
-        provider=settings.llm_provider_type,
-    )
+        _repo_cache[cache_key] = ShoppingListGraph(
+            llm_chat=llm_chat,
+            shopping_list_service=shopping_list_service,
+            provider=settings.llm_provider_type,
+        )
+    return _repo_cache[cache_key]
 
 
 def get_smart_home_lights_graph() -> SmartHomeLightsGraph:
@@ -197,23 +213,26 @@ def get_smart_home_lights_graph() -> SmartHomeLightsGraph:
 
     settings = _get_settings()
 
-    # Instancing LLM Provider
-    llm_chat = get_llm_chat(
-        model=settings.llm_smart_home_lights_graph_chat_model,
-        temperature=settings.llm_smart_home_lights_graph_chat_temperature,
-    )
+    cache_key = ("graph", "smart_home_lights")
+    if cache_key not in _repo_cache:
+        # Instancing LLM Provider
+        llm_chat = get_llm_chat(
+            model=settings.llm_smart_home_lights_graph_chat_model,
+            temperature=settings.llm_smart_home_lights_graph_chat_temperature,
+        )
 
-    smart_home_service = get_smart_home_service()
-    smart_home_entity_alias_repository = get_smart_home_entity_alias_repository()
-    smart_home_area_repository = get_smart_home_area_repository()
+        smart_home_service = get_smart_home_service()
+        smart_home_entity_alias_repository = get_smart_home_entity_alias_repository()
+        smart_home_area_repository = get_smart_home_area_repository()
 
-    return SmartHomeLightsGraph(
-        llm_chat=llm_chat,
-        smart_home_service=smart_home_service,
-        smart_home_entity_alias_repository=smart_home_entity_alias_repository,
-        smart_home_area_repository=smart_home_area_repository,
-        provider=settings.llm_provider_type,
-    )
+        _repo_cache[cache_key] = SmartHomeLightsGraph(
+            llm_chat=llm_chat,
+            smart_home_service=smart_home_service,
+            smart_home_entity_alias_repository=smart_home_entity_alias_repository,
+            smart_home_area_repository=smart_home_area_repository,
+            provider=settings.llm_provider_type,
+        )
+    return _repo_cache[cache_key]
 
 
 def get_smart_home_climate_graph() -> SmartHomeClimateGraph:
@@ -223,20 +242,23 @@ def get_smart_home_climate_graph() -> SmartHomeClimateGraph:
 
     settings = _get_settings()
 
-    llm_chat = get_llm_chat(
-        model=settings.llm_smart_home_climate_graph_chat_model,
-        temperature=settings.llm_smart_home_climate_graph_chat_temperature,
-    )
+    cache_key = ("graph", "smart_home_climate")
+    if cache_key not in _repo_cache:
+        llm_chat = get_llm_chat(
+            model=settings.llm_smart_home_climate_graph_chat_model,
+            temperature=settings.llm_smart_home_climate_graph_chat_temperature,
+        )
 
-    smart_home_service = get_smart_home_service()
-    smart_home_entity_alias_repository = get_smart_home_entity_alias_repository()
+        smart_home_service = get_smart_home_service()
+        smart_home_entity_alias_repository = get_smart_home_entity_alias_repository()
 
-    return SmartHomeClimateGraph(
-        llm_chat=llm_chat,
-        smart_home_service=smart_home_service,
-        smart_home_entity_alias_repository=smart_home_entity_alias_repository,
-        provider=settings.llm_provider_type,
-    )
+        _repo_cache[cache_key] = SmartHomeClimateGraph(
+            llm_chat=llm_chat,
+            smart_home_service=smart_home_service,
+            smart_home_entity_alias_repository=smart_home_entity_alias_repository,
+            provider=settings.llm_provider_type,
+        )
+    return _repo_cache[cache_key]
 
 
 def get_smart_home_sensors_graph() -> SmartHomeSensorsGraph:
@@ -246,20 +268,23 @@ def get_smart_home_sensors_graph() -> SmartHomeSensorsGraph:
 
     settings = _get_settings()
 
-    llm_chat = get_llm_chat(
-        model=settings.llm_smart_home_sensors_graph_chat_model,
-        temperature=settings.llm_smart_home_sensors_graph_chat_temperature,
-    )
+    cache_key = ("graph", "smart_home_sensors")
+    if cache_key not in _repo_cache:
+        llm_chat = get_llm_chat(
+            model=settings.llm_smart_home_sensors_graph_chat_model,
+            temperature=settings.llm_smart_home_sensors_graph_chat_temperature,
+        )
 
-    smart_home_service = get_smart_home_service()
-    smart_home_entity_alias_repository = get_smart_home_entity_alias_repository()
+        smart_home_service = get_smart_home_service()
+        smart_home_entity_alias_repository = get_smart_home_entity_alias_repository()
 
-    return SmartHomeSensorsGraph(
-        llm_chat=llm_chat,
-        smart_home_service=smart_home_service,
-        smart_home_entity_alias_repository=smart_home_entity_alias_repository,
-        provider=settings.llm_provider_type,
-    )
+        _repo_cache[cache_key] = SmartHomeSensorsGraph(
+            llm_chat=llm_chat,
+            smart_home_service=smart_home_service,
+            smart_home_entity_alias_repository=smart_home_entity_alias_repository,
+            provider=settings.llm_provider_type,
+        )
+    return _repo_cache[cache_key]
 
 
 def get_smart_home_cameras_graph() -> SmartHomeCamerasGraph:
@@ -269,20 +294,23 @@ def get_smart_home_cameras_graph() -> SmartHomeCamerasGraph:
 
     settings = _get_settings()
 
-    llm_chat = get_llm_chat(
-        model=settings.llm_smart_home_cameras_graph_chat_model,
-        temperature=settings.llm_smart_home_cameras_graph_chat_temperature,
-    )
+    cache_key = ("graph", "smart_home_cameras")
+    if cache_key not in _repo_cache:
+        llm_chat = get_llm_chat(
+            model=settings.llm_smart_home_cameras_graph_chat_model,
+            temperature=settings.llm_smart_home_cameras_graph_chat_temperature,
+        )
 
-    smart_home_service = get_smart_home_service()
-    smart_home_entity_alias_repository = get_smart_home_entity_alias_repository()
+        smart_home_service = get_smart_home_service()
+        smart_home_entity_alias_repository = get_smart_home_entity_alias_repository()
 
-    return SmartHomeCamerasGraph(
-        llm_chat=llm_chat,
-        smart_home_service=smart_home_service,
-        smart_home_entity_alias_repository=smart_home_entity_alias_repository,
-        provider=settings.llm_provider_type,
-    )
+        _repo_cache[cache_key] = SmartHomeCamerasGraph(
+            llm_chat=llm_chat,
+            smart_home_service=smart_home_service,
+            smart_home_entity_alias_repository=smart_home_entity_alias_repository,
+            provider=settings.llm_provider_type,
+        )
+    return _repo_cache[cache_key]
 
 
 def get_music_graph() -> MusicGraph:
@@ -292,16 +320,19 @@ def get_music_graph() -> MusicGraph:
 
     settings = _get_settings()
 
-    llm_chat = get_llm_chat(
-        model=settings.llm_music_graph_chat_model,
-        temperature=settings.llm_music_graph_chat_temperature,
-    )
+    cache_key = ("graph", "music")
+    if cache_key not in _repo_cache:
+        llm_chat = get_llm_chat(
+            model=settings.llm_music_graph_chat_model,
+            temperature=settings.llm_music_graph_chat_temperature,
+        )
 
-    return MusicGraph(
-        llm_chat=llm_chat,
-        music_service=get_music_service(),
-        provider=settings.llm_provider_type,
-    )
+        _repo_cache[cache_key] = MusicGraph(
+            llm_chat=llm_chat,
+            music_service=get_music_service(),
+            provider=settings.llm_provider_type,
+        )
+    return _repo_cache[cache_key]
 
 
 # ====================================
@@ -401,7 +432,13 @@ def get_music_service() -> MusicService:
     IOC for Music Service
     """
 
-    return MusicService(music_repository=get_music_repository())
+    _get_settings()
+    cache_key = ("service", "music")
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = MusicService(
+            music_repository=get_music_repository(),
+        )
+    return _repo_cache[cache_key]
 
 
 def get_user_service() -> UserService:
@@ -592,7 +629,7 @@ def get_llm_chat(model: str, temperature: float) -> BaseChatModel:
     Return LLM provider
     """
 
-    settings = Settings()
+    settings = _get_settings()
     provider_type = settings.llm_provider_type.upper()
 
     if provider_type == "OPENAI":
@@ -603,7 +640,12 @@ def get_llm_chat(model: str, temperature: float) -> BaseChatModel:
         )
     elif provider_type == "OLLAMA":
         return ChatOllama(
-            base_url=settings.llm_provider_url, model=model, temperature=temperature
+            base_url=settings.llm_provider_url,
+            model=model,
+            temperature=temperature,
+            keep_alive=settings.llm_keep_alive,
+            num_ctx=settings.llm_num_ctx,
+            num_predict=settings.llm_num_predict,
         )
     else:
         raise ValueError(f"Invalid provider type: {provider_type!r}")

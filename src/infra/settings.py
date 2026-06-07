@@ -22,6 +22,16 @@ class Settings(BaseSettings):
     llm_provider_url: str = "http://10.10.1.10:11434"
     llm_provider_api_key: str = ""
 
+    # Keep the model resident in the Ollama VRAM between requests. Integer
+    # seconds: -1 keeps it loaded indefinitely, 0 unloads immediately, e.g.
+    # 1800 for 30 min. Must be an int — Ollama rejects the string "-1" with
+    # "missing unit in duration".
+    llm_keep_alive: int = -1
+    # Context window; the Ollama default of 4096 truncates large prompts.
+    llm_num_ctx: int = 8192
+    # Token generation cap; -1 means no limit (neutral default).
+    llm_num_predict: int = -1
+
     # ===============================
     # LLM Models config
     # ===============================

@@ -83,9 +83,9 @@ class TestTurnOnUrlConstruction:
         The URL passed to session.post must NOT start with 'http://http://'.
         """
         repo = _make_repo(base_url="http://localhost:8123")
-        mock_cm_session, mock_session = _make_mock_session([])
+        _, mock_session = _make_mock_session([])
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             cmd = LightTurnOn(entity_id="light.sala")
             asyncio.get_event_loop().run_until_complete(
                 repo.turn_on(turn_on_command=cmd)
@@ -113,9 +113,9 @@ class TestTurnOffUrlConstruction:
         The URL passed to session.post must NOT start with 'http://http://'.
         """
         repo = _make_repo(base_url="http://localhost:8123")
-        mock_cm_session, mock_session = _make_mock_session({"status": 200})
+        _, mock_session = _make_mock_session({"status": 200})
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             asyncio.get_event_loop().run_until_complete(
                 repo.turn_off(entity_id="light.sala")
             )
@@ -143,11 +143,11 @@ class TestGetStateEntityId:
         """
         entity_id = "light.quarto"
         repo = _make_repo()
-        mock_cm_session, _ = _make_mock_session(
+        _, mock_session = _make_mock_session(
             _make_ha_state_response(entity_id=entity_id)
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state(entity_id=entity_id)
             )
@@ -173,9 +173,9 @@ class TestGetStateColorTempKelvin:
         """
         repo = _make_repo()
         ha_response = _make_ha_state_response(color_temp=370, color_temp_kelvin=2700)
-        mock_cm_session, _ = _make_mock_session(ha_response)
+        _, mock_session = _make_mock_session(ha_response)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state(entity_id="light.sala")
             )
@@ -243,9 +243,9 @@ class TestGetAllLightsState:
         )
 
         repo = _make_repo()
-        mock_cm_session, _ = _make_mock_session(payload)
+        _, mock_session = _make_mock_session(payload)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_all_states()
             )
@@ -264,9 +264,9 @@ class TestGetAllLightsState:
         )
 
         repo = _make_repo()
-        mock_cm_session, _ = _make_mock_session(payload)
+        _, mock_session = _make_mock_session(payload)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_all_states()
             )
@@ -284,9 +284,9 @@ class TestGetAllLightsState:
         )
 
         repo = _make_repo()
-        mock_cm_session, _ = _make_mock_session(payload)
+        _, mock_session = _make_mock_session(payload)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_all_states()
             )
@@ -307,9 +307,9 @@ class TestGetAllLightsState:
         )
 
         repo = _make_repo()
-        mock_cm_session, _ = _make_mock_session(payload)
+        _, mock_session = _make_mock_session(payload)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_all_states()
             )
@@ -339,9 +339,9 @@ class TestGetAllLightsState:
         )
 
         repo = _make_repo()
-        mock_cm_session, _ = _make_mock_session(payload)
+        _, mock_session = _make_mock_session(payload)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_all_states()
             )
@@ -362,9 +362,9 @@ class TestGetAllLightsState:
         )
 
         repo = _make_repo()
-        mock_cm_session, _ = _make_mock_session(payload)
+        _, mock_session = _make_mock_session(payload)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_all_states()
             )
@@ -378,7 +378,7 @@ class TestGetAllLightsState:
         When raise_for_status throws, the error must propagate (no swallow).
         """
         repo = _make_repo()
-        mock_cm_session, mock_session = _make_mock_session([])
+        _, mock_session = _make_mock_session([])
 
         # Force raise_for_status to raise via the response mock.
         # We re-build the session so the response's raise_for_status raises.
@@ -392,7 +392,7 @@ class TestGetAllLightsState:
         mock_cm_resp.__aexit__ = AsyncMock(return_value=False)
         mock_session.get = MagicMock(return_value=mock_cm_resp)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             with pytest.raises(RuntimeError):
                 asyncio.get_event_loop().run_until_complete(repo.get_all_states())
 
@@ -400,11 +400,72 @@ class TestGetAllLightsState:
         payload = _make_ha_all_states_response([])
 
         repo = _make_repo()
-        mock_cm_session, _ = _make_mock_session(payload)
+        _, mock_session = _make_mock_session(payload)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_all_states()
             )
 
         assert result == [], f"Expected [] for empty response, got {result!r}"
+
+
+# ===========================================================================
+# TestSessionReuse — aiohttp.ClientSession must be created at most once
+# ===========================================================================
+#
+# Contract (Milestone 2B-2): the adapter reuses a single aiohttp.ClientSession
+# across calls via _get_session(). Calling a method twice must instantiate
+# aiohttp.ClientSession AT MOST ONCE.
+#
+# RED today: every method opens `async with aiohttp.ClientSession() as session`,
+# so two calls instantiate the session twice (call_count == 2).
+
+
+def _make_reusable_session(json_response):
+    """
+    Build a single session mock that works regardless of whether production
+    uses it as a context manager (`async with aiohttp.ClientSession() as s`)
+    or directly via _get_session() (`s = self._get_session()`).
+
+    The session enters itself (`__aenter__` returns the same object), so the
+    `.get`/`.post` calls — which return the response context manager — are
+    always reachable. Only the instantiation count is asserted by the caller.
+    """
+    mock_resp = AsyncMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.json = AsyncMock(return_value=json_response)
+    mock_resp.status = 200
+
+    mock_cm_resp = AsyncMock()
+    mock_cm_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_cm_resp.__aexit__ = AsyncMock(return_value=False)
+
+    mock_session = AsyncMock()
+    mock_session.get = MagicMock(return_value=mock_cm_resp)
+    mock_session.post = MagicMock(return_value=mock_cm_resp)
+    # Self-entering: `async with mock_session as s` yields mock_session.
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+    return mock_session
+
+
+class TestSessionReuse:
+    def test_get_state__called_twice__client_session_instantiated_once(self):
+        repo = _make_repo()
+        mock_session = _make_reusable_session(_make_ha_state_response())
+
+        with patch(
+            "aiohttp.ClientSession", return_value=mock_session
+        ) as client_session_cls:
+            asyncio.get_event_loop().run_until_complete(
+                repo.get_state(entity_id="light.sala")
+            )
+            asyncio.get_event_loop().run_until_complete(
+                repo.get_state(entity_id="light.sala")
+            )
+
+        assert client_session_cls.call_count == 1, (
+            f"Expected aiohttp.ClientSession to be instantiated once across two "
+            f"calls (session reuse), got {client_session_cls.call_count}"
+        )

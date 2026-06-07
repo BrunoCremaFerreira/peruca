@@ -1,4 +1,5 @@
 import asyncio
+from infra import async_runner
 import json
 from typing import List, Optional, TypedDict
 from application.graphs.graph import Graph
@@ -126,7 +127,7 @@ class SmartHomeClimateGraph(Graph):
                 self.smart_home_service.climate_turn_on(command=ClimateTurnOn(entity_id=eid))
                 for eid in entity_ids
             ])
-        asyncio.run(_run())
+        async_runner.run(_run())
 
         return {"output_turn_on": devices}
 
@@ -150,7 +151,7 @@ class SmartHomeClimateGraph(Graph):
                 self.smart_home_service.climate_turn_off(command=ClimateTurnOff(entity_id=eid))
                 for eid in entity_ids
             ])
-        asyncio.run(_run())
+        async_runner.run(_run())
 
         return {"output_turn_off": devices}
 
@@ -193,7 +194,7 @@ class SmartHomeClimateGraph(Graph):
                     )
                     for eid in entity_ids
                 ])
-            asyncio.run(_run())
+            async_runner.run(_run())
 
         if not resolved_any:
             return {"output_set_temperature": DEVICE_NOT_RECOGNIZED}
@@ -236,7 +237,7 @@ class SmartHomeClimateGraph(Graph):
                     )
                     for eid in entity_ids
                 ])
-            asyncio.run(_run())
+            async_runner.run(_run())
 
         if not resolved_any:
             return {"output_set_hvac_mode": DEVICE_NOT_RECOGNIZED}
@@ -289,7 +290,7 @@ class SmartHomeClimateGraph(Graph):
                         fetched.append(f"{label}: {', '.join(state_parts)}")
                 return fetched
 
-            lines.extend(asyncio.run(_fetch_states(entity_ids, device_str)))
+            lines.extend(async_runner.run(_fetch_states(entity_ids, device_str)))
 
         return {"output_query_state": "\n".join(lines) if lines else ""}
 
@@ -383,7 +384,7 @@ class SmartHomeClimateGraph(Graph):
                 print("[_find_entity_ids][ERROR]: Timeout")
                 return "None"
 
-        entity_ids_delimited_str = asyncio.run(_invoke_with_timeout())
+        entity_ids_delimited_str = async_runner.run(_invoke_with_timeout())
 
         entity_ids = entity_ids_delimited_str.split("|")
         entity_ids = [e for e in entity_ids if e.upper() != "NONE" and e.strip() != ""]

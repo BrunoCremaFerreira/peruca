@@ -115,7 +115,7 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetState:
         get_state must return a SensorReading populated from the HA response.
         """
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session(
+        _, mock_session = _mock_aiohttp_session(
             _make_ha_state_response(
                 entity_id="sensor.temperature_sala",
                 state="23.5",
@@ -125,7 +125,7 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetState:
             )
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state("sensor.temperature_sala")
             )
@@ -145,11 +145,11 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetState:
     def test_get_state__maps_device_class_temperature__to_sensor_type_temperature(self):
         """device_class 'temperature' must map to SensorType.TEMPERATURE."""
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session(
+        _, mock_session = _mock_aiohttp_session(
             _make_ha_state_response(device_class="temperature")
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state("sensor.temperature_sala")
             )
@@ -162,7 +162,7 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetState:
     def test_get_state__maps_device_class_door__to_sensor_type_door(self):
         """device_class 'door' must map to SensorType.DOOR."""
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session(
+        _, mock_session = _mock_aiohttp_session(
             _make_ha_state_response(
                 entity_id="binary_sensor.door_front",
                 state="on",
@@ -172,7 +172,7 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetState:
             )
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state("binary_sensor.door_front")
             )
@@ -184,7 +184,7 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetState:
     def test_get_state__maps_device_class_motion__to_sensor_type_motion(self):
         """device_class 'motion' must map to SensorType.MOTION."""
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session(
+        _, mock_session = _mock_aiohttp_session(
             _make_ha_state_response(
                 entity_id="binary_sensor.motion_sala",
                 state="off",
@@ -194,7 +194,7 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetState:
             )
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state("binary_sensor.motion_sala")
             )
@@ -206,11 +206,11 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetState:
     def test_get_state__maps_unknown_device_class__to_sensor_type_unknown(self):
         """An unrecognized device_class must fall back to SensorType.UNKNOWN."""
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session(
+        _, mock_session = _mock_aiohttp_session(
             _make_ha_state_response(device_class="flux_capacitor")
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state("sensor.weird_device")
             )
@@ -225,7 +225,7 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetState:
         must be None.
         """
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session(
+        _, mock_session = _mock_aiohttp_session(
             _make_ha_state_response(
                 entity_id="binary_sensor.door_front",
                 state="on",
@@ -235,7 +235,7 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetState:
             )
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state("binary_sensor.door_front")
             )
@@ -249,7 +249,7 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetState:
         A binary sensor with state 'on' must have state='on' in SensorReading.
         """
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session(
+        _, mock_session = _mock_aiohttp_session(
             _make_ha_state_response(
                 entity_id="binary_sensor.window_sala",
                 state="on",
@@ -259,7 +259,7 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetState:
             )
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state("binary_sensor.window_sala")
             )
@@ -278,11 +278,11 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetState:
         """
         repo = _make_repo()
         entity_id = "sensor.temperature_sala"
-        mock_cm_session, mock_session = _mock_aiohttp_session(
+        _, mock_session = _mock_aiohttp_session(
             _make_ha_state_response(entity_id=entity_id)
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             asyncio.get_event_loop().run_until_complete(repo.get_state(entity_id))
 
         called_url = mock_session.get.call_args[0][0]
@@ -315,11 +315,7 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetState:
         mock_session = AsyncMock()
         mock_session.get = MagicMock(return_value=mock_cm_resp)
 
-        mock_cm_session = AsyncMock()
-        mock_cm_session.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_cm_session.__aexit__ = AsyncMock(return_value=False)
-
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             with pytest.raises(aiohttp.ClientResponseError):
                 asyncio.get_event_loop().run_until_complete(
                     repo.get_state("sensor.nonexistent")
@@ -349,9 +345,9 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetHistory:
                 ),
             ]
         ]
-        mock_cm_session, _ = _mock_aiohttp_session(ha_history_response)
+        _, mock_session = _mock_aiohttp_session(ha_history_response)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_history("binary_sensor.motion_lavanderia", 3)
             )
@@ -374,11 +370,11 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetHistory:
         """
         repo = _make_repo()
         hours_back = 3
-        mock_cm_session, mock_session = _mock_aiohttp_session([[]])
+        _, mock_session = _mock_aiohttp_session([[]])
 
         before_call = datetime.now(timezone.utc)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             asyncio.get_event_loop().run_until_complete(
                 repo.get_history("binary_sensor.motion_lavanderia", hours_back)
             )
@@ -423,9 +419,9 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetHistory:
         When HA returns an empty outer list, get_history must return [].
         """
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session([])
+        _, mock_session = _mock_aiohttp_session([])
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_history("sensor.nonexistent", 3)
             )
@@ -439,9 +435,9 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetHistory:
         When HA returns [[]] (outer list with one empty inner list), must return [].
         """
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session([[]])
+        _, mock_session = _mock_aiohttp_session([[]])
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_history("sensor.temperature_sala", 6)
             )
@@ -461,9 +457,9 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetHistory:
                 _make_ha_history_entry(device_class="motion", state="on"),
             ]
         ]
-        mock_cm_session, _ = _mock_aiohttp_session(ha_history_response)
+        _, mock_session = _mock_aiohttp_session(ha_history_response)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_history("binary_sensor.motion_lavanderia", 3)
             )
@@ -480,12 +476,72 @@ class TestHomeAssistantSmartHomeSensorRepositoryGetHistory:
         """
         repo = _make_repo()
         entity_id = "sensor.humidity_quarto"
-        mock_cm_session, mock_session = _mock_aiohttp_session([[]])
+        _, mock_session = _mock_aiohttp_session([[]])
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             asyncio.get_event_loop().run_until_complete(repo.get_history(entity_id, 3))
 
         called_url = mock_session.get.call_args[0][0]
         assert entity_id in called_url, (
             f"Expected entity_id={entity_id!r} in URL query params, got: {called_url!r}"
+        )
+
+
+# ===========================================================================
+# TestSessionReuse — aiohttp.ClientSession must be created at most once
+# ===========================================================================
+#
+# Contract (Milestone 2B-2): the adapter reuses a single aiohttp.ClientSession
+# across calls via _get_session(). Calling a method twice must instantiate
+# aiohttp.ClientSession AT MOST ONCE.
+#
+# RED today: every method opens `async with aiohttp.ClientSession() as session`,
+# so two calls instantiate the session twice (call_count == 2).
+
+
+def _make_reusable_session(json_response):
+    """
+    Build a single session mock that works regardless of whether production
+    uses it as a context manager (`async with aiohttp.ClientSession() as s`)
+    or directly via _get_session() (`s = self._get_session()`).
+
+    The session enters itself (`__aenter__` returns the same object), so the
+    `.get`/`.post` calls — which return the response context manager — are
+    always reachable. Only the instantiation count is asserted by the caller.
+    """
+    mock_resp = AsyncMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.json = AsyncMock(return_value=json_response)
+    mock_resp.status = 200
+
+    mock_cm_resp = AsyncMock()
+    mock_cm_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_cm_resp.__aexit__ = AsyncMock(return_value=False)
+
+    mock_session = AsyncMock()
+    mock_session.get = MagicMock(return_value=mock_cm_resp)
+    mock_session.post = MagicMock(return_value=mock_cm_resp)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+    return mock_session
+
+
+class TestSessionReuse:
+    def test_get_state__called_twice__client_session_instantiated_once(self):
+        repo = _make_repo()
+        mock_session = _make_reusable_session(_make_ha_state_response())
+
+        with patch(
+            "aiohttp.ClientSession", return_value=mock_session
+        ) as client_session_cls:
+            asyncio.get_event_loop().run_until_complete(
+                repo.get_state("sensor.temperature_sala")
+            )
+            asyncio.get_event_loop().run_until_complete(
+                repo.get_state("sensor.temperature_sala")
+            )
+
+        assert client_session_cls.call_count == 1, (
+            f"Expected aiohttp.ClientSession to be instantiated once across two "
+            f"calls (session reuse), got {client_session_cls.call_count}"
         )

@@ -121,9 +121,9 @@ class TestGetPlayers:
         MusicPlayer objects with all fields populated correctly.
         """
         repo = _make_repo()
-        mock_cm_session, mock_session = _make_mock_session(_mass_players_payload())
+        _, mock_session = _make_mock_session(_mass_players_payload())
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = _run(repo.get_players())
 
         assert isinstance(result, list)
@@ -138,9 +138,9 @@ class TestGetPlayers:
     def test_get_players__calls_correct_url(self):
         """get_players must issue a GET request to /api/players."""
         repo = _make_repo(base_url="http://mass.local:8095")
-        mock_cm_session, mock_session = _make_mock_session([])
+        _, mock_session = _make_mock_session([])
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             _run(repo.get_players())
 
         called_url = mock_session.get.call_args[0][0]
@@ -161,9 +161,9 @@ class TestSearch:
         objects with correct fields.
         """
         repo = _make_repo()
-        mock_cm_session, mock_session = _make_mock_session(_mass_search_payload())
+        _, mock_session = _make_mock_session(_mass_search_payload())
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = _run(repo.search(query="Song A", limit=5))
 
         assert isinstance(result, list)
@@ -177,9 +177,9 @@ class TestSearch:
     def test_search__calls_url_with_query_parameter(self):
         """The search request URL must include the query string."""
         repo = _make_repo(base_url="http://mass.local:8095")
-        mock_cm_session, mock_session = _make_mock_session({"tracks": []})
+        _, mock_session = _make_mock_session({"tracks": []})
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             _run(repo.search(query="my query", limit=5))
 
         called_url = mock_session.get.call_args[0][0]
@@ -209,9 +209,9 @@ class TestPlayMedia:
         containing player_id, media_id, and media_type.
         """
         repo = _make_repo(base_url="http://mass.local:8095")
-        mock_cm_session, mock_session = _make_mock_session({"status": "ok"})
+        _, mock_session = _make_mock_session({"status": "ok"})
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             _run(
                 repo.play_media(
                     player_id="player.living_room",
@@ -245,9 +245,9 @@ class TestPlayerCommand:
         player_id and command in the JSON body.
         """
         repo = _make_repo(base_url="http://mass.local:8095")
-        mock_cm_session, mock_session = _make_mock_session({"status": "ok"})
+        _, mock_session = _make_mock_session({"status": "ok"})
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             _run(repo.player_command(player_id="player.bedroom", command="pause"))
 
         called_url = mock_session.post.call_args[0][0]
@@ -274,9 +274,9 @@ class TestSetVolume:
         Both the player_id and the volume must appear in the URL.
         """
         repo = _make_repo(base_url="http://mass.local:8095")
-        mock_cm_session, mock_session = _make_mock_session({"status": "ok"})
+        _, mock_session = _make_mock_session({"status": "ok"})
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             _run(repo.set_volume(player_id="player.living_room", volume=75))
 
         called_url = mock_session.post.call_args[0][0]
@@ -303,29 +303,12 @@ class TestAuthHeader:
         Authorization header (Bearer scheme or equivalent).
         """
         repo = _make_repo(token="my-secret-token")
-        mock_cm_session, mock_session = _make_mock_session([])
+        _, mock_session = _make_mock_session([])
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             _run(repo.get_players())
 
         # Auth can be set on the session constructor or on individual requests.
-        # Accept both: headers kwarg on session constructor OR on the get call.
-        session_call_kwargs = mock_cm_session.__class__.__init__
-        get_call_kwargs = mock_session.get.call_args[1] if mock_session.get.call_args else {}
-        headers = get_call_kwargs.get("headers", {})
-
-        # If headers not on get(), check session-level headers passed via ClientSession()
-        session_ctor_kwargs = (
-            mock_cm_session.__aenter__.call_args[1]
-            if mock_cm_session.__aenter__.call_args
-            else {}
-        )
-
-        # The simplest assertion: somewhere "my-secret-token" was used
-        all_call_args_str = str(mock_session.get.call_args) + str(
-            mock_cm_session.__aenter__.call_args
-        )
-        # Also check if ClientSession() itself was called with headers
         # We can't introspect deeply without implementation — so we verify
         # that the repo actually stores the token for later use.
         assert repo.token == "my-secret-token", (
@@ -338,9 +321,9 @@ class TestAuthHeader:
         The repo must still function normally.
         """
         repo = _make_repo(token="")
-        mock_cm_session, mock_session = _make_mock_session([])
+        _, mock_session = _make_mock_session([])
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = _run(repo.get_players())
 
         # No exception must be raised; result must be a list
@@ -381,10 +364,62 @@ class TestErrorPropagation:
         mock_session = AsyncMock()
         mock_session.get = MagicMock(return_value=mock_cm_resp)
 
-        mock_cm_session = AsyncMock()
-        mock_cm_session.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_cm_session.__aexit__ = AsyncMock(return_value=False)
-
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             with pytest.raises(aiohttp.ClientConnectorError):
                 _run(repo.get_players())
+
+
+# ===========================================================================
+# TestSessionReuse — aiohttp.ClientSession must be created at most once
+# ===========================================================================
+#
+# Contract (Milestone 2B-2): the adapter reuses a single aiohttp.ClientSession
+# across calls via _get_session(). Calling a method twice must instantiate
+# aiohttp.ClientSession AT MOST ONCE.
+#
+# RED today: every method opens `async with aiohttp.ClientSession() as session`,
+# so two calls instantiate the session twice (call_count == 2).
+
+
+def _make_reusable_session(json_response):
+    """
+    Build a single session mock that works regardless of whether production
+    uses it as a context manager (`async with aiohttp.ClientSession() as s`)
+    or directly via _get_session() (`s = self._get_session()`).
+
+    The session enters itself (`__aenter__` returns the same object), so the
+    `.get`/`.post` calls — which return the response context manager — are
+    always reachable. Only the instantiation count is asserted by the caller.
+    """
+    mock_resp = AsyncMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.json = AsyncMock(return_value=json_response)
+    mock_resp.status = 200
+
+    mock_cm_resp = AsyncMock()
+    mock_cm_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_cm_resp.__aexit__ = AsyncMock(return_value=False)
+
+    mock_session = AsyncMock()
+    mock_session.get = MagicMock(return_value=mock_cm_resp)
+    mock_session.post = MagicMock(return_value=mock_cm_resp)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+    return mock_session
+
+
+class TestSessionReuse:
+    def test_get_players__called_twice__client_session_instantiated_once(self):
+        repo = _make_repo()
+        mock_session = _make_reusable_session(_mass_players_payload())
+
+        with patch(
+            "aiohttp.ClientSession", return_value=mock_session
+        ) as client_session_cls:
+            _run(repo.get_players())
+            _run(repo.get_players())
+
+        assert client_session_cls.call_count == 1, (
+            f"Expected aiohttp.ClientSession to be instantiated once across two "
+            f"calls (session reuse), got {client_session_cls.call_count}"
+        )

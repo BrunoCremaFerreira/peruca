@@ -1,4 +1,5 @@
 import asyncio
+from infra import async_runner
 import base64
 import json
 from typing import List, Optional, TypedDict
@@ -104,7 +105,7 @@ class SmartHomeCamerasGraph(Graph):
 
         entity_id = entity_ids[0]
         try:
-            snapshot: SmartHomeCameraSnapshot = asyncio.run(
+            snapshot: SmartHomeCameraSnapshot = async_runner.run(
                 self.smart_home_service.camera_get_snapshot(entity_id)
             )
             encoded = base64.b64encode(snapshot.image_bytes).decode()
@@ -128,7 +129,7 @@ class SmartHomeCamerasGraph(Graph):
 
         entity_id = entity_ids[0]
         try:
-            camera: SmartHomeCamera = asyncio.run(
+            camera: SmartHomeCamera = async_runner.run(
                 self.smart_home_service.camera_get_state(entity_id)
             )
             name = camera.friendly_name or camera.entity_id
@@ -209,7 +210,7 @@ class SmartHomeCamerasGraph(Graph):
                 print("[SmartHomeCamerasGraph._find_entity_ids][ERROR]: Timeout")
                 return "None"
 
-        entity_ids_str = asyncio.run(_invoke_with_timeout())
+        entity_ids_str = async_runner.run(_invoke_with_timeout())
 
         entity_ids = entity_ids_str.split("|")
         entity_ids = [e for e in entity_ids if e.upper() != "NONE" and e.strip() != ""]

@@ -45,10 +45,10 @@ class HomeAssistantSmartHomeClimateRepository(SmartHomeClimateRepository):
             SmartHomeClimate instance populated with the current state.
         """
         url = f"{self.base_url}/api/states/{entity_id}"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=self.headers, ssl=self._ssl) as resp:
-                resp.raise_for_status()
-                data = await resp.json()
+        session = self._get_session()
+        async with session.get(url, headers=self.headers, ssl=self._ssl) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
 
         attributes = data.get("attributes", {})
         state = data["state"]
@@ -78,12 +78,12 @@ class HomeAssistantSmartHomeClimateRepository(SmartHomeClimateRepository):
             "entity_id": command.entity_id,
             "temperature": command.temperature,
         }
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url, headers=self.headers, json=payload, ssl=self._ssl
-            ) as resp:
-                resp.raise_for_status()
-                return await resp.json()
+        session = self._get_session()
+        async with session.post(
+            url, headers=self.headers, json=payload, ssl=self._ssl
+        ) as resp:
+            resp.raise_for_status()
+            return await resp.json()
 
     async def set_hvac_mode(self, command: ClimateSetHvacMode) -> dict:
         """
@@ -100,12 +100,12 @@ class HomeAssistantSmartHomeClimateRepository(SmartHomeClimateRepository):
             "entity_id": command.entity_id,
             "hvac_mode": command.hvac_mode,
         }
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url, headers=self.headers, json=payload, ssl=self._ssl
-            ) as resp:
-                resp.raise_for_status()
-                return await resp.json()
+        session = self._get_session()
+        async with session.post(
+            url, headers=self.headers, json=payload, ssl=self._ssl
+        ) as resp:
+            resp.raise_for_status()
+            return await resp.json()
 
     async def turn_on(self, command: ClimateTurnOn) -> dict:
         """
@@ -119,12 +119,12 @@ class HomeAssistantSmartHomeClimateRepository(SmartHomeClimateRepository):
         """
         url = f"{self.base_url}/api/services/climate/turn_on"
         payload = {"entity_id": command.entity_id}
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url, headers=self.headers, json=payload, ssl=self._ssl
-            ) as resp:
-                resp.raise_for_status()
-                return await resp.json()
+        session = self._get_session()
+        async with session.post(
+            url, headers=self.headers, json=payload, ssl=self._ssl
+        ) as resp:
+            resp.raise_for_status()
+            return await resp.json()
 
     async def turn_off(self, command: ClimateTurnOff) -> dict:
         """
@@ -139,12 +139,12 @@ class HomeAssistantSmartHomeClimateRepository(SmartHomeClimateRepository):
         """
         url = f"{self.base_url}/api/services/climate/turn_off"
         payload = {"entity_id": command.entity_id}
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url, headers=self.headers, json=payload, ssl=self._ssl
-            ) as resp:
-                resp.raise_for_status()
-                try:
-                    return await resp.json()
-                except aiohttp.ContentTypeError:
-                    return {"status": resp.status, "message": "Request successful"}
+        session = self._get_session()
+        async with session.post(
+            url, headers=self.headers, json=payload, ssl=self._ssl
+        ) as resp:
+            resp.raise_for_status()
+            try:
+                return await resp.json()
+            except aiohttp.ContentTypeError:
+                return {"status": resp.status, "message": "Request successful"}

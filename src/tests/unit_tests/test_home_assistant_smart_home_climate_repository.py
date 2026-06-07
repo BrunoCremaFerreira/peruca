@@ -131,11 +131,11 @@ class TestGetState:
         """entity_id passed to get_state must be reflected on the returned entity."""
         entity_id = "climate.quarto"
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session(
+        _, mock_session = _mock_aiohttp_session(
             _make_ha_climate_state_response(entity_id=entity_id)
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state(entity_id=entity_id)
             )
@@ -147,11 +147,11 @@ class TestGetState:
     def test_get_state__state_field_cool__maps_to_hvac_mode_cool(self):
         """HA state 'cool' must map to SmartHomeHvacMode.COOL."""
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session(
+        _, mock_session = _mock_aiohttp_session(
             _make_ha_climate_state_response(state="cool")
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state(entity_id="climate.sala")
             )
@@ -163,11 +163,11 @@ class TestGetState:
     def test_get_state__state_field_heat__maps_to_hvac_mode_heat(self):
         """HA state 'heat' must map to SmartHomeHvacMode.HEAT."""
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session(
+        _, mock_session = _mock_aiohttp_session(
             _make_ha_climate_state_response(state="heat")
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state(entity_id="climate.sala")
             )
@@ -179,11 +179,11 @@ class TestGetState:
     def test_get_state__state_is_not_off__is_on_is_true(self):
         """When HA state is not 'off', is_on must be True."""
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session(
+        _, mock_session = _mock_aiohttp_session(
             _make_ha_climate_state_response(state="cool")
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state(entity_id="climate.sala")
             )
@@ -195,11 +195,11 @@ class TestGetState:
     def test_get_state__state_is_off__is_on_is_false(self):
         """When HA state is 'off', is_on must be False."""
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session(
+        _, mock_session = _mock_aiohttp_session(
             _make_ha_climate_state_response(state="off")
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state(entity_id="climate.sala")
             )
@@ -211,11 +211,11 @@ class TestGetState:
     def test_get_state__current_temperature__read_from_attributes(self):
         """current_temperature must be read from attributes.current_temperature."""
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session(
+        _, mock_session = _mock_aiohttp_session(
             _make_ha_climate_state_response(current_temperature=26.3)
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state(entity_id="climate.sala")
             )
@@ -232,11 +232,11 @@ class TestGetState:
         The HA API field is named 'temperature', not 'target_temperature'.
         """
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session(
+        _, mock_session = _mock_aiohttp_session(
             _make_ha_climate_state_response(target_temperature=21.0)
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state(entity_id="climate.sala")
             )
@@ -250,11 +250,11 @@ class TestGetState:
         """hvac_modes must be read from attributes.hvac_modes."""
         expected_modes = ["cool", "heat", "dry", "off"]
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session(
+        _, mock_session = _mock_aiohttp_session(
             _make_ha_climate_state_response(hvac_modes=expected_modes)
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state(entity_id="climate.sala")
             )
@@ -266,11 +266,11 @@ class TestGetState:
     def test_get_state__fan_mode__read_from_attributes(self):
         """fan_mode must be read from attributes.fan_mode."""
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session(
+        _, mock_session = _mock_aiohttp_session(
             _make_ha_climate_state_response(fan_mode="high")
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state(entity_id="climate.sala")
             )
@@ -287,11 +287,11 @@ class TestGetState:
         """
         repo = _make_repo()
         entity_id = "climate.sala"
-        mock_cm_session, mock_session = _mock_aiohttp_session(
+        _, mock_session = _mock_aiohttp_session(
             _make_ha_climate_state_response(entity_id=entity_id)
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             asyncio.get_event_loop().run_until_complete(
                 repo.get_state(entity_id=entity_id)
             )
@@ -326,11 +326,7 @@ class TestGetState:
         mock_session = AsyncMock()
         mock_session.get = MagicMock(return_value=mock_cm_resp)
 
-        mock_cm_session = AsyncMock()
-        mock_cm_session.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_cm_session.__aexit__ = AsyncMock(return_value=False)
-
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             with pytest.raises(aiohttp.ClientResponseError):
                 asyncio.get_event_loop().run_until_complete(
                     repo.get_state(entity_id="climate.nonexistent")
@@ -346,9 +342,9 @@ class TestSetTemperature:
     def test_set_temperature__sends_correct_url(self):
         """POST must be sent to /api/services/climate/set_temperature."""
         repo = _make_repo()
-        mock_cm_session, mock_session = _mock_aiohttp_session([])
+        _, mock_session = _mock_aiohttp_session([])
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             cmd = ClimateSetTemperature(entity_id="climate.sala", temperature=22.0)
             asyncio.get_event_loop().run_until_complete(repo.set_temperature(cmd))
 
@@ -363,9 +359,9 @@ class TestSetTemperature:
     def test_set_temperature__payload_contains_entity_id(self):
         """The POST body must include the entity_id field."""
         repo = _make_repo()
-        mock_cm_session, mock_session = _mock_aiohttp_session([])
+        _, mock_session = _mock_aiohttp_session([])
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             cmd = ClimateSetTemperature(entity_id="climate.quarto", temperature=20.0)
             asyncio.get_event_loop().run_until_complete(repo.set_temperature(cmd))
 
@@ -378,9 +374,9 @@ class TestSetTemperature:
     def test_set_temperature__payload_contains_temperature(self):
         """The POST body must include the temperature field with the correct value."""
         repo = _make_repo()
-        mock_cm_session, mock_session = _mock_aiohttp_session([])
+        _, mock_session = _mock_aiohttp_session([])
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             cmd = ClimateSetTemperature(entity_id="climate.sala", temperature=18.5)
             asyncio.get_event_loop().run_until_complete(repo.set_temperature(cmd))
 
@@ -394,9 +390,9 @@ class TestSetTemperature:
         """set_temperature must return the response body as a dict."""
         repo = _make_repo()
         expected_response = {"result": "ok"}
-        mock_cm_session, _ = _mock_aiohttp_session(expected_response)
+        _, mock_session = _mock_aiohttp_session(expected_response)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             cmd = ClimateSetTemperature(entity_id="climate.sala", temperature=22.0)
             result = asyncio.get_event_loop().run_until_complete(
                 repo.set_temperature(cmd)
@@ -416,9 +412,9 @@ class TestSetHvacMode:
     def test_set_hvac_mode__sends_correct_url(self):
         """POST must be sent to /api/services/climate/set_hvac_mode."""
         repo = _make_repo()
-        mock_cm_session, mock_session = _mock_aiohttp_session([])
+        _, mock_session = _mock_aiohttp_session([])
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             cmd = ClimateSetHvacMode(entity_id="climate.sala", hvac_mode="cool")
             asyncio.get_event_loop().run_until_complete(repo.set_hvac_mode(cmd))
 
@@ -433,9 +429,9 @@ class TestSetHvacMode:
     def test_set_hvac_mode__payload_contains_entity_id(self):
         """The POST body must include the entity_id field."""
         repo = _make_repo()
-        mock_cm_session, mock_session = _mock_aiohttp_session([])
+        _, mock_session = _mock_aiohttp_session([])
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             cmd = ClimateSetHvacMode(entity_id="climate.quarto", hvac_mode="heat")
             asyncio.get_event_loop().run_until_complete(repo.set_hvac_mode(cmd))
 
@@ -451,9 +447,9 @@ class TestSetHvacMode:
         SmartHomeHvacMode enum instance. HA REST API does not accept Python objects.
         """
         repo = _make_repo()
-        mock_cm_session, mock_session = _mock_aiohttp_session([])
+        _, mock_session = _mock_aiohttp_session([])
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             cmd = ClimateSetHvacMode(entity_id="climate.sala", hvac_mode="cool")
             asyncio.get_event_loop().run_until_complete(repo.set_hvac_mode(cmd))
 
@@ -477,9 +473,9 @@ class TestTurnOn:
     def test_turn_on__sends_correct_url(self):
         """POST must be sent to /api/services/climate/turn_on."""
         repo = _make_repo()
-        mock_cm_session, mock_session = _mock_aiohttp_session([])
+        _, mock_session = _mock_aiohttp_session([])
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             cmd = ClimateTurnOn(entity_id="climate.sala")
             asyncio.get_event_loop().run_until_complete(repo.turn_on(cmd))
 
@@ -494,9 +490,9 @@ class TestTurnOn:
     def test_turn_on__payload_contains_entity_id(self):
         """The POST body must include the entity_id field."""
         repo = _make_repo()
-        mock_cm_session, mock_session = _mock_aiohttp_session([])
+        _, mock_session = _mock_aiohttp_session([])
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             cmd = ClimateTurnOn(entity_id="climate.quarto")
             asyncio.get_event_loop().run_until_complete(repo.turn_on(cmd))
 
@@ -510,9 +506,9 @@ class TestTurnOn:
         """turn_on must return the response body as a dict."""
         repo = _make_repo()
         expected_response = {"result": "ok"}
-        mock_cm_session, _ = _mock_aiohttp_session(expected_response)
+        _, mock_session = _mock_aiohttp_session(expected_response)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             cmd = ClimateTurnOn(entity_id="climate.sala")
             result = asyncio.get_event_loop().run_until_complete(repo.turn_on(cmd))
 
@@ -530,9 +526,9 @@ class TestTurnOff:
     def test_turn_off__sends_correct_url(self):
         """POST must be sent to /api/services/climate/turn_off."""
         repo = _make_repo()
-        mock_cm_session, mock_session = _mock_aiohttp_session([])
+        _, mock_session = _mock_aiohttp_session([])
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             cmd = ClimateTurnOff(entity_id="climate.sala")
             asyncio.get_event_loop().run_until_complete(repo.turn_off(cmd))
 
@@ -547,9 +543,9 @@ class TestTurnOff:
     def test_turn_off__payload_contains_entity_id(self):
         """The POST body must include the entity_id field."""
         repo = _make_repo()
-        mock_cm_session, mock_session = _mock_aiohttp_session([])
+        _, mock_session = _mock_aiohttp_session([])
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             cmd = ClimateTurnOff(entity_id="climate.quarto")
             asyncio.get_event_loop().run_until_complete(repo.turn_off(cmd))
 
@@ -563,9 +559,9 @@ class TestTurnOff:
         """turn_off must return the response body as a dict when JSON is available."""
         repo = _make_repo()
         expected_response = [{"result": "ok"}]
-        mock_cm_session, _ = _mock_aiohttp_session(expected_response)
+        _, mock_session = _mock_aiohttp_session(expected_response)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             cmd = ClimateTurnOff(entity_id="climate.sala")
             result = asyncio.get_event_loop().run_until_complete(repo.turn_off(cmd))
 
@@ -580,9 +576,9 @@ class TestTurnOff:
         the HTTP status and a generic message instead of propagating the exception.
         """
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session_content_type_error(status=200)
+        _, mock_session = _mock_aiohttp_session_content_type_error(status=200)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             cmd = ClimateTurnOff(entity_id="climate.sala")
             result = asyncio.get_event_loop().run_until_complete(repo.turn_off(cmd))
 
@@ -594,4 +590,64 @@ class TestTurnOff:
         )
         assert "message" in result, (
             f"Expected 'message' key in fallback dict, got: {result!r}"
+        )
+
+
+# ===========================================================================
+# TestSessionReuse — aiohttp.ClientSession must be created at most once
+# ===========================================================================
+#
+# Contract (Milestone 2B-2): the adapter reuses a single aiohttp.ClientSession
+# across calls via _get_session(). Calling a method twice must instantiate
+# aiohttp.ClientSession AT MOST ONCE.
+#
+# RED today: every method opens `async with aiohttp.ClientSession() as session`,
+# so two calls instantiate the session twice (call_count == 2).
+
+
+def _make_reusable_session(json_response):
+    """
+    Build a single session mock that works regardless of whether production
+    uses it as a context manager (`async with aiohttp.ClientSession() as s`)
+    or directly via _get_session() (`s = self._get_session()`).
+
+    The session enters itself (`__aenter__` returns the same object), so the
+    `.get`/`.post` calls — which return the response context manager — are
+    always reachable. Only the instantiation count is asserted by the caller.
+    """
+    mock_resp = AsyncMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.json = AsyncMock(return_value=json_response)
+    mock_resp.status = 200
+
+    mock_cm_resp = AsyncMock()
+    mock_cm_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_cm_resp.__aexit__ = AsyncMock(return_value=False)
+
+    mock_session = AsyncMock()
+    mock_session.get = MagicMock(return_value=mock_cm_resp)
+    mock_session.post = MagicMock(return_value=mock_cm_resp)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+    return mock_session
+
+
+class TestSessionReuse:
+    def test_get_state__called_twice__client_session_instantiated_once(self):
+        repo = _make_repo()
+        mock_session = _make_reusable_session(_make_ha_climate_state_response())
+
+        with patch(
+            "aiohttp.ClientSession", return_value=mock_session
+        ) as client_session_cls:
+            asyncio.get_event_loop().run_until_complete(
+                repo.get_state(entity_id="climate.sala")
+            )
+            asyncio.get_event_loop().run_until_complete(
+                repo.get_state(entity_id="climate.sala")
+            )
+
+        assert client_session_cls.call_count == 1, (
+            f"Expected aiohttp.ClientSession to be instantiated once across two "
+            f"calls (session reuse), got {client_session_cls.call_count}"
         )

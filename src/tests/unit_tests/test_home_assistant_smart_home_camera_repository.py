@@ -135,7 +135,7 @@ def _mock_aiohttp_error_session(status_code: int = 404):
     mock_cm_session.__aenter__ = AsyncMock(return_value=mock_session)
     mock_cm_session.__aexit__ = AsyncMock(return_value=False)
 
-    return mock_cm_session
+    return mock_cm_session, mock_session
 
 
 # ===========================================================================
@@ -150,7 +150,7 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetState:
         get_state must return a SmartHomeCamera instance populated from the HA response.
         """
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session_json(
+        _, mock_session = _mock_aiohttp_session_json(
             _make_ha_camera_state_response(
                 entity_id="camera.cozinha",
                 state="idle",
@@ -158,7 +158,7 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetState:
             )
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state("camera.cozinha")
             )
@@ -170,11 +170,11 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetState:
     def test_get_state__entity_id_mapped_correctly(self):
         """entity_id in the returned SmartHomeCamera must match the requested entity_id."""
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session_json(
+        _, mock_session = _mock_aiohttp_session_json(
             _make_ha_camera_state_response(entity_id="camera.cozinha")
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state("camera.cozinha")
             )
@@ -186,11 +186,11 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetState:
     def test_get_state__state_mapped_from_ha_response(self):
         """The 'state' field in the HA response must be mapped to SmartHomeCamera.state."""
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session_json(
+        _, mock_session = _mock_aiohttp_session_json(
             _make_ha_camera_state_response(state="recording")
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state("camera.cozinha")
             )
@@ -202,11 +202,11 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetState:
     def test_get_state__friendly_name_mapped_from_attributes(self):
         """friendly_name must be populated from attributes.friendly_name in the HA response."""
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session_json(
+        _, mock_session = _mock_aiohttp_session_json(
             _make_ha_camera_state_response(friendly_name="Camera da Cozinha")
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state("camera.cozinha")
             )
@@ -218,11 +218,11 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetState:
     def test_get_state__is_available_true_when_state_is_not_unavailable(self):
         """When HA state is not 'unavailable', is_available must be True."""
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session_json(
+        _, mock_session = _mock_aiohttp_session_json(
             _make_ha_camera_state_response(state="idle")
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state("camera.cozinha")
             )
@@ -234,11 +234,11 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetState:
     def test_get_state__is_available_false_when_state_is_unavailable(self):
         """When HA state is 'unavailable', is_available must be False."""
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session_json(
+        _, mock_session = _mock_aiohttp_session_json(
             _make_ha_camera_state_response(state="unavailable")
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_state("camera.cozinha")
             )
@@ -254,11 +254,11 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetState:
         """
         repo = _make_repo()
         entity_id = "camera.cozinha"
-        mock_cm_session, mock_session = _mock_aiohttp_session_json(
+        _, mock_session = _mock_aiohttp_session_json(
             _make_ha_camera_state_response(entity_id=entity_id)
         )
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             asyncio.get_event_loop().run_until_complete(repo.get_state(entity_id))
 
         called_url = mock_session.get.call_args[0][0]
@@ -275,9 +275,9 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetState:
     def test_get_state__ha_returns_404__propagates_exception(self):
         """A 4xx response from HA must propagate as aiohttp.ClientResponseError."""
         repo = _make_repo()
-        mock_cm_session = _mock_aiohttp_error_session(status_code=404)
+        _, mock_session = _mock_aiohttp_error_session(status_code=404)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             with pytest.raises(aiohttp.ClientResponseError):
                 asyncio.get_event_loop().run_until_complete(
                     repo.get_state("camera.nonexistent")
@@ -286,9 +286,9 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetState:
     def test_get_state__ha_returns_500__propagates_exception(self):
         """A 5xx response from HA must propagate as aiohttp.ClientResponseError."""
         repo = _make_repo()
-        mock_cm_session = _mock_aiohttp_error_session(status_code=500)
+        _, mock_session = _mock_aiohttp_error_session(status_code=500)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             with pytest.raises(aiohttp.ClientResponseError):
                 asyncio.get_event_loop().run_until_complete(
                     repo.get_state("camera.cozinha")
@@ -309,9 +309,9 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetSnapshot:
         """
         repo = _make_repo()
         fake_jpeg = b"\xff\xd8\xff\xe0\x00fake_jpeg_content"
-        mock_cm_session, _ = _mock_aiohttp_session_bytes(fake_jpeg)
+        _, mock_session = _mock_aiohttp_session_bytes(fake_jpeg)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_snapshot("camera.cozinha")
             )
@@ -323,9 +323,9 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetSnapshot:
     def test_get_snapshot__entity_id_mapped_correctly(self):
         """entity_id in the returned SmartHomeCameraSnapshot must match the requested entity."""
         repo = _make_repo()
-        mock_cm_session, _ = _mock_aiohttp_session_bytes(b"fake_image")
+        _, mock_session = _mock_aiohttp_session_bytes(b"fake_image")
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_snapshot("camera.cozinha")
             )
@@ -338,9 +338,9 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetSnapshot:
         """image_bytes in the snapshot must contain the exact bytes from the HA response."""
         repo = _make_repo()
         expected_bytes = b"\xff\xd8\xff\xe0real_jpeg_data_here"
-        mock_cm_session, _ = _mock_aiohttp_session_bytes(expected_bytes)
+        _, mock_session = _mock_aiohttp_session_bytes(expected_bytes)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             result = asyncio.get_event_loop().run_until_complete(
                 repo.get_snapshot("camera.cozinha")
             )
@@ -356,9 +356,9 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetSnapshot:
         """
         repo = _make_repo()
         entity_id = "camera.cozinha"
-        mock_cm_session, mock_session = _mock_aiohttp_session_bytes(b"fake_image")
+        _, mock_session = _mock_aiohttp_session_bytes(b"fake_image")
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             asyncio.get_event_loop().run_until_complete(repo.get_snapshot(entity_id))
 
         called_url = mock_session.get.call_args[0][0]
@@ -378,9 +378,9 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetSnapshot:
         /api/camera_proxy. Using the wrong endpoint would return JSON, not bytes.
         """
         repo = _make_repo()
-        mock_cm_session, mock_session = _mock_aiohttp_session_bytes(b"img")
+        _, mock_session = _mock_aiohttp_session_bytes(b"img")
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             asyncio.get_event_loop().run_until_complete(
                 repo.get_snapshot("camera.cozinha")
             )
@@ -393,9 +393,9 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetSnapshot:
     def test_get_snapshot__ha_returns_404__propagates_exception(self):
         """A 4xx response must propagate as aiohttp.ClientResponseError."""
         repo = _make_repo()
-        mock_cm_session = _mock_aiohttp_error_session(status_code=404)
+        _, mock_session = _mock_aiohttp_error_session(status_code=404)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             with pytest.raises(aiohttp.ClientResponseError):
                 asyncio.get_event_loop().run_until_complete(
                     repo.get_snapshot("camera.nonexistent")
@@ -404,10 +404,71 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetSnapshot:
     def test_get_snapshot__ha_returns_500__propagates_exception(self):
         """A 5xx response must propagate as aiohttp.ClientResponseError."""
         repo = _make_repo()
-        mock_cm_session = _mock_aiohttp_error_session(status_code=500)
+        _, mock_session = _mock_aiohttp_error_session(status_code=500)
 
-        with patch("aiohttp.ClientSession", return_value=mock_cm_session):
+        with patch.object(repo, "_get_session", return_value=mock_session):
             with pytest.raises(aiohttp.ClientResponseError):
                 asyncio.get_event_loop().run_until_complete(
                     repo.get_snapshot("camera.cozinha")
                 )
+
+
+# ===========================================================================
+# TestSessionReuse — aiohttp.ClientSession must be created at most once
+# ===========================================================================
+#
+# Contract (Milestone 2B-2): the adapter reuses a single aiohttp.ClientSession
+# across calls via _get_session(). Calling a method twice must instantiate
+# aiohttp.ClientSession AT MOST ONCE.
+#
+# RED today: every method opens `async with aiohttp.ClientSession() as session`,
+# so two calls instantiate the session twice (call_count == 2).
+
+
+def _make_reusable_session_bytes(image_bytes: bytes):
+    """
+    Build a single session mock that works regardless of whether production
+    uses it as a context manager (`async with aiohttp.ClientSession() as s`)
+    or directly via _get_session() (`s = self._get_session()`).
+
+    The session enters itself (`__aenter__` returns the same object), so the
+    `.get` call — which returns the response context manager whose .read()
+    yields the image bytes — is always reachable. Only the instantiation count
+    is asserted by the caller.
+    """
+    mock_resp = AsyncMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.read = AsyncMock(return_value=image_bytes)
+    mock_resp.status = 200
+
+    mock_cm_resp = AsyncMock()
+    mock_cm_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_cm_resp.__aexit__ = AsyncMock(return_value=False)
+
+    mock_session = AsyncMock()
+    mock_session.get = MagicMock(return_value=mock_cm_resp)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+    return mock_session
+
+
+@_SKIP_IF_NOT_IMPLEMENTED
+class TestSessionReuse:
+    def test_get_snapshot__called_twice__client_session_instantiated_once(self):
+        repo = _make_repo()
+        mock_session = _make_reusable_session_bytes(b"fake_image")
+
+        with patch(
+            "aiohttp.ClientSession", return_value=mock_session
+        ) as client_session_cls:
+            asyncio.get_event_loop().run_until_complete(
+                repo.get_snapshot("camera.cozinha")
+            )
+            asyncio.get_event_loop().run_until_complete(
+                repo.get_snapshot("camera.cozinha")
+            )
+
+        assert client_session_cls.call_count == 1, (
+            f"Expected aiohttp.ClientSession to be instantiated once across two "
+            f"calls (session reuse), got {client_session_cls.call_count}"
+        )

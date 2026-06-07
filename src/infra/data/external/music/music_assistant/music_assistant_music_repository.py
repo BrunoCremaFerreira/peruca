@@ -49,10 +49,10 @@ class MusicAssistantMusicRepository(MusicRepository):
 
     async def get_players(self) -> List[MusicPlayer]:
         url = f"{self.base_url}/api/players"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=self._headers()) as resp:
-                resp.raise_for_status()
-                data = await resp.json()
+        session = self._get_session()
+        async with session.get(url, headers=self._headers()) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
 
         players: List[MusicPlayer] = []
         for item in data or []:
@@ -74,10 +74,10 @@ class MusicAssistantMusicRepository(MusicRepository):
             "media_types": "track,artist,playlist,album",
             "limit": limit,
         }
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=self._headers(), params=params) as resp:
-                resp.raise_for_status()
-                data = await resp.json()
+        session = self._get_session()
+        async with session.get(url, headers=self._headers(), params=params) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
 
         results: List[MusicSearchResult] = []
         # Music Assistant returns a dict of media_type -> list
@@ -115,22 +115,22 @@ class MusicAssistantMusicRepository(MusicRepository):
             "media_id": media_id,
             "media_type": media_type,
         }
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=self._headers(), json=payload) as resp:
-                resp.raise_for_status()
-                return await resp.json()
+        session = self._get_session()
+        async with session.post(url, headers=self._headers(), json=payload) as resp:
+            resp.raise_for_status()
+            return await resp.json()
 
     async def player_command(self, player_id: str, command: str) -> dict:
         url = f"{self.base_url}/api/players/player_command"
         payload = {"player_id": player_id, "command": command}
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=self._headers(), json=payload) as resp:
-                resp.raise_for_status()
-                return await resp.json()
+        session = self._get_session()
+        async with session.post(url, headers=self._headers(), json=payload) as resp:
+            resp.raise_for_status()
+            return await resp.json()
 
     async def set_volume(self, player_id: str, volume: int) -> dict:
         url = f"{self.base_url}/api/players/{player_id}/volume_set/{volume}"
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=self._headers()) as resp:
-                resp.raise_for_status()
-                return await resp.json()
+        session = self._get_session()
+        async with session.post(url, headers=self._headers()) as resp:
+            resp.raise_for_status()
+            return await resp.json()

@@ -1,3 +1,4 @@
+import time
 from typing import List, Optional
 
 from domain.entities import MusicPlayer, MusicSearchResult
@@ -9,12 +10,27 @@ class MusicService:
     Domain service for Music Assistant operations.
     """
 
-    def __init__(self, music_repository: MusicRepository) -> None:
+    def __init__(
+        self, music_repository: MusicRepository, players_cache_ttl: float = 3.0
+    ) -> None:
         self._repository = music_repository
+        self._players_cache_ttl = players_cache_ttl
+        self._players_cache: Optional[List[MusicPlayer]] = None
+        self._players_cache_at = 0.0
 
     async def get_players(self) -> List[MusicPlayer]:
-        """Return all available media players."""
-        return await self._repository.get_players()
+        """Return all available media players, cached for players_cache_ttl seconds."""
+        now = time.monotonic()
+        if (
+            self._players_cache is not None
+            and now - self._players_cache_at < self._players_cache_ttl
+        ):
+            return self._players_cache
+
+        players = await self._repository.get_players()
+        self._players_cache = players
+        self._players_cache_at = now
+        return players
 
     async def search_and_play(
         self, query: str, media_type: str, player_id: str

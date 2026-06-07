@@ -1,4 +1,5 @@
 import asyncio
+from infra import async_runner
 import json
 from typing import List, Optional, TypedDict
 
@@ -124,7 +125,7 @@ class SmartHomeSensorsGraph(Graph):
                     fetched.append(f"{name}: {value}")
             return fetched
 
-        lines = asyncio.run(_fetch_states(entity_ids))
+        lines = async_runner.run(_fetch_states(entity_ids))
         return {"output_query_current_state": "\n".join(lines) if lines else ""}
 
     def _handle_query_history(self, data):
@@ -169,7 +170,7 @@ class SmartHomeSensorsGraph(Graph):
                     fetched.append(f"{eid}: sem histórico")
             return fetched
 
-        lines = asyncio.run(_fetch_histories(entity_ids, hours_back))
+        lines = async_runner.run(_fetch_histories(entity_ids, hours_back))
         return {"output_query_history": "\n".join(lines) if lines else ""}
 
     def _handle_not_recognized(self, data):
@@ -257,7 +258,7 @@ class SmartHomeSensorsGraph(Graph):
                 print("[SmartHomeSensorsGraph._find_entity_ids][ERROR]: Timeout")
                 return "None"
 
-        entity_ids_str = asyncio.run(_invoke_with_timeout())
+        entity_ids_str = async_runner.run(_invoke_with_timeout())
 
         entity_ids = entity_ids_str.split("|")
         entity_ids = [e for e in entity_ids if e.upper() != "NONE" and e.strip() != ""]
