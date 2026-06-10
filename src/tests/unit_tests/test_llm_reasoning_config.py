@@ -129,16 +129,17 @@ class TestSettingsReasoningFields:
     RED: none of these attributes exist on Settings yet.
     """
 
-    def test_settings__has_global_llm_reasoning_default_none(self):
+    def test_settings__has_global_llm_reasoning_default_false(self):
         from infra.settings import Settings
 
         settings = Settings()
         assert hasattr(settings, "llm_reasoning"), (
             "Settings must expose the global `llm_reasoning` field."
         )
-        assert settings.llm_reasoning is None, (
-            f"Default llm_reasoning must be None (do not send `think` to the API "
-            f"by default), got {settings.llm_reasoning!r}."
+        assert settings.llm_reasoning is False, (
+            f"Default llm_reasoning must be False (disable thinking by default so "
+            f"the configured gemma4 model stops wasting reasoning tokens), got "
+            f"{settings.llm_reasoning!r}."
         )
 
     @pytest.mark.parametrize("field_name", _PER_GRAPH_REASONING_FIELDS)

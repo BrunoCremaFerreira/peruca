@@ -32,10 +32,12 @@ class Settings(BaseSettings):
     llm_num_ctx: int = 8192
     # Token generation cap; -1 means no limit (neutral default).
     llm_num_predict: int = -1
-    # Reasoning/thinking mode for the model. None = omit the `think` param
-    # (safe default for models that reject it); False = disable thinking
-    # (gemma4 — avoids ~350-500 wasted reasoning tokens per call); True = enable.
-    llm_reasoning: bool | None = None
+    # Reasoning/thinking mode for the model. False (default) disables thinking
+    # so the configured gemma4 model stops emitting ~350-500 wasted reasoning
+    # tokens per call (the dominant /chat latency cost). True enables it. Set
+    # to empty (LLM_REASONING=) to omit the `think` param entirely — needed
+    # only for models that reject it. Per-graph overrides win when not None.
+    llm_reasoning: bool | None = False
 
     # ===============================
     # LLM Models config
