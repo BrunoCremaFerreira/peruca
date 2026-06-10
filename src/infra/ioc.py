@@ -116,6 +116,7 @@ def get_main_graph() -> MainGraph:
         llm_chat = get_llm_chat(
             model=settings.llm_main_graph_chat_model,
             temperature=settings.llm_main_graph_chat_temperature,
+            reasoning=_resolve_reasoning(settings.llm_main_graph_chat_reasoning),
         )
 
         only_talk_graph = get_only_talk_graph()
@@ -153,6 +154,7 @@ def get_memory_graph() -> MemoryGraph:
         llm_chat = get_llm_chat(
             model=settings.llm_memory_graph_chat_model,
             temperature=settings.llm_memory_graph_chat_temperature,
+            reasoning=_resolve_reasoning(settings.llm_memory_graph_chat_reasoning),
         )
 
         _repo_cache[cache_key] = MemoryGraph(
@@ -174,6 +176,7 @@ def get_only_talk_graph() -> OnlyTalkGraph:
         llm_chat = get_llm_chat(
             model=settings.llm_only_talk_graph_chat_model,
             temperature=settings.llm_only_talk_graph_chat_temperature,
+            reasoning=_resolve_reasoning(settings.llm_only_talk_graph_chat_reasoning),
         )
 
         _repo_cache[cache_key] = OnlyTalkGraph(
@@ -195,6 +198,9 @@ def get_shopping_list_graph() -> ShoppingListGraph:
         llm_chat = get_llm_chat(
             model=settings.llm_shopping_list_graph_chat_model,
             temperature=settings.llm_shopping_list_graph_chat_temperature,
+            reasoning=_resolve_reasoning(
+                settings.llm_shopping_list_graph_chat_reasoning
+            ),
         )
 
         shopping_list_service = get_shopping_list_service()
@@ -221,6 +227,9 @@ def get_smart_home_lights_graph() -> SmartHomeLightsGraph:
         llm_chat = get_llm_chat(
             model=settings.llm_smart_home_lights_graph_chat_model,
             temperature=settings.llm_smart_home_lights_graph_chat_temperature,
+            reasoning=_resolve_reasoning(
+                settings.llm_smart_home_lights_graph_chat_reasoning
+            ),
         )
 
         smart_home_service = get_smart_home_service()
@@ -250,6 +259,9 @@ def get_smart_home_climate_graph() -> SmartHomeClimateGraph:
         llm_chat = get_llm_chat(
             model=settings.llm_smart_home_climate_graph_chat_model,
             temperature=settings.llm_smart_home_climate_graph_chat_temperature,
+            reasoning=_resolve_reasoning(
+                settings.llm_smart_home_climate_graph_chat_reasoning
+            ),
         )
 
         smart_home_service = get_smart_home_service()
@@ -277,6 +289,9 @@ def get_smart_home_sensors_graph() -> SmartHomeSensorsGraph:
         llm_chat = get_llm_chat(
             model=settings.llm_smart_home_sensors_graph_chat_model,
             temperature=settings.llm_smart_home_sensors_graph_chat_temperature,
+            reasoning=_resolve_reasoning(
+                settings.llm_smart_home_sensors_graph_chat_reasoning
+            ),
         )
 
         smart_home_service = get_smart_home_service()
@@ -304,6 +319,9 @@ def get_smart_home_cameras_graph() -> SmartHomeCamerasGraph:
         llm_chat = get_llm_chat(
             model=settings.llm_smart_home_cameras_graph_chat_model,
             temperature=settings.llm_smart_home_cameras_graph_chat_temperature,
+            reasoning=_resolve_reasoning(
+                settings.llm_smart_home_cameras_graph_chat_reasoning
+            ),
         )
 
         smart_home_service = get_smart_home_service()
@@ -331,6 +349,7 @@ def get_music_graph() -> MusicGraph:
         llm_chat = get_llm_chat(
             model=settings.llm_music_graph_chat_model,
             temperature=settings.llm_music_graph_chat_temperature,
+            reasoning=_resolve_reasoning(settings.llm_music_graph_chat_reasoning),
         )
 
         _repo_cache[cache_key] = MusicGraph(
@@ -646,7 +665,21 @@ def get_home_assistant_smart_home_configuration_repository() -> (
 # ====================================
 
 
-def get_llm_chat(model: str, temperature: float) -> BaseChatModel:
+def _resolve_reasoning(per_graph_value: bool | None) -> bool | None:
+    """
+    Resolve a per-graph reasoning override against the global setting: return the
+    per-graph value when it is not None, otherwise fall back to
+    settings.llm_reasoning.
+    """
+
+    if per_graph_value is not None:
+        return per_graph_value
+    return _get_settings().llm_reasoning
+
+
+def get_llm_chat(
+    model: str, temperature: float, reasoning: bool | None = None
+) -> BaseChatModel:
     """
     Return LLM provider
     """
@@ -661,7 +694,7 @@ def get_llm_chat(model: str, temperature: float) -> BaseChatModel:
             api_key=settings.llm_provider_api_key,
         )
     elif provider_type == "OLLAMA":
-        return ChatOllama(
+        kwargs = dict(
             base_url=settings.llm_provider_url,
             model=model,
             temperature=temperature,
@@ -669,5 +702,8 @@ def get_llm_chat(model: str, temperature: float) -> BaseChatModel:
             num_ctx=settings.llm_num_ctx,
             num_predict=settings.llm_num_predict,
         )
+        if reasoning is not None:
+            kwargs["reasoning"] = reasoning
+        return ChatOllama(**kwargs)
     else:
         raise ValueError(f"Invalid provider type: {provider_type!r}")

@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     llm_num_ctx: int = 8192
     # Token generation cap; -1 means no limit (neutral default).
     llm_num_predict: int = -1
+    # Reasoning/thinking mode for the model. None = omit the `think` param
+    # (safe default for models that reject it); False = disable thinking
+    # (gemma4 — avoids ~350-500 wasted reasoning tokens per call); True = enable.
+    llm_reasoning: bool | None = None
 
     # ===============================
     # LLM Models config
@@ -42,27 +46,36 @@ class Settings(BaseSettings):
     # other classifier graphs (sensors/cameras at 0.1). Higher values made
     # borderline commands flap between runs.
     llm_main_graph_chat_temperature: float = 0.1
+    # Per-graph reasoning override; None inherits the global `llm_reasoning`.
+    llm_main_graph_chat_reasoning: bool | None = None
 
     llm_only_talk_graph_chat_model: str = "gemma4:12b"
     llm_only_talk_graph_chat_temperature: float = 0.5
+    llm_only_talk_graph_chat_reasoning: bool | None = None
 
     llm_shopping_list_graph_chat_model: str = "gemma4:12b"
     llm_shopping_list_graph_chat_temperature: float = 0.5
+    llm_shopping_list_graph_chat_reasoning: bool | None = None
 
     llm_smart_home_lights_graph_chat_model: str = "gemma4:12b"
     llm_smart_home_lights_graph_chat_temperature: float = 0.5
+    llm_smart_home_lights_graph_chat_reasoning: bool | None = None
 
     llm_smart_home_climate_graph_chat_model: str = "gemma4:12b"
     llm_smart_home_climate_graph_chat_temperature: float = 0.1
+    llm_smart_home_climate_graph_chat_reasoning: bool | None = None
 
     llm_smart_home_sensors_graph_chat_model: str = "gemma4:12b"
     llm_smart_home_sensors_graph_chat_temperature: float = 0.1
+    llm_smart_home_sensors_graph_chat_reasoning: bool | None = None
 
     llm_smart_home_cameras_graph_chat_model: str = "gemma4:12b"
     llm_smart_home_cameras_graph_chat_temperature: float = 0.1
+    llm_smart_home_cameras_graph_chat_reasoning: bool | None = None
 
     llm_memory_graph_chat_model: str = "gemma4:12b"
     llm_memory_graph_chat_temperature: float = 0.1
+    llm_memory_graph_chat_reasoning: bool | None = None
 
     # ===============================
     # NLP Models config
@@ -84,6 +97,7 @@ class Settings(BaseSettings):
     music_assistant_token: str = ""
     llm_music_graph_chat_model: str = "gemma4:12b"
     llm_music_graph_chat_temperature: float = 0.3
+    llm_music_graph_chat_reasoning: bool | None = None
 
     # ===============================
     # Databases Config
