@@ -36,31 +36,31 @@ class Settings(BaseSettings):
     # LLM Models config
     # ===============================
 
-    llm_main_graph_chat_model: str = "qwen3:14b"
+    llm_main_graph_chat_model: str = "gemma4:12b"
     # Intent classification must be near-deterministic — keep it low like the
     # other classifier graphs (sensors/cameras at 0.1). Higher values made
     # borderline commands flap between runs.
     llm_main_graph_chat_temperature: float = 0.1
 
-    llm_only_talk_graph_chat_model: str = "qwen3:14b"
+    llm_only_talk_graph_chat_model: str = "gemma4:12b"
     llm_only_talk_graph_chat_temperature: float = 0.5
 
-    llm_shopping_list_graph_chat_model: str = "qwen3:14b"
+    llm_shopping_list_graph_chat_model: str = "gemma4:12b"
     llm_shopping_list_graph_chat_temperature: float = 0.5
 
-    llm_smart_home_lights_graph_chat_model: str = "qwen3:14b"
+    llm_smart_home_lights_graph_chat_model: str = "gemma4:12b"
     llm_smart_home_lights_graph_chat_temperature: float = 0.5
 
-    llm_smart_home_climate_graph_chat_model: str = "qwen3:14b"
+    llm_smart_home_climate_graph_chat_model: str = "gemma4:12b"
     llm_smart_home_climate_graph_chat_temperature: float = 0.1
 
-    llm_smart_home_sensors_graph_chat_model: str = "qwen3:14b"
+    llm_smart_home_sensors_graph_chat_model: str = "gemma4:12b"
     llm_smart_home_sensors_graph_chat_temperature: float = 0.1
 
-    llm_smart_home_cameras_graph_chat_model: str = "qwen3:14b"
+    llm_smart_home_cameras_graph_chat_model: str = "gemma4:12b"
     llm_smart_home_cameras_graph_chat_temperature: float = 0.1
 
-    llm_memory_graph_chat_model: str = "qwen3:14b"
+    llm_memory_graph_chat_model: str = "gemma4:12b"
     llm_memory_graph_chat_temperature: float = 0.1
 
     # ===============================
@@ -81,7 +81,7 @@ class Settings(BaseSettings):
 
     music_assistant_url: str = "http://localhost:8095"
     music_assistant_token: str = ""
-    llm_music_graph_chat_model: str = "qwen3:14b"
+    llm_music_graph_chat_model: str = "gemma4:12b"
     llm_music_graph_chat_temperature: float = 0.3
 
     # ===============================
