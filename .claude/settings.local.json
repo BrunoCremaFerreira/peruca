@@ -11,7 +11,28 @@
       "Bash(python -m pytest tests/integration_tests/ --collect-only)",
       "Bash(python3 -m pytest tests/integration_tests/ --collect-only)",
       "Bash(.venv/bin/pytest tests/integration_tests/ --collect-only)",
-      "Bash(.venv/bin/pytest tests/unit_tests/ --collect-only)"
+      "Bash(.venv/bin/pytest tests/unit_tests/ --collect-only)",
+      "Bash(python -m pytest tests/unit_tests/test_graph_base.py --collect-only -q)",
+      "Bash(python3 -m pytest tests/unit_tests/test_graph_base.py --collect-only -q)",
+      "Bash(.venv/bin/python -m pytest tests/unit_tests/test_graph_base.py --collect-only -q)",
+      "Bash(.venv/bin/python -m pytest tests/unit_tests/test_graph_base.py -v --tb=no -q)",
+      "Bash(.venv/bin/python -m pytest tests/unit_tests/test_graph_base.py::TestLoadPromptStripThinkDirectiveFlag::test_load_prompt__strip_flag_false_ollama__preserves_directive -v --tb=short)",
+      "Bash(.venv/bin/python -m pytest tests/unit_tests/test_graph_base.py --collect-only)",
+      "Bash(.venv/bin/python -m pytest tests/unit_tests/test_graph_base.py -v)",
+      "Bash(.venv/bin/python -m pytest tests/unit_tests/test_graph_base.py::TestExtractStructuredOutputCleanInput tests/unit_tests/test_graph_base.py::TestExtractStructuredOutputProseAround tests/unit_tests/test_graph_base.py::TestExtractStructuredOutputMarkdownFences tests/unit_tests/test_graph_base.py::TestExtractStructuredOutputCurlyQuotes tests/unit_tests/test_graph_base.py::TestExtractStructuredOutputThinkBlocks tests/unit_tests/test_graph_base.py::TestExtractStructuredOutputNoStructure tests/unit_tests/test_graph_base.py::TestExtractStructuredOutputFirstMatch tests/unit_tests/test_graph_base.py::TestLoadPromptStripThinkDirectiveFlag -v)",
+      "Bash(.venv/bin/python *)",
+      "Bash(python3 *)",
+      "Bash(curl -s http://unix.rtx-server:11434/api/ps)",
+      "Bash(git -C /home/brn/projects/peruca log --oneline -5 -- src/infra/settings.py)",
+      "Bash(git -C /home/brn/projects/peruca show 935af0c --stat)",
+      "Bash(curl -s --max-time 5 http://localhost:8000/docs -o /dev/null -w \"localhost:8000 -> HTTP %{http_code}\\\\n\")",
+      "Bash(curl -s --max-time 5 http://unix.rtx-server:8000/docs -o /dev/null -w \"rtx-server:8000 -> HTTP %{http_code}\\\\n\")",
+      "Bash(pip3 download *)",
+      "Read(//tmp/**)",
+      "Bash(python -m pytest tests/unit_tests/test_llm_reasoning_config.py --collect-only -q)",
+      "Bash(./.venv/bin/python -m pytest tests/unit_tests/test_llm_reasoning_config.py --collect-only -q)",
+      "Bash(./.venv/bin/python -m pytest tests/unit_tests/test_llm_reasoning_config.py -q)",
+      "Bash(./.venv/bin/python -m pytest tests/unit_tests/test_llm_reasoning_config.py -v)"
     ]
   }
 }
