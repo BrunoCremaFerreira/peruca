@@ -24,10 +24,10 @@ Sua tarefa: ler a última mensagem do usuário e identificar APENAS **fatos dur�
 4. Se não houver nenhum fato durável novo, retorne a lista vazia.
 
 📤 **Formato de saída** (estrito, parseável por json.loads — SEM prosa, SEM markdown, SEM blocos de código):
-(caractere abre chave) "memories": ["fato 1", "fato 2"] (caractere fecha chave)
+{{ "memories": ["fato 1", "fato 2"] }}
 
 Quando não houver nada a memorizar:
-(caractere abre chave) "memories": [] (caractere fecha chave)
+{{ "memories": [] }}
 
 🧾 **Memórias já conhecidas sobre o usuário** (NÃO repita nenhuma destas):
 {existing_memories}
@@ -37,32 +37,32 @@ Quando não houver nada a memorizar:
 📚 **Exemplos** (entrada do usuário → saída esperada):
 
 Entrada: "Adoro café sem açúcar de manhã."
-Saída: (caractere abre chave) "memories": ["Prefere café sem açúcar."] (caractere fecha chave)
+Saída: {{ "memories": ["Prefere café sem açúcar."] }}
 
 Entrada: "Meu cachorro se chama Rex e minha filha é a Ana."
-Saída: (caractere abre chave) "memories": ["Tem um cachorro chamado Rex.", "Tem uma filha chamada Ana."] (caractere fecha chave)
+Saída: {{ "memories": ["Tem um cachorro chamado Rex.", "Tem uma filha chamada Ana."] }}
 
 Entrada: "Acende a luz da sala."
-Saída: (caractere abre chave) "memories": [] (caractere fecha chave)
+Saída: {{ "memories": [] }}
 
 Entrada: "Adiciona leite na lista de compras."
-Saída: (caractere abre chave) "memories": [] (caractere fecha chave)
+Saída: {{ "memories": [] }}
 
 Entrada: "Estou com muita fome agora."
-Saída: (caractere abre chave) "memories": [] (caractere fecha chave)
+Saída: {{ "memories": [] }}
 
 Entrada: "Quanto é 12 vezes 8?"
-Saída: (caractere abre chave) "memories": [] (caractere fecha chave)
+Saída: {{ "memories": [] }}
 
 Entrada: "Oi, tudo bem? Obrigado pela ajuda de antes."
-Saída: (caractere abre chave) "memories": [] (caractere fecha chave)
+Saída: {{ "memories": [] }}
 
 Entrada: "Sou engenheiro e moro em Curitiba; trabalho de casa todos os dias."
-Saída: (caractere abre chave) "memories": ["É engenheiro.", "Mora em Curitiba.", "Trabalha de casa todos os dias."] (caractere fecha chave)
+Saída: {{ "memories": ["É engenheiro.", "Mora em Curitiba.", "Trabalha de casa todos os dias."] }}
 
 Exemplo de NÃO duplicar — se "Prefere café sem açúcar." já estiver nas memórias conhecidas:
 Entrada: "Como você sabe, eu tomo meu café sempre sem açúcar."
-Saída: (caractere abre chave) "memories": [] (caractere fecha chave)
+Saída: {{ "memories": [] }}
 
 ---
 

@@ -49,5 +49,7 @@ Você deve classificar a entrada em **uma ou mais** das seguintes categorias:
 `["smart_home_sensors", "shopping_list"]`
 `["music"]`
 
+⚠️ **Importante**: Retorne APENAS a lista Python, sem texto antes ou depois, sem bloco de código markdown, sem explicação.
+
 Agora classifique a seguinte entrada do usuário:  
 **{input}**

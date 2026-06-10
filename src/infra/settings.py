@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     llm_provider_type: str = "OLLAMA"
     llm_provider_url: str = "http://10.10.1.10:11434"
     llm_provider_api_key: str = ""
+    llm_strip_think_directive: bool = True
 
     # Keep the model resident in the Ollama VRAM between requests. Integer
     # seconds: -1 keeps it loaded indefinitely, 0 unloads immediately, e.g.

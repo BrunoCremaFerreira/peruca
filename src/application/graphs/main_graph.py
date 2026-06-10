@@ -38,8 +38,9 @@ class MainGraph(Graph):
         smart_home_cameras_graph: SmartHomeCamerasGraph = None,
         music_graph=None,
         provider: str = "OLLAMA",
+        strip_think_directive: bool = False,
     ):
-        super().__init__(provider)
+        super().__init__(provider, strip_think_directive)
         self.llm_chat = llm_chat
         self.only_talk_graph = only_talk_graph
         self.shopping_list_graph = shopping_list_graph
@@ -74,22 +75,17 @@ class MainGraph(Graph):
             response = chain.invoke(invoke_payload)
         except Exception:
             response = chain.invoke({"input": data["input"].message, "music_is_playing": hint_str})
-        cleaned = self._remove_thinking_tag(response.content)
-        if isinstance(cleaned, str):
-            # Qwen3 mimics the prompt examples and may emit smart/curly quotes,
-            # which eval() rejects. Normalize them so the classification is not
-            # silently lost and collapsed into "only_talking".
-            cleaned = (
-                cleaned.replace("“", '"')
-                .replace("”", '"')
-                .replace("‘", "'")
-                .replace("’", "'")
-            )
+        raw_content = response.content
+        extracted = self._extract_structured_output(raw_content)
+        if extracted is None:
+            print(f"[main_graph.classify_intent] fallback: no structure found. raw={raw_content!r}")
+            return {"intent": ["only_talking"], "input": data["input"]}
         try:
-            intents = eval(cleaned) if isinstance(cleaned, str) else []
+            intents = eval(extracted)
             if isinstance(intents, str):
                 intents = [intents]
-        except:
+        except Exception:
+            print(f"[main_graph.classify_intent] fallback: eval failed. extracted={extracted!r}")
             intents = ["only_talking"]
         return {"intent": intents, "input": data["input"]}
 
@@ -114,19 +110,14 @@ class MainGraph(Graph):
         ]
 
         if len(outputs) <= 1:
-            # A single (or zero) sub-graph output needs no merge — the LLM call
-            # is only meaningful to blend 2+ responses. Return it verbatim.
             response = outputs[0] if outputs else ""
         else:
-            # Merging multiple cathegory responses into a friendly response
             responses = "\n\n".join([f"{i + 1}. {s}" for i, s in enumerate(outputs)])
             final_reponse_chain = self.final_response_prompt | self.llm_chat
             llm_response = final_reponse_chain.invoke(
                 {"input": data["input"].message, "responses": responses}
             )
             response = self._remove_thinking_tag(llm_response.content)
-            # The merge LLM occasionally returns an empty string; never surface
-            # an empty output — fall back to the raw sub-graph responses.
             if not response or not response.strip():
                 response = "\n\n".join(outputs)
 

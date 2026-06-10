@@ -35,7 +35,7 @@ Responda SEMPRE em JSON válido no formato abaixo.
 - Campos de intents não presentes na mensagem devem ter valor `""`.
 - Não use blocos de código markdown nem texto antes/depois. Responda apenas com o JSON, sem raciocínio.
 
-(caractere abre chave)
+{{
   "intents": ["turn_on", "set_temperature"],
   "turn_on": "ar da sala|ar do quarto",
   "turn_off": "",
@@ -43,33 +43,33 @@ Responda SEMPRE em JSON válido no formato abaixo.
   "set_hvac_mode": "",
   "query_state": "",
   "not_recognized": ""
-(caractere fecha chave)
+}}
 
 ## Exemplos:
 
 **Usuário:** Liga o ar da sala.
-(caractere abre chave)"intents": ["turn_on"], "turn_on": "ar da sala", "turn_off": "", "set_temperature": "", "set_hvac_mode": "", "query_state": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["turn_on"], "turn_on": "ar da sala", "turn_off": "", "set_temperature": "", "set_hvac_mode": "", "query_state": "", "not_recognized": ""}}
 
 **Usuário:** Desliga o ar do quarto e o da sala.
-(caractere abre chave)"intents": ["turn_off"], "turn_on": "", "turn_off": "ar do quarto|ar da sala", "set_temperature": "", "set_hvac_mode": "", "query_state": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["turn_off"], "turn_on": "", "turn_off": "ar do quarto|ar da sala", "set_temperature": "", "set_hvac_mode": "", "query_state": "", "not_recognized": ""}}
 
 **Usuário:** Coloca o ar da sala em 22 graus.
-(caractere abre chave)"intents": ["set_temperature"], "turn_on": "", "turn_off": "", "set_temperature": "ar da sala, 22", "set_hvac_mode": "", "query_state": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["set_temperature"], "turn_on": "", "turn_off": "", "set_temperature": "ar da sala, 22", "set_hvac_mode": "", "query_state": "", "not_recognized": ""}}
 
 **Usuário:** Liga o ar do quarto e já coloca em 18 graus no modo frio.
-(caractere abre chave)"intents": ["turn_on", "set_temperature", "set_hvac_mode"], "turn_on": "ar do quarto", "turn_off": "", "set_temperature": "ar do quarto, 18", "set_hvac_mode": "ar do quarto, frio", "query_state": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["turn_on", "set_temperature", "set_hvac_mode"], "turn_on": "ar do quarto", "turn_off": "", "set_temperature": "ar do quarto, 18", "set_hvac_mode": "ar do quarto, frio", "query_state": "", "not_recognized": ""}}
 
 **Usuário:** Muda o ar da sala para modo calor.
-(caractere abre chave)"intents": ["set_hvac_mode"], "turn_on": "", "turn_off": "", "set_temperature": "", "set_hvac_mode": "ar da sala, calor", "query_state": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["set_hvac_mode"], "turn_on": "", "turn_off": "", "set_temperature": "", "set_hvac_mode": "ar da sala, calor", "query_state": "", "not_recognized": ""}}
 
 **Usuário:** Qual a temperatura do ar da sala agora?
-(caractere abre chave)"intents": ["query_state"], "turn_on": "", "turn_off": "", "set_temperature": "", "set_hvac_mode": "", "query_state": "ar da sala", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["query_state"], "turn_on": "", "turn_off": "", "set_temperature": "", "set_hvac_mode": "", "query_state": "ar da sala", "not_recognized": ""}}
 
 **Usuário:** Qual o estado do ar do quarto e do ar da sala?
-(caractere abre chave)"intents": ["query_state"], "turn_on": "", "turn_off": "", "set_temperature": "", "set_hvac_mode": "", "query_state": "ar do quarto|ar da sala", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["query_state"], "turn_on": "", "turn_off": "", "set_temperature": "", "set_hvac_mode": "", "query_state": "ar do quarto|ar da sala", "not_recognized": ""}}
 
 **Usuário:** Quanto tempo falta para o jantar?
-(caractere abre chave)"intents": ["not_recognized"], "turn_on": "", "turn_off": "", "set_temperature": "", "set_hvac_mode": "", "query_state": "", "not_recognized": "clima_nao_relacionado"(caractere fecha chave)
+{{"intents": ["not_recognized"], "turn_on": "", "turn_off": "", "set_temperature": "", "set_hvac_mode": "", "query_state": "", "not_recognized": "clima_nao_relacionado"}}
 
 ## Entrada do usuário:
 {input}

@@ -35,8 +35,9 @@ class ShoppingListGraph(Graph):
         llm_chat: BaseChatModel,
         shopping_list_service: ShoppingListService,
         provider: str = "OLLAMA",
+        strip_think_directive: bool = False,
     ):
-        super().__init__(provider)
+        super().__init__(provider, strip_think_directive)
         self.llm_chat = llm_chat
         self.shopping_list_service = shopping_list_service
         self.classification_prompt = ChatPromptTemplate.from_template(
@@ -49,9 +50,14 @@ class ShoppingListGraph(Graph):
     def _classify_intent(self, data):
         chain = self.classification_prompt | self.llm_chat
         response = chain.invoke({"input": data["input"].message})
-        cleaned = self._remove_thinking_tag(response.content)
+        extracted = self._extract_structured_output(response.content)
+        if extracted is None:
+            return {"intent": ["not_recognized"], "input": data["input"],
+                    "output_add_item": None, "output_edit_item": None,
+                    "output_delete_item": None, "output_check_item": None,
+                    "output_uncheck_item": None}
         try:
-            parsed = eval(cleaned) if isinstance(cleaned, str) else cleaned
+            parsed = eval(extracted)
             intents = parsed.get("intents", ["not_recognized"])
         except Exception:
             parsed = {}
@@ -84,10 +90,8 @@ class ShoppingListGraph(Graph):
         ]
 
         if len(outputs) > 1:
-            # Merging multiple cathegory responses into a friendly response
             response = "\n\n".join([f"{i + 1}. {s}" for i, s in enumerate(outputs)])
         else:
-            # Unique response
             response = outputs[0]
 
         return {"output": response}
@@ -285,9 +289,6 @@ class ShoppingListGraph(Graph):
             if not name:
                 print(f"Warning: Item ignored: '{pair}'")
                 continue
-            # The LLM may emit quantities with units ("2 kg") or words
-            # ("a gosto"). Extract the leading number; default to 1.0 so the
-            # item is never dropped just because the quantity is non-numeric.
             match = re.search(r"\d+(?:[.,]\d+)?", quantity_raw)
             quantity = float(match.group().replace(",", ".")) if match else 1.0
             items.append(ShoppingListItemAdd(name=name, quantity=quantity))

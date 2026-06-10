@@ -28,44 +28,44 @@ Responda SEMPRE em JSON válido no formato abaixo.
 - `query_history`: `"sensor_type|location|hours_back"` — location vazia se não especificada; hours_back é inteiro estimado a partir da expressão do usuário (ex: "hoje" → 24, "essa semana" → 168).
 - Campos de intents não presentes na mensagem devem ter valor `""`.
 
-(caractere abre chave)
+{{
   "intents": ["query_current_state"],
   "query_current_state": "door|cozinha",
   "query_history": "",
   "not_recognized": ""
-(caractere fecha chave)
+}}
 
 ## Exemplos:
 
 **Usuário:** Há alguma porta aberta na casa?
-(caractere abre chave)"intents": ["query_current_state"], "query_current_state": "door|", "query_history": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["query_current_state"], "query_current_state": "door|", "query_history": "", "not_recognized": ""}}
 
 **Usuário:** Alguma janela da cozinha está aberta?
-(caractere abre chave)"intents": ["query_current_state"], "query_current_state": "window|cozinha", "query_history": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["query_current_state"], "query_current_state": "window|cozinha", "query_history": "", "not_recognized": ""}}
 
 **Usuário:** Qual a temperatura do quarto agora?
-(caractere abre chave)"intents": ["query_current_state"], "query_current_state": "temperature|quarto", "query_history": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["query_current_state"], "query_current_state": "temperature|quarto", "query_history": "", "not_recognized": ""}}
 
 **Usuário:** Tem alguém no escritório agora?
-(caractere abre chave)"intents": ["query_current_state"], "query_current_state": "presence|escritório", "query_history": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["query_current_state"], "query_current_state": "presence|escritório", "query_history": "", "not_recognized": ""}}
 
 **Usuário:** Qual a umidade da casa?
-(caractere abre chave)"intents": ["query_current_state"], "query_current_state": "humidity|", "query_history": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["query_current_state"], "query_current_state": "humidity|", "query_history": "", "not_recognized": ""}}
 
 **Usuário:** Houve movimento na lavanderia nas últimas 3 horas?
-(caractere abre chave)"intents": ["query_history"], "query_current_state": "", "query_history": "motion|lavanderia|3", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["query_history"], "query_current_state": "", "query_history": "motion|lavanderia|3", "not_recognized": ""}}
 
 **Usuário:** A porta da frente ficou aberta hoje?
-(caractere abre chave)"intents": ["query_history"], "query_current_state": "", "query_history": "door|frente|24", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["query_history"], "query_current_state": "", "query_history": "door|frente|24", "not_recognized": ""}}
 
 **Usuário:** Teve algum movimento aqui nas últimas 2 horas?
-(caractere abre chave)"intents": ["query_history"], "query_current_state": "", "query_history": "motion||2", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["query_history"], "query_current_state": "", "query_history": "motion||2", "not_recognized": ""}}
 
 **Usuário:** Acende a luz da cozinha.
-(caractere abre chave)"intents": ["not_recognized"], "query_current_state": "", "query_history": "", "not_recognized": "nao_relacionado_a_sensores"(caractere fecha chave)
+{{"intents": ["not_recognized"], "query_current_state": "", "query_history": "", "not_recognized": "nao_relacionado_a_sensores"}}
 
 **Usuário:** Liga o ar-condicionado da sala.
-(caractere abre chave)"intents": ["not_recognized"], "query_current_state": "", "query_history": "", "not_recognized": "nao_relacionado_a_sensores"(caractere fecha chave)
+{{"intents": ["not_recognized"], "query_current_state": "", "query_history": "", "not_recognized": "nao_relacionado_a_sensores"}}
 
 ## Entrada do usuário:
 {input}

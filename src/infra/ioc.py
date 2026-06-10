@@ -136,6 +136,7 @@ def get_main_graph() -> MainGraph:
             smart_home_cameras_graph=smart_home_cameras_graph,
             music_graph=music_graph,
             provider=settings.llm_provider_type,
+            strip_think_directive=settings.llm_strip_think_directive,
         )
     return _repo_cache[cache_key]
 
@@ -202,6 +203,7 @@ def get_shopping_list_graph() -> ShoppingListGraph:
             llm_chat=llm_chat,
             shopping_list_service=shopping_list_service,
             provider=settings.llm_provider_type,
+            strip_think_directive=settings.llm_strip_think_directive,
         )
     return _repo_cache[cache_key]
 
@@ -231,6 +233,7 @@ def get_smart_home_lights_graph() -> SmartHomeLightsGraph:
             smart_home_entity_alias_repository=smart_home_entity_alias_repository,
             smart_home_area_repository=smart_home_area_repository,
             provider=settings.llm_provider_type,
+            strip_think_directive=settings.llm_strip_think_directive,
         )
     return _repo_cache[cache_key]
 
@@ -257,6 +260,7 @@ def get_smart_home_climate_graph() -> SmartHomeClimateGraph:
             smart_home_service=smart_home_service,
             smart_home_entity_alias_repository=smart_home_entity_alias_repository,
             provider=settings.llm_provider_type,
+            strip_think_directive=settings.llm_strip_think_directive,
         )
     return _repo_cache[cache_key]
 
@@ -283,6 +287,7 @@ def get_smart_home_sensors_graph() -> SmartHomeSensorsGraph:
             smart_home_service=smart_home_service,
             smart_home_entity_alias_repository=smart_home_entity_alias_repository,
             provider=settings.llm_provider_type,
+            strip_think_directive=settings.llm_strip_think_directive,
         )
     return _repo_cache[cache_key]
 
@@ -309,6 +314,7 @@ def get_smart_home_cameras_graph() -> SmartHomeCamerasGraph:
             smart_home_service=smart_home_service,
             smart_home_entity_alias_repository=smart_home_entity_alias_repository,
             provider=settings.llm_provider_type,
+            strip_think_directive=settings.llm_strip_think_directive,
         )
     return _repo_cache[cache_key]
 
@@ -331,6 +337,7 @@ def get_music_graph() -> MusicGraph:
             llm_chat=llm_chat,
             music_service=get_music_service(),
             provider=settings.llm_provider_type,
+            strip_think_directive=settings.llm_strip_think_directive,
         )
     return _repo_cache[cache_key]
 

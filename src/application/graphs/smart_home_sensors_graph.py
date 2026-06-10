@@ -35,8 +35,9 @@ class SmartHomeSensorsGraph(Graph):
         smart_home_service: SmartHomeService,
         smart_home_entity_alias_repository: SmartHomeEntityAliasRepository,
         provider: str = "OLLAMA",
+        strip_think_directive: bool = False,
     ):
-        super().__init__(provider)
+        super().__init__(provider, strip_think_directive)
         self.llm_chat = llm_chat
         self.smart_home_service = smart_home_service
         self.smart_home_entity_alias_repository = smart_home_entity_alias_repository
@@ -53,15 +54,13 @@ class SmartHomeSensorsGraph(Graph):
 
         chain = self.classification_prompt | self.llm_chat
         response = chain.invoke({"input": data["input"]})
-        cleaned = self._remove_thinking_tag(response.content)
+        extracted = self._extract_structured_output(response.content)
 
-        print(f"[SmartHomeSensorsGraph._classify_intent]: raw_output={cleaned}")
+        print(f"[SmartHomeSensorsGraph._classify_intent]: raw_output={extracted}")
 
         try:
             try:
-                parsed = (
-                    json.loads(cleaned) if isinstance(cleaned, str) and cleaned else {}
-                )
+                parsed = json.loads(extracted) if extracted else {}
             except (json.JSONDecodeError, ValueError):
                 parsed = {}
 

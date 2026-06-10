@@ -73,7 +73,7 @@ Depois de identificar as intenções, extraia os dados relevantes de acordo com 
 
 Retorne os dados como um dicionário JSON com a chave da intenção e os valores reconhecidos. Exemplo:
 
-(caractere abre chave)
+{{
   "intents": ["add_item", "delete_item"],
   "add_item": "água com gás,1",
   "edit_item": "",
@@ -83,11 +83,11 @@ Retorne os dados como um dicionário JSON com a chave da intenção e os valores
   "list_items": "",
   "clear_items": "",
   "not_recognized": ""
-(caractere fecha chave)
+}}
 
 Exemplo com check_item e uncheck_item:
 
-(caractere abre chave)
+{{
   "intents": ["check_item", "uncheck_item"],
   "add_item": "",
   "edit_item": "",
@@ -97,12 +97,12 @@ Exemplo com check_item e uncheck_item:
   "list_items": "",
   "clear_items": "",
   "not_recognized": ""
-(caractere fecha chave)
+}}
 
 Se nenhuma informação relevante for encontrada, retorne:
 
-(caractere abre chave)
+{{
   "intents": ["not_recognized"]
-(caractere fecha chave)
+}}
 
 Mensagem: {input}

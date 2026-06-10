@@ -64,7 +64,7 @@ Responda SEMPRE em **JSON puro válido** com as seguintes regras estritas:
 
 Estrutura completa (sempre presente, mesmo com valores vazios):
 
-(caractere abre chave)
+{{
   "intents": ["turn_on"],
   "turn_on": "",
   "turn_off": "",
@@ -77,51 +77,51 @@ Estrutura completa (sempre presente, mesmo com valores vazios):
   "change_bright": "",
   "change_mode": "",
   "not_recognized": ""
-(caractere fecha chave)
+}}
 
 ## Exemplos:
 
 **Usuário:** Ligue a luz da cozinha.
-(caractere abre chave)"intents": ["turn_on"], "turn_on": "luz da cozinha", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["turn_on"], "turn_on": "luz da cozinha", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""}}
 
 **Usuário:** Apague o abajur da sala.
-(caractere abre chave)"intents": ["turn_off"], "turn_on": "", "turn_off": "abajur da sala", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["turn_off"], "turn_on": "", "turn_off": "abajur da sala", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""}}
 
 **Usuário:** Ligue todas as luzes da cozinha.
-(caractere abre chave)"intents": ["turn_on_by_area"], "turn_on": "", "turn_off": "", "turn_on_by_area": "cozinha", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["turn_on_by_area"], "turn_on": "", "turn_off": "", "turn_on_by_area": "cozinha", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""}}
 
 **Usuário:** Apague as luzes do quarto e da sala.
-(caractere abre chave)"intents": ["turn_off_by_area"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "quarto|sala", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["turn_off_by_area"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "quarto|sala", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""}}
 
 **Usuário:** Apague todas as luzes da casa.
-(caractere abre chave)"intents": ["turn_off_all"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "true", "list_lights_status": "", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["turn_off_all"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "true", "list_lights_status": "", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""}}
 
 **Usuário:** Ligue todas as luzes.
-(caractere abre chave)"intents": ["turn_on_all"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "true", "turn_off_all": "", "list_lights_status": "", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["turn_on_all"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "true", "turn_off_all": "", "list_lights_status": "", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""}}
 
 **Usuário:** Mostre as luzes da casa.
-(caractere abre chave)"intents": ["list_lights_status"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "all", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["list_lights_status"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "all", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""}}
 
 **Usuário:** Quais luzes da cozinha estão ligadas?
-(caractere abre chave)"intents": ["list_lights_status"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "cozinha", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["list_lights_status"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "cozinha", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""}}
 
 **Usuário:** Liste o estado das luzes da cozinha e da sala.
-(caractere abre chave)"intents": ["list_lights_status"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "cozinha|sala", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["list_lights_status"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "cozinha|sala", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""}}
 
 **Usuário:** Ligue a luz da sala e apague as do quarto.
-(caractere abre chave)"intents": ["turn_on", "turn_off_by_area"], "turn_on": "luz da sala", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "quarto", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["turn_on", "turn_off_by_area"], "turn_on": "luz da sala", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "quarto", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": ""}}
 
 **Usuário:** Coloca o brilho da luz central em 20.
-(caractere abre chave)"intents": ["change_bright"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "", "change_color": "", "change_bright": "luz central, 20", "change_mode": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["change_bright"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "", "change_color": "", "change_bright": "luz central, 20", "change_mode": "", "not_recognized": ""}}
 
 **Usuário:** Muda a cor do abajur da sala para 3000K e da luz da cozinha para 2000K.
-(caractere abre chave)"intents": ["change_color"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "", "change_color": "abajur da sala, 3000K|luz da cozinha, 2000K", "change_bright": "", "change_mode": "", "not_recognized": ""(caractere fecha chave)
+{{"intents": ["change_color"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "", "change_color": "abajur da sala, 3000K|luz da cozinha, 2000K", "change_bright": "", "change_mode": "", "not_recognized": ""}}
 
 **Usuário:** Apague as luzes da lavanderia.  *(suponha que "lavanderia" NÃO está em available_areas nem em available_entities)*
-(caractere abre chave)"intents": ["not_recognized"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": "area_desconhecida"(caractere fecha chave)
+{{"intents": ["not_recognized"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": "area_desconhecida"}}
 
 **Usuário:** Quanto tempo falta para o jantar?
-(caractere abre chave)"intents": ["not_recognized"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": "nao_relacionado_a_luzes"(caractere fecha chave)
+{{"intents": ["not_recognized"], "turn_on": "", "turn_off": "", "turn_on_by_area": "", "turn_off_by_area": "", "turn_on_all": "", "turn_off_all": "", "list_lights_status": "", "change_color": "", "change_bright": "", "change_mode": "", "not_recognized": "nao_relacionado_a_luzes"}}
 
 ## Entrada do usuário:
 {input}

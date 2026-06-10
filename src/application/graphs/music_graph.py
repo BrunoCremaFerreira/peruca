@@ -46,8 +46,9 @@ class MusicGraph(Graph):
         llm_chat: BaseChatModel,
         music_service: MusicService,
         provider: str = "OLLAMA",
+        strip_think_directive: bool = False,
     ) -> None:
-        super().__init__(provider)
+        super().__init__(provider, strip_think_directive)
         self.llm_chat = llm_chat
         self.music_service = music_service
         self.classification_prompt = ChatPromptTemplate.from_template(
@@ -81,11 +82,11 @@ class MusicGraph(Graph):
         except KeyError:
             response = chain.invoke({"input": invoke_request})
 
-        cleaned = self._remove_thinking_tag(response.content)
-        print(f"[MusicGraph._classify_intent]: raw_output={cleaned!r}")
+        extracted = self._extract_structured_output(response.content)
+        print(f"[MusicGraph._classify_intent]: raw_output={extracted!r}")
 
         try:
-            parsed = json.loads(cleaned) if isinstance(cleaned, str) else {}
+            parsed = json.loads(extracted) if extracted else {}
             if not isinstance(parsed, dict):
                 parsed = {}
         except (json.JSONDecodeError, ValueError):
