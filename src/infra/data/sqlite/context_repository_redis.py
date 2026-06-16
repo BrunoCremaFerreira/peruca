@@ -1,5 +1,5 @@
 from domain.interfaces.data_repository import ContextRepository
-from redis import Redis, from_url  # type: ignore
+from redis.asyncio import Redis, from_url  # type: ignore
 
 
 class RedisContextRepository(ContextRepository):
