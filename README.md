@@ -33,7 +33,7 @@ Peruca is a self-hosted virtual assistant powered by local large language models
 
 | Capability | Description |
 |---|---|
-| **Free conversation** | Context-aware chat with per-user in-memory history |
+| **Free conversation** | Context-aware chat with per-user history persisted in Redis (falls back to in-memory when Redis is not configured) |
 | **Persistent memory** | Facts extracted from conversations are stored per user (ChatGPT-style) and injected into every subsequent request |
 | **Shopping list** | Add, remove, list, check, uncheck, and clear items via natural language |
 | **Smart home lights** | Turn on/off and adjust brightness of Home Assistant light entities |
@@ -116,7 +116,9 @@ src/
     ├── prompts/                  ← LLM prompt files (.md)
     └── data/
         ├── sqlite/               ← SQLite repository implementations
-        └── external/smart_home/  ← Home Assistant HTTP & WebSocket adapters
+        └── external/
+            ├── redis/            ← RedisChatMessageHistory (conversation history)
+            └── smart_home/       ← Home Assistant HTTP & WebSocket adapters
 ```
 
 ---
@@ -270,9 +272,13 @@ START → classify → [show_snapshot | check_status | not_recognized]
 
 ### OnlyTalkGraph
 
-Free-form conversational graph. Does **not** use `StateGraph` — it uses `RunnableWithMessageHistory` with per-user in-memory history keyed by `user.id`.
+Free-form conversational graph. Does **not** use `StateGraph` — it uses `RunnableWithMessageHistory` with per-user history keyed by `user.id`.
 
-> Conversation history is held in memory and is lost on process restart. Persistent facts are handled separately by `MemoryGraph`.
+History backend is selected at startup by `ioc.py`:
+- **Redis** (when `CACHE_DB_CONNECTION_STRING` is set): history survives process restarts and is shared across multiple workers. Optional TTL via `CHAT_HISTORY_TTL_SECONDS`.
+- **In-memory** (fallback when `CACHE_DB_CONNECTION_STRING` is empty): same behaviour as before — history is lost on restart.
+
+> Persistent *facts* (long-term memory) are handled separately by `MemoryGraph` and stored in SQLite regardless of the history backend.
 
 ---
 
@@ -346,8 +352,8 @@ The API runs on port **8000** by default. Interactive docs are available at `/do
 | Store | Technology | Purpose |
 |---|---|---|
 | Main database | SQLite | Users, shopping list items, entity aliases, user memories |
-| Conversation history | In-memory (`dict`) | Per-user chat history for `OnlyTalkGraph` (lost on restart) |
-| Context repository | Redis (wired but unused) | Reserved for future persistent session store |
+| Conversation history | Redis / in-memory | Per-user chat history for `OnlyTalkGraph`; Redis when `CACHE_DB_CONNECTION_STRING` is set, in-memory otherwise |
+| Long-term memory | SQLite | Extracted facts per user, injected as context into every request |
 
 The SQLite file path is controlled by `PERUCA_DB_CONNECTION_STRING` (defaults to `src/peruca.db`; Docker mounts it at `/data/peruca.db`).
 
@@ -445,7 +451,8 @@ HOME_ASSISTANT_TOKEN=<long-lived-token>
 
 # Databases
 PERUCA_DB_CONNECTION_STRING=sqlite:///path/to/peruca.db
-CACHE_DB_CONNECTION_STRING=redis://localhost:6379   # unused at runtime
+CACHE_DB_CONNECTION_STRING=redis://localhost:6379   # enables Redis-backed conversation history
+CHAT_HISTORY_TTL_SECONDS=                          # optional: expire history keys (e.g. 86400 for 24h)
 
 # NLP (spaCy model for Portuguese)
 NLP_SPACY_MODEL=pt_core_news_sm
@@ -533,9 +540,8 @@ peruca/
 |---|---|
 | Shopping list | `edit_item` node is a stub — returns the payload unchanged |
 | Lights | `change_color` and `change_mode` nodes are stubs |
-| Conversation history | Held in-memory in `OnlyTalkGraph`; lost on process restart |
 | Persistent memory | Memory extraction may occasionally miss or duplicate facts depending on LLM output quality |
-| Context repository | Redis wired in `LlmAppService` constructor but never consumed |
+| Conversation history (no Redis) | When `CACHE_DB_CONNECTION_STRING` is not set, history falls back to in-memory and is lost on restart |
 | Async/sync mixing | `SmartHomeLightsGraph` and other sync graphs call `asyncio.run()` per action, creating a new event loop each time — may conflict with an async FastAPI context |
 | Prompt inconsistency | `main_graph.md` uses `/no_think`; other prompts use `/no_thinking` — the model may emit `<think>` blocks that break parsing |
 | SSL | WebSocket adapter disables SSL verification for `wss://` connections |
