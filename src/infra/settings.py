@@ -106,6 +106,7 @@ class Settings(BaseSettings):
     # ===============================
 
     cache_db_connection_string: str = ""
+    chat_history_ttl_seconds: int | None = None
     peruca_db_connection_string: str = (
         f"sqlite://{Path(__file__).parent.parent / 'peruca.db'}"
     )

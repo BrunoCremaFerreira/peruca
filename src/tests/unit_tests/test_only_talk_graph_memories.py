@@ -13,8 +13,9 @@ Test strategy (deterministic, no real LLM / no RunnableWithMessageHistory run):
     message that invoke builds (first positional arg, the messages list).
   - the captured system text is then asserted.
 
-The class-level _context_memory_store dict and unique user.id per test keep the
-in-memory history isolated.
+After the Redis-history feature, OnlyTalkGraph.__init__ accepts an optional
+`get_session_history` callable.  Tests pass a local in-memory factory so the
+class-level `_context_memory_store` dict is no longer required for isolation.
 
 Expected to FAIL until OnlyTalkGraph.invoke formats with user_memories=.
 """
@@ -36,10 +37,32 @@ FALLBACK_TEXT = "(você ainda não tem memórias registradas sobre esta pessoa)"
 _PROMPT_TEMPLATE = "{user_name}|{user_summary}|{user_memories}|{current_datetime}"
 
 
+def _make_fake_history():
+    """
+    Return a callable that satisfies the `get_session_history` contract.
+
+    Each call with the same session_id returns the same InMemoryChatMessageHistory
+    instance, keeping tests isolated from the class-level store.
+    """
+    from langchain_core.chat_history import InMemoryChatMessageHistory
+
+    store = {}
+
+    def get(session_id: str) -> InMemoryChatMessageHistory:
+        if session_id not in store:
+            store[session_id] = InMemoryChatMessageHistory()
+        return store[session_id]
+
+    return get
+
+
 def _make_graph() -> OnlyTalkGraph:
     llm_chat = MagicMock()
     with patch.object(OnlyTalkGraph, "load_prompt", return_value=_PROMPT_TEMPLATE):
-        graph = OnlyTalkGraph(llm_chat=llm_chat, provider="OLLAMA")
+        graph = OnlyTalkGraph(
+            llm_chat=llm_chat,
+            get_session_history=_make_fake_history(),
+        )
     return graph
 
 
@@ -93,12 +116,8 @@ def _capture_system_message(graph: OnlyTalkGraph, request: GraphInvokeRequest) -
 
 
 class TestOnlyTalkGraphMemories:
-    def setup_method(self):
-        # Class-level store must be clean between tests.
-        OnlyTalkGraph._context_memory_store.clear()
-
-    def teardown_method(self):
-        OnlyTalkGraph._context_memory_store.clear()
+    # No class-level store cleanup needed: each _make_graph() injects its own
+    # isolated get_session_history factory, so tests are independent.
 
     def test_invoke__with_memories__system_message_contains_memory(self):
         # Arrange

@@ -22,7 +22,7 @@ class LlmAppService:
     def __init__(
         self,
         main_graph: MainGraph,
-        context_repository: ContextRepository,
+        context_repository: Optional[ContextRepository],
         user_repository: UserRepository,
         user_memory_service: UserMemoryService,
         music_service=None,

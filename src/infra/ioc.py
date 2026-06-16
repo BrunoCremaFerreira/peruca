@@ -1,3 +1,5 @@
+from typing import Callable, Optional
+
 from application.appservices.llm_app_service import LlmAppService
 from application.appservices.memory_app_service import MemoryAppService
 from application.appservices.shopping_list_app_service import ShoppingListAppService
@@ -55,6 +57,8 @@ from infra.data.sqlite.context_repository_redis import RedisContextRepository
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.chat_history import BaseChatMessageHistory, InMemoryChatMessageHistory
+from infra.data.external.redis.redis_chat_message_history import RedisChatMessageHistory
 from infra.data.sqlite.sqlite_shopping_list_repository import (
     SqliteShoppingListRepository,
 )
@@ -163,6 +167,29 @@ def get_memory_graph() -> MemoryGraph:
     return _repo_cache[cache_key]
 
 
+def _get_session_history_factory() -> Callable[[str], BaseChatMessageHistory]:
+    settings = _get_settings()
+    conn_str = settings.cache_db_connection_string
+    ttl = settings.chat_history_ttl_seconds
+
+    if not conn_str:
+        _store: dict[str, InMemoryChatMessageHistory] = {}
+
+        def _get_in_memory(session_id: str) -> InMemoryChatMessageHistory:
+            if session_id not in _store:
+                _store[session_id] = InMemoryChatMessageHistory()
+            return _store[session_id]
+
+        return _get_in_memory
+
+    context_repo = get_context_repository()
+
+    def _get_redis(session_id: str) -> RedisChatMessageHistory:
+        return RedisChatMessageHistory(session_id, context_repo, ttl)
+
+    return _get_redis
+
+
 def get_only_talk_graph() -> OnlyTalkGraph:
     """
     IOC for Only Talk Graph
@@ -180,7 +207,9 @@ def get_only_talk_graph() -> OnlyTalkGraph:
         )
 
         _repo_cache[cache_key] = OnlyTalkGraph(
-            llm_chat=llm_chat, provider=settings.llm_provider_type
+            llm_chat=llm_chat,
+            get_session_history=_get_session_history_factory(),
+            provider=settings.llm_provider_type,
         )
     return _repo_cache[cache_key]
 
@@ -514,13 +543,16 @@ def get_smart_home_service() -> SmartHomeService:
 # ====================================
 
 
-def get_context_repository() -> ContextRepository:
+def get_context_repository() -> Optional[ContextRepository]:
     """
     IOC for Cache Repository
     """
 
     settings = _get_settings()
     connection_string = settings.cache_db_connection_string
+
+    if not connection_string:
+        return None
 
     return RedisContextRepository(connection_string)
 

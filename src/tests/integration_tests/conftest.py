@@ -38,7 +38,7 @@ INTEGRATION_ENV = {
     "MUSIC_ASSISTANT_TOKEN": "",
     "NLP_SPACY_MODEL": "pt_core_news_sm",
     "HOME_ASSISTANT_URL": "unix.kubernetes:8123",
-    "CACHE_DB_CONNECTION_STRING": "redis://localhost:6379/0",
+    "CACHE_DB_CONNECTION_STRING": "",
     "PERUCA_DB_CONNECTION_STRING": f"sqlite://{DB_PATH}",
 }
 

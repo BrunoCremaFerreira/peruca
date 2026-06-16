@@ -14,6 +14,8 @@ class RedisContextRepository(ContextRepository):
         self._client: Redis = from_url(self._connection_string)
 
     def _get_client(self) -> Redis:
+        if not hasattr(self, '_client') or self._client is None:
+            self._client = from_url(self._connection_string)
         return self._client
 
     def connect(self):
