@@ -31,7 +31,10 @@ class RedisContextRepository(ContextRepository):
         """
         Retrieves the value associated with a key.
         """
-        return str(await self._get_client().get(key))
+        result = await self._get_client().get(key)
+        if result is None:
+            return "None"
+        return result.decode("utf-8") if isinstance(result, bytes) else str(result)
 
     async def delete_key(self, key: str) -> bool:
         """
