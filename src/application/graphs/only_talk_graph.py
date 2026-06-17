@@ -53,16 +53,10 @@ class OnlyTalkGraph(Graph):
 
         chain = chat_prompt | self.llm_chat
 
-        chain_with_history = RunnableWithMessageHistory(
-            chain,
-            self._get_session_history,
-            input_messages_key="input",
-            history_messages_key="history",
-        )
+        history_messages = self._get_session_history(user.id).messages
 
-        response = chain_with_history.invoke(
-            {"input": invoke_request.message},
-            config={"configurable": {"session_id": user.id}},
+        response = chain.invoke(
+            {"input": invoke_request.message, "history": history_messages}
         )
 
         return response.content

@@ -405,6 +405,7 @@ def get_llm_app_service() -> LlmAppService:
         user_repository=get_user_repository(),
         user_memory_service=get_user_memory_service(),
         music_service=get_music_service(),
+        get_session_history=_get_session_history_factory(),
     )
 
 

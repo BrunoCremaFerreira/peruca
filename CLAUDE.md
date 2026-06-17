@@ -89,7 +89,7 @@ LLM_SMART_HOME_LIGHTS_GRAPH_CHAT_MODEL=qwen3:14b
 HOME_ASSISTANT_URL=http://<ha-host>:8123
 HOME_ASSISTANT_TOKEN=<long-lived-token>
 PERUCA_DB_CONNECTION_STRING=<path>/peruca.db
-CACHE_DB_CONNECTION_STRING=<redis-url>          # unused at runtime (see below)
+CACHE_DB_CONNECTION_STRING=<redis-url>          # Redis for conversation history; if empty, falls back to in-memory store
 ```
 
 ## Architecture
@@ -133,7 +133,7 @@ All graphs inherit from `Graph` (ABC at `application/graphs/graph.py`) and imple
 - The `classify` node in each graph both classifies intent **and** extracts structured data in a single LLM call. Downstream action nodes consume what's already in the state — they do not re-call the LLM.
 - Intent strings returned by the LLM must match the node names in the `StateGraph` exactly. The `intent_router` function returns `state["intent"]` directly as edge targets.
 - `MainGraph` and the list/lights subgraphs use `eval()` to parse LLM output (a Python literal). `SmartHomeLightsGraph._classify_intent` uses `json.loads()`. Do not change this inconsistency without updating both the node code and the corresponding prompt.
-- `OnlyTalkGraph` does not use `StateGraph`. It uses `RunnableWithMessageHistory` with an in-memory store keyed by `user.id`. Conversation history is lost on process restart.
+- `OnlyTalkGraph` does not use `StateGraph`. It is a plain `prompt | llm` chain that **reads** conversation history (read-only): it loads `get_session_history(user.id).messages` and injects them into the `MessagesPlaceholder("history")`. It does **not** write history. The turn is persisted once, centrally, in `LlmAppService.chat()` (see below) — so reads and writes share the same `session_id = user.id` key.
 - All graphs call `self._compile()` inside `invoke()`, recompiling the `StateGraph` on every request. This is known overhead; do not "fix" it without testing for thread-safety implications.
 
 ### Fluent Validation Pattern
@@ -180,4 +180,4 @@ Conventions in unit test files:
 These nodes exist in code but perform no real action:
 - `ShoppingListGraph`: `edit_item`, `check_item`, `uncheck_item`
 - `SmartHomeLightsGraph`: `change_color`, `change_bright`, `change_mode`
-- `LlmAppService`: receives `ContextRepository` (Redis) in constructor but never uses it — conversation history is held in-memory in `OnlyTalkGraph`
+- `LlmAppService`: still receives `ContextRepository` in its constructor but never uses it — conversation persistence now goes through the injected `get_session_history` factory, not this field. The param is dead and can be removed when convenient.

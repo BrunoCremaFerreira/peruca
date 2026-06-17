@@ -1,6 +1,9 @@
 import asyncio
 from infra import async_runner
-from typing import Optional
+from typing import Callable, Optional
+
+from langchain_core.chat_history import BaseChatMessageHistory
+from langchain_core.messages import AIMessage, HumanMessage
 
 from application.appservices.view_models import ChatRequest
 from application.graphs.main_graph import MainGraph
@@ -26,12 +29,16 @@ class LlmAppService:
         user_repository: UserRepository,
         user_memory_service: UserMemoryService,
         music_service=None,
+        get_session_history: Optional[
+            Callable[[str], BaseChatMessageHistory]
+        ] = None,
     ) -> None:
         self.main_graph = main_graph
         self.context_repository = context_repository
         self.user_repository = user_repository
         self.user_memory_service = user_memory_service
         self.music_service = music_service
+        self.get_session_history = get_session_history
 
     # ===============================================
     # Public Methods
@@ -81,5 +88,26 @@ class LlmAppService:
         output = result.get("output")
         intents = result.get("intent")
 
+        self._persist_turn(user=user, message=chat_request.message, output=output)
+
         print(f"[LlmAppService.chat]: Response: '{result}'")
         return {"intents": intents, "output": output}
+
+    # ===============================================
+    # Private Methods
+    # ===============================================
+
+    def _persist_turn(self, user: User, message: str, output: Optional[str]) -> None:
+        if self.get_session_history is None:
+            return
+
+        if is_null_or_whitespace(output):
+            return
+
+        try:
+            history = self.get_session_history(user.id)
+            history.add_messages(
+                [HumanMessage(content=message), AIMessage(content=output)]
+            )
+        except Exception as error:
+            print(f"[LlmAppService.chat]: Failed to persist turn: {error}")
