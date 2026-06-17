@@ -69,5 +69,4 @@ class RedisChatMessageHistory(BaseChatMessageHistory):
             async_runner.run(self._get_client().expire(self._key, self._ttl))
 
     def clear(self) -> None:
-        async_runner.run(self._repo.get_key(self._key))
         async_runner.run(self._repo.delete_key(self._key))

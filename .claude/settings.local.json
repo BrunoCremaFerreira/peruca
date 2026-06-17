@@ -32,7 +32,9 @@
       "Bash(python -m pytest tests/unit_tests/test_llm_reasoning_config.py --collect-only -q)",
       "Bash(./.venv/bin/python -m pytest tests/unit_tests/test_llm_reasoning_config.py --collect-only -q)",
       "Bash(./.venv/bin/python -m pytest tests/unit_tests/test_llm_reasoning_config.py -q)",
-      "Bash(./.venv/bin/python -m pytest tests/unit_tests/test_llm_reasoning_config.py -v)"
+      "Bash(./.venv/bin/python -m pytest tests/unit_tests/test_llm_reasoning_config.py -v)",
+      "Bash(.venv/bin/pip show *)",
+      "Bash(redis-cli ping *)"
     ]
   }
 }

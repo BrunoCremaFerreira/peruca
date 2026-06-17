@@ -324,8 +324,7 @@ class TestRedisChatMessageHistoryClear:
         """
         repo = _make_context_repo()
         repo.get_key = AsyncMock(side_effect=[
-            json.dumps([{"type": "human", "content": "Oi"}]),  # before clear
-            None,  # after clear
+            None,  # after clear, key no longer exists
         ])
         history = _make_history(context_repo=repo)
 
