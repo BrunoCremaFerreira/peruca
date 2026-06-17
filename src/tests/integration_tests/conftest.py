@@ -79,3 +79,57 @@ def llm_app_service(integration_user, integration_db_path):
 @pytest.fixture
 def shopping_list_repo_for_integration(integration_db_path):
     return get_shopping_list_repository()
+
+
+# ---------------------------------------------------------------------------
+# Redis-backed conversation history
+#
+# The OnlyTalkGraph history tests must exercise the real Redis persistence
+# path, not the in-memory fallback. They point CACHE_DB_CONNECTION_STRING at a
+# dedicated test Redis (DB index 15 by default, overridable via TEST_REDIS_URL)
+# and skip gracefully when no Redis server is reachable, so the suite stays
+# green in environments without Redis.
+# ---------------------------------------------------------------------------
+TEST_REDIS_URL = os.environ.get("TEST_REDIS_URL", "redis://localhost:6379/15")
+
+
+def _clear_history_keys(connection_string: str) -> None:
+    from redis import from_url
+
+    client = from_url(connection_string)
+    try:
+        for key in client.scan_iter("chat_history:*"):
+            client.delete(key)
+    finally:
+        client.close()
+
+
+@pytest.fixture
+def redis_backed_env(integration_env):
+    from redis import from_url
+    from redis.exceptions import RedisError
+
+    client = from_url(TEST_REDIS_URL)
+    try:
+        client.ping()
+    except (RedisError, OSError) as exc:
+        pytest.skip(f"Test Redis not reachable at {TEST_REDIS_URL}: {exc}")
+    finally:
+        client.close()
+
+    import infra.ioc as ioc
+
+    with patch.dict(os.environ, {"CACHE_DB_CONNECTION_STRING": TEST_REDIS_URL}):
+        # Changing the environment invalidates the cached IoC graphs (the
+        # session-history factory captures the Redis repo at build time), so the
+        # graph must be rebuilt with the Redis-backed factory.
+        ioc._repo_cache.clear()
+        _clear_history_keys(TEST_REDIS_URL)
+        yield TEST_REDIS_URL
+        _clear_history_keys(TEST_REDIS_URL)
+        ioc._repo_cache.clear()
+
+
+@pytest.fixture
+def llm_app_service_redis(redis_backed_env, integration_user, integration_db_path):
+    return get_llm_app_service()

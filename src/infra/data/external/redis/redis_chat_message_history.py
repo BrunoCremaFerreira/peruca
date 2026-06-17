@@ -65,7 +65,11 @@ class RedisChatMessageHistory(BaseChatMessageHistory):
         all_messages = current + list(messages)
         serialized = json.dumps(_serialize_messages(all_messages))
         async_runner.run(self._repo.set_key(self._key, serialized))
-        if self._ttl is not None:
+        # A non-positive TTL is treated as "no expiry". Redis `EXPIRE key 0`
+        # (or a negative value) deletes the key immediately, which would wipe
+        # the conversation history on every write and make the bot forget the
+        # previous message.
+        if self._ttl is not None and self._ttl > 0:
             async_runner.run(self._get_client().expire(self._key, self._ttl))
 
     def clear(self) -> None:

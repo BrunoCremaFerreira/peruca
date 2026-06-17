@@ -387,6 +387,51 @@ class TestRedisChatMessageHistoryTTL:
         mock_redis_client.expire.assert_not_called()
 
     @_requires_impl
+    def test_add_messages__ttl_zero__expire_not_called(self):
+        """
+        ttl_seconds == 0 must be treated as "no expiry".
+
+        Redis `EXPIRE key 0` deletes the key immediately, so calling expire
+        with 0 after every write would wipe the conversation history on each
+        turn — the bot would always "forget" the previous message.
+        """
+        from langchain_core.messages import HumanMessage
+
+        repo = _make_context_repo()
+        repo.get_key = AsyncMock(return_value=None)
+        mock_redis_client = MagicMock()
+        mock_redis_client.expire = AsyncMock(return_value=True)
+
+        history = _make_history(context_repo=repo, ttl_seconds=0)
+
+        with patch(_ASYNC_RUNNER_PATCH, side_effect=lambda coro: _sync(coro)), \
+             patch.object(history, "_get_client", return_value=mock_redis_client):
+            history.add_messages([HumanMessage(content="zero ttl")])
+
+        mock_redis_client.expire.assert_not_called()
+
+    @_requires_impl
+    def test_add_messages__ttl_negative__expire_not_called(self):
+        """
+        A negative ttl_seconds must also be treated as "no expiry" — Redis
+        deletes the key for any non-positive expiry, which would erase history.
+        """
+        from langchain_core.messages import HumanMessage
+
+        repo = _make_context_repo()
+        repo.get_key = AsyncMock(return_value=None)
+        mock_redis_client = MagicMock()
+        mock_redis_client.expire = AsyncMock(return_value=True)
+
+        history = _make_history(context_repo=repo, ttl_seconds=-1)
+
+        with patch(_ASYNC_RUNNER_PATCH, side_effect=lambda coro: _sync(coro)), \
+             patch.object(history, "_get_client", return_value=mock_redis_client):
+            history.add_messages([HumanMessage(content="negative ttl")])
+
+        mock_redis_client.expire.assert_not_called()
+
+    @_requires_impl
     def test_add_messages__ttl_set__expire_called_with_correct_key(self):
         """
         expire() must be called with the same key used for set_key —

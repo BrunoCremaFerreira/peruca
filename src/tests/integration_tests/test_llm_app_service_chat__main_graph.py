@@ -479,8 +479,11 @@ class TestLlmAppServiceChatErrors:
 
 class TestOnlyTalkGraphHistory:
     def test_llm_app_service_chat__two_consecutive_messages_same_user__second_response_is_contextual(
-        self, llm_app_service, integration_user
+        self, llm_app_service_redis, integration_user
     ):
+        # History is persisted in the test Redis (not the in-memory fallback).
+        llm_app_service = llm_app_service_redis
+
         # Arrange — first message introduces a topic
         first_request = ChatRequest(
             external_user_id=integration_user.external_id,
@@ -508,9 +511,12 @@ class TestOnlyTalkGraphHistory:
         )
 
     def test_llm_app_service_chat__two_different_users__histories_are_isolated(
-        self, user_app_service, llm_app_service
+        self, user_app_service, llm_app_service_redis
     ):
         from domain.commands import UserAdd
+
+        # History is persisted in the test Redis (not the in-memory fallback).
+        llm_app_service = llm_app_service_redis
 
         # Arrange — create a second distinct user
         second_user_cmd = UserAdd(name="Maria", external_id="2000", summary="")

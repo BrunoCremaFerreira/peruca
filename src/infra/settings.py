@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -110,3 +111,15 @@ class Settings(BaseSettings):
     peruca_db_connection_string: str = (
         f"sqlite://{Path(__file__).parent.parent / 'peruca.db'}"
     )
+
+    @field_validator("chat_history_ttl_seconds", mode="before")
+    @classmethod
+    def _empty_ttl_means_none(cls, value):
+        # `.env.example` ships `CHAT_HISTORY_TTL_SECONDS=` (empty). An empty or
+        # blank value must be read as "unset" (None) instead of failing int
+        # parsing and crashing Settings() construction.
+        if value is None:
+            return None
+        if isinstance(value, str) and value.strip() == "":
+            return None
+        return value
