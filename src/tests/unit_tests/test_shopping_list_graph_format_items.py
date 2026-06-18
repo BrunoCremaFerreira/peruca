@@ -2,6 +2,7 @@ import uuid
 from unittest.mock import MagicMock, patch
 
 from application.graphs.shopping_list_graph import ShoppingListGraph
+from application.graphs.markers import SHOPPING_LIST_HEADER
 from domain.entities import ShoppingListItem
 
 
@@ -249,6 +250,23 @@ class TestFormatItemsHeader:
         first_line = result.splitlines()[0]
         assert "lista" in first_line.lower(), (
             f"First line must contain 'lista', got: {first_line!r}"
+        )
+
+    def test_format_items__first_line_is_exactly_shopping_list_header(self):
+        """
+        RED: the first line must be exactly the SHOPPING_LIST_HEADER constant
+        from application.graphs.markers. This marker is what MainGraph uses to
+        recognise a listing and bypass the merge LLM, so it must match verbatim.
+        """
+        graph = _make_graph()
+        items = [_sample_item(name="leite", quantity=1.0)]
+
+        result = graph._format_items(items)
+
+        first_line = result.splitlines()[0]
+        assert first_line == SHOPPING_LIST_HEADER, (
+            f"First line must be exactly SHOPPING_LIST_HEADER "
+            f"({SHOPPING_LIST_HEADER!r}), got: {first_line!r}"
         )
 
     def test_format_items__header_is_not_an_item_line(self):

@@ -664,6 +664,155 @@ class TestHandleDeleteItemDoesNotLeakEntities:
         )
 
 
+# ---------------------------------------------------------------------------
+# Mudanca 6 — _handle_final_response must NOT prefix outputs with numbering.
+#
+# Today, with more than one non-null output, _handle_final_response joins them
+# with f"{i + 1}. {s}" (lines ~92-93), producing "1. ...", "2. ...". This breaks
+# the listing rendering (a listing already has its own hyphen bullets) and leaks
+# numbering into the user-facing text. The combined output must contain no
+# "1. " / "2. " prefixes, and the listing's own hyphen lines must stay intact.
+# ---------------------------------------------------------------------------
+
+
+class TestHandleFinalResponseNoNumbering:
+    def test_final_response__multiple_outputs__no_numbered_prefix(self):
+        """
+        RED: with two non-null outputs the current implementation prefixes each
+        with "1. " / "2. ". No line in the combined output may start with a
+        numbered prefix.
+        """
+        graph = _make_graph()
+        listing = "Aqui está sua lista de compras:\n- leite\n- arroz (2)"
+        state = {
+            "output_add_item": "Adicionado: leite",
+            "output_list_items": listing,
+        }
+
+        result = graph._handle_final_response(state)
+
+        output = result["output"]
+        for line in output.splitlines():
+            assert not line.startswith("1. "), (
+                f"Numbered prefix leaked into final response: {line!r}"
+            )
+            assert not line.startswith("2. "), (
+                f"Numbered prefix leaked into final response: {line!r}"
+            )
+
+    def test_final_response__multiple_outputs__listing_hyphen_lines_intact(self):
+        """
+        RED: the listing's own hyphen bullet lines must survive verbatim inside
+        the combined output (they must not be turned into "1. - leite" etc.).
+        """
+        graph = _make_graph()
+        listing = "Aqui está sua lista de compras:\n- leite\n- arroz (2)"
+        state = {
+            "output_add_item": "Adicionado: leite",
+            "output_list_items": listing,
+        }
+
+        result = graph._handle_final_response(state)
+
+        output = result["output"]
+        assert "- leite" in output, (
+            f"Listing hyphen line '- leite' missing from output: {output!r}"
+        )
+        assert "- arroz (2)" in output, (
+            f"Listing hyphen line '- arroz (2)' missing from output: {output!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Mudanca 7 — _handle_edit_item / _handle_not_recognized output in Portuguese,
+# and _handle_add_item generic-exception fallback in Portuguese.
+# ---------------------------------------------------------------------------
+
+
+class TestHandleEditItemOutputLanguage:
+    def test_handle_edit_item__does_not_return_english_prefix(self):
+        """RED: stub currently returns 'Items Edited: ...'."""
+        graph = _make_graph()
+        state = {"output_edit_item": "leite"}
+
+        result = graph._handle_edit_item(state)
+
+        assert "Items Edited" not in result["output_edit_item"], (
+            "English prefix 'Items Edited' must be replaced with Portuguese"
+        )
+
+    def test_handle_edit_item__output_is_in_portuguese(self):
+        graph = _make_graph()
+        state = {"output_edit_item": "leite"}
+
+        result = graph._handle_edit_item(state)
+
+        output = result["output_edit_item"]
+        assert isinstance(output, str)
+        portuguese_keywords = ["editar", "ainda", "sei", "não", "consigo"]
+        assert any(kw in output.lower() for kw in portuguese_keywords), (
+            f"Expected a Portuguese string, got: {output!r}"
+        )
+
+
+class TestHandleNotRecognizedOutputLanguage:
+    def test_handle_not_recognized__does_not_return_english_message(self):
+        """RED: stub currently returns 'Not Recognized Triggered'."""
+        graph = _make_graph()
+
+        result = graph._handle_not_recognized({})
+
+        assert "Not Recognized" not in result["output_not_recognized"], (
+            "English message 'Not Recognized' must be replaced with Portuguese"
+        )
+
+    def test_handle_not_recognized__output_is_in_portuguese(self):
+        graph = _make_graph()
+
+        result = graph._handle_not_recognized({})
+
+        output = result["output_not_recognized"]
+        assert isinstance(output, str)
+        portuguese_keywords = ["entendi", "não", "lista", "compras"]
+        assert any(kw in output.lower() for kw in portuguese_keywords), (
+            f"Expected a Portuguese string, got: {output!r}"
+        )
+
+
+class TestHandleAddItemExceptionLanguage:
+    def test_handle_add_item__generic_exception__does_not_return_english(self):
+        """
+        RED: when shopping_list_service.add raises a non-validation Exception the
+        handler currently returns 'An internal error was ocurred'. The fallback
+        message must be in Portuguese.
+        """
+        graph = _make_graph()
+        graph.shopping_list_service.add.side_effect = Exception("boom")
+        state = {"output_add_item": "leite,1"}
+
+        result = graph._handle_add_item(state)
+
+        assert "An internal error" not in result["output_add_item"], (
+            "English error fallback must be replaced with Portuguese"
+        )
+
+    def test_handle_add_item__generic_exception__output_is_in_portuguese(self):
+        graph = _make_graph()
+        graph.shopping_list_service.add.side_effect = Exception("boom")
+        state = {"output_add_item": "leite,1"}
+
+        result = graph._handle_add_item(state)
+
+        output = result["output_add_item"]
+        assert isinstance(output, str)
+        # Note: avoid "erro" here — it is a substring of the English "error",
+        # which would falsely pass against "An internal error was ocurred".
+        portuguese_keywords = ["problema", "tente", "novamente", "ocorreu", "interno"]
+        assert any(kw in output.lower() for kw in portuguese_keywords), (
+            f"Expected a Portuguese error message, got: {output!r}"
+        )
+
+
 class TestHandleFinalResponseOnlyStrings:
     def test_final_response__after_list_items__output_is_str_without_entity_repr(self):
         """

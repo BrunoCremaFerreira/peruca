@@ -14,6 +14,7 @@ import uuid
 import pytest
 
 from application.graphs.main_graph import MainGraph
+from application.graphs.markers import SHOPPING_LIST_HEADER
 from domain.entities import GraphInvokeRequest, User
 
 
@@ -244,3 +245,101 @@ class TestFinalResponseSkipMergeForSingleOutput:
             "With zero sub-graph outputs the node must return an empty string "
             "without calling the merge LLM and without raising IndexError."
         )
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 (TDD RED) — a shopping-list LISTING (output_shopping that starts with
+# SHOPPING_LIST_HEADER) must be preserved verbatim in the final response and
+# must NEVER be sent to the merge LLM. Short confirmations (which do not carry
+# the header, e.g. "Adicionado: leite") keep flowing through the merge as today.
+# ---------------------------------------------------------------------------
+
+
+def _listing() -> str:
+    """A realistic listing as produced by ShoppingListGraph._format_items."""
+    return f"{SHOPPING_LIST_HEADER}\n- leite\n- arroz (2)"
+
+
+class TestFinalResponseProtectsListingVerbatim:
+    def test_listing_with_other_outputs__listing_verbatim_plus_merged_conversation(self):
+        """
+        Test A: a listing combined with other (mergeable) outputs.
+
+        The listing must appear VERBATIM in result["output"] (it is bypassed from
+        the LLM, so the model can never rewrite its bytes), AND the legitimate
+        merged conversational content (lights confirmation + free talk) must
+        survive alongside it. SHOPPING_LIST_HEADER must NOT appear in the rendered
+        input handed to the merge LLM (i.e. the listing was bypassed).
+        """
+        graph = _make_main_graph(merge_content="Liguei a luz da sala. E que fome, hein!")
+        listing = _listing()
+        data = {
+            "input": _request("o que tem na lista e acende a luz"),
+            "intent": ["shopping_list", "smart_home_lights", "only_talking"],
+            "output_shopping": listing,
+            "output_lights": "Ligado: sala",
+            "output_only_talking": "Que fome!",
+        }
+
+        result = graph._handle_final_response(data)
+
+        # The listing survives verbatim (exact substring, with newlines/hyphens).
+        assert listing in result["output"], (
+            f"Listing must be preserved verbatim. output={result['output']!r}"
+        )
+        # The legitimate merged conversational content must NOT be discarded —
+        # the user still hears about the light and the chit-chat.
+        assert "Liguei a luz da sala. E que fome, hein!" in result["output"], (
+            "Merged conversational content was dropped when a listing was "
+            f"present: {result['output']!r}"
+        )
+        # The listing must have been bypassed from the LLM merge input.
+        graph.llm_chat.assert_called_once()
+        rendered = str(graph.llm_chat.call_args.args[0])
+        assert SHOPPING_LIST_HEADER not in rendered, (
+            f"Listing leaked into the merge LLM input: {rendered!r}"
+        )
+
+    def test_listing_alone__llm_not_invoked_and_output_is_listing_verbatim(self):
+        """
+        Test B: a listing as the only output. The merge LLM must NOT be called
+        and result["output"] must equal the listing verbatim.
+        """
+        graph = _make_main_graph(merge_content="MERGED (should not appear)")
+        listing = _listing()
+        data = {
+            "input": _request("o que tem na lista de compras?"),
+            "intent": ["shopping_list"],
+            "output_shopping": listing,
+        }
+
+        result = graph._handle_final_response(data)
+
+        graph.llm_chat.assert_not_called()
+        graph.llm_chat.invoke.assert_not_called()
+        assert result["output"] == listing, (
+            f"A lone listing must be returned verbatim, got: {result['output']!r}"
+        )
+
+    def test_multi_output_with_listing__no_numbered_prefix_lines(self):
+        """
+        Test C (anti-numbering regression): with a listing plus other outputs,
+        no line in the final output may start with a numbered prefix "1. "/"2. ".
+        """
+        graph = _make_main_graph(merge_content="Luz acesa.")
+        data = {
+            "input": _request("o que tem na lista e acende a luz"),
+            "intent": ["shopping_list", "smart_home_lights"],
+            "output_shopping": _listing(),
+            "output_lights": "Ligado: sala",
+        }
+
+        result = graph._handle_final_response(data)
+
+        for line in result["output"].splitlines():
+            assert not line.startswith("1. "), (
+                f"Numbered prefix leaked into final response: {line!r}"
+            )
+            assert not line.startswith("2. "), (
+                f"Numbered prefix leaked into final response: {line!r}"
+            )

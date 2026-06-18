@@ -5,6 +5,7 @@ from langgraph.graph import StateGraph, START, END
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from application.graphs.graph import Graph
+from application.graphs.markers import SHOPPING_LIST_HEADER
 from domain.commands import ShoppingListItemAdd
 from domain.entities import GraphInvokeRequest, ShoppingListItem
 from domain.exceptions import ValidationError
@@ -90,7 +91,7 @@ class ShoppingListGraph(Graph):
         ]
 
         if len(outputs) > 1:
-            response = "\n\n".join([f"{i + 1}. {s}" for i, s in enumerate(outputs)])
+            response = "\n\n".join(outputs)
         else:
             response = outputs[0]
 
@@ -113,7 +114,9 @@ class ShoppingListGraph(Graph):
             return {"output_add_item": validation_error.errors}
         except Exception as exception:
             print(f"ERROR: {exception}")
-            return {"output_add_item": "An internal error was ocurred"}
+            return {
+                "output_add_item": "Tive um problema interno aqui, tente de novo daqui a pouco."
+            }
 
     def _handle_delete_item(self, data):
         payload: str = data.get("output_delete_item")
@@ -136,7 +139,9 @@ class ShoppingListGraph(Graph):
     def _handle_edit_item(self, data):
         payload = data.get("output_edit_item")
         print(f"[shopping_list_graph.handle_edit_item]: {payload}")
-        return {"output_edit_item": f"Items Edited: {payload}"}
+        return {
+            "output_edit_item": "Ainda não sei editar item da lista, mas já já aprendo."
+        }
 
     def _handle_check_item(self, data):
         payload: str = data.get("output_check_item")
@@ -224,14 +229,16 @@ class ShoppingListGraph(Graph):
 
     def _handle_not_recognized(self, data):
         print(f"[shopping_list_graph.handle_not_recognized]: Triggered...")
-        return {"output_not_recognized": "Not Recognized Triggered"}
+        return {
+            "output_not_recognized": "Não entendi o que você quer fazer com a lista de compras."
+        }
 
     # ===============================================
     # Private Methods
     # ===============================================
 
     def _format_items(self, items: List[ShoppingListItem]) -> str:
-        lines = ["Aqui está sua lista de compras:"]
+        lines = [SHOPPING_LIST_HEADER]
         for item in items:
             quantity = f" ({self._format_quantity(item.quantity)})" if item.quantity != 1 else ""
             status = " (comprado)" if item.checked else ""

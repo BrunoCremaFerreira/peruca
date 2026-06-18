@@ -4,6 +4,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from typing import Optional, TypedDict
 from langchain_core.language_models.chat_models import BaseChatModel
 from application.graphs.graph import Graph
+from application.graphs.markers import SHOPPING_LIST_HEADER
 from application.graphs.only_talk_graph import OnlyTalkGraph
 from application.graphs.shopping_list_graph import ShoppingListGraph
 from application.graphs.smart_home_lights_graph import SmartHomeLightsGraph
@@ -95,11 +96,22 @@ class MainGraph(Graph):
         return {"output_music": result.get("output")}
 
     def _handle_final_response(self, data):
+        output_shopping = data.get("output_shopping")
+        listing = (
+            output_shopping
+            if output_shopping
+            and output_shopping.strip()
+            and SHOPPING_LIST_HEADER in output_shopping
+            else None
+        )
+
+        mergeable_shopping = None if listing else output_shopping
+
         outputs = [
             e
             for e in [
                 data.get("output_lights"),
-                data.get("output_shopping"),
+                mergeable_shopping,
                 data.get("output_cams"),
                 data.get("output_only_talking"),
                 data.get("output_climate"),
@@ -110,16 +122,26 @@ class MainGraph(Graph):
         ]
 
         if len(outputs) <= 1:
-            response = outputs[0] if outputs else ""
+            merged = outputs[0] if outputs else ""
         else:
-            responses = "\n\n".join([f"{i + 1}. {s}" for i, s in enumerate(outputs)])
+            responses = "\n\n".join(outputs)
             final_reponse_chain = self.final_response_prompt | self.llm_chat
             llm_response = final_reponse_chain.invoke(
                 {"input": data["input"].message, "responses": responses}
             )
-            response = self._remove_thinking_tag(llm_response.content)
-            if not response or not response.strip():
-                response = "\n\n".join(outputs)
+            merged = self._remove_thinking_tag(llm_response.content)
+            if not merged or not merged.strip():
+                merged = "\n\n".join(outputs)
+
+        # A verbatim listing is bypassed from the LLM (the model can never
+        # rewrite its bytes), but any legitimate merged conversational content
+        # is still appended after it so nothing the user asked for is dropped.
+        if listing and merged and merged.strip():
+            response = f"{listing}\n\n{merged}"
+        elif listing:
+            response = listing
+        else:
+            response = merged
 
         return {"output": response}
 
