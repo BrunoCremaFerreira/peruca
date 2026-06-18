@@ -40,7 +40,7 @@ class OnlyTalkGraph(Graph):
             user_name=user.name,
             user_summary=user.summary,
             user_memories=user_memories,
-            current_datetime=datetime.now().strftime("%d/%m/%Y %H:%M"),
+            current_datetime=datetime.now().astimezone().strftime("%d/%m/%Y %H:%M"),
         )
 
         chat_prompt = ChatPromptTemplate.from_messages(
