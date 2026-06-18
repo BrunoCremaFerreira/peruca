@@ -231,11 +231,20 @@ class ShoppingListGraph(Graph):
     # ===============================================
 
     def _format_items(self, items: List[ShoppingListItem]) -> str:
-        lines = []
-        for index, item in enumerate(items, start=1):
+        lines = ["Aqui está sua lista de compras:"]
+        for item in items:
+            quantity = f" ({self._format_quantity(item.quantity)})" if item.quantity != 1 else ""
             status = " (comprado)" if item.checked else ""
-            lines.append(f"{index}. {item.name} ({item.quantity}){status}")
+            lines.append(f"- {item.name}{quantity}{status}")
         return "\n".join(lines)
+
+    @staticmethod
+    def _format_quantity(quantity: float) -> str:
+        # Render whole numbers without the trailing ".0" (2.0 -> "2"), keep
+        # genuine fractions intact (1.5 -> "1.5").
+        if quantity == int(quantity):
+            return str(int(quantity))
+        return str(quantity)
 
     def _compile(self):
         workflow = StateGraph(ShoppingListGraphState)
