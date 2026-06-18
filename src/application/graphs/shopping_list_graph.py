@@ -131,12 +131,7 @@ class ShoppingListGraph(Graph):
             if item:
                 self.shopping_list_service.delete(item.id)
 
-        items = self.shopping_list_service.get_all()
-
-        return {
-            "output_delete_item": f"Removido: {payload}",
-            "output_list_items": items,
-        }
+        return {"output_delete_item": f"Removido: {payload}"}
 
     def _handle_edit_item(self, data):
         payload = data.get("output_edit_item")
@@ -216,9 +211,9 @@ class ShoppingListGraph(Graph):
         items: ShoppingListItem = self.shopping_list_service.get_all()
 
         if not items:
-            return {"output_list_items": "The Shopping List is empty"}
+            return {"output_list_items": "A lista de compras está vazia"}
 
-        return {"output_list_items": items}
+        return {"output_list_items": self._format_items(items)}
 
     def _handle_clear_items(self, data):
         print(f"[shopping_list_graph.handle_clear_items]: Triggered...")
@@ -234,6 +229,13 @@ class ShoppingListGraph(Graph):
     # ===============================================
     # Private Methods
     # ===============================================
+
+    def _format_items(self, items: List[ShoppingListItem]) -> str:
+        lines = []
+        for index, item in enumerate(items, start=1):
+            status = " (comprado)" if item.checked else ""
+            lines.append(f"{index}. {item.name} ({item.quantity}){status}")
+        return "\n".join(lines)
 
     def _compile(self):
         workflow = StateGraph(ShoppingListGraphState)

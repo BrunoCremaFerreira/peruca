@@ -520,3 +520,186 @@ class TestHandleDeleteItemWhitespaceTolerance:
         graph._handle_delete_item(state)
         # Assert — item must have been deleted despite the leading space
         graph.shopping_list_service.delete.assert_called_once_with(item_leite.id)
+
+
+# ---------------------------------------------------------------------------
+# Bug 3 — handlers must never leak raw ShoppingListItem entities into the state.
+#
+# _handle_list_items and _handle_delete_item currently place
+# List[ShoppingListItem] under "output_list_items". _handle_final_response then
+# joins/echoes whatever it finds, serialising the dataclasses into the API
+# response (e.g. "ShoppingListItem(id=..., name='leite', ...)"). The graph state
+# must only carry human-readable strings.
+# ---------------------------------------------------------------------------
+
+
+class TestHandleListItemsOutputType:
+    def test_handle_list_items__with_items__output_is_str_not_list(self):
+        """
+        output_list_items must be a human-readable string, never a
+        List[ShoppingListItem]. FAILS with current implementation which
+        returns the raw entity list.
+        """
+        # Arrange
+        graph = _make_graph()
+        item_leite = _sample_item(name="leite")
+        item_arroz = ShoppingListItem(
+            id="arroz-id", name="arroz", quantity=2.0, checked=False
+        )
+        graph.shopping_list_service.get_all = MagicMock(
+            return_value=[item_leite, item_arroz]
+        )
+        # Act
+        result = graph._handle_list_items({})
+        # Assert — must be a string, not a list of entities
+        assert isinstance(result["output_list_items"], str), (
+            f"Expected str, got {type(result['output_list_items']).__name__}"
+        )
+        assert not isinstance(result["output_list_items"], list)
+
+    def test_handle_list_items__with_items__output_contains_item_names(self):
+        # Arrange
+        graph = _make_graph()
+        item_leite = _sample_item(name="leite")
+        item_arroz = ShoppingListItem(
+            id="arroz-id", name="arroz", quantity=2.0, checked=False
+        )
+        graph.shopping_list_service.get_all = MagicMock(
+            return_value=[item_leite, item_arroz]
+        )
+        # Act
+        result = graph._handle_list_items({})
+        # Assert
+        output = result["output_list_items"]
+        assert "leite" in output.lower()
+        assert "arroz" in output.lower()
+
+    def test_handle_list_items__with_items__does_not_leak_entity_repr(self):
+        """Regression: the raw dataclass repr must never reach the output."""
+        # Arrange
+        graph = _make_graph()
+        item_leite = _sample_item(name="leite")
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item_leite])
+        # Act
+        result = graph._handle_list_items({})
+        # Assert
+        assert "ShoppingListItem(" not in result["output_list_items"], (
+            "Raw ShoppingListItem entity leaked into output_list_items"
+        )
+
+
+class TestHandleListItemsEmpty:
+    def test_handle_list_items__empty_list__output_is_str(self):
+        # Arrange
+        graph = _make_graph()
+        graph.shopping_list_service.get_all = MagicMock(return_value=[])
+        # Act
+        result = graph._handle_list_items({})
+        # Assert
+        assert isinstance(result["output_list_items"], str)
+        assert not isinstance(result["output_list_items"], list)
+
+    def test_handle_list_items__empty_list__output_is_in_portuguese(self):
+        # Arrange
+        graph = _make_graph()
+        graph.shopping_list_service.get_all = MagicMock(return_value=[])
+        # Act
+        result = graph._handle_list_items({})
+        # Assert
+        output = result["output_list_items"]
+        portuguese_keywords = ["vazia", "nenhum", "lista", "sem itens"]
+        assert any(kw in output.lower() for kw in portuguese_keywords), (
+            f"Expected a Portuguese message, got: {output!r}"
+        )
+
+    def test_handle_list_items__empty_list__does_not_return_english_message(self):
+        """Regression: previous implementation returned an English string."""
+        # Arrange
+        graph = _make_graph()
+        graph.shopping_list_service.get_all = MagicMock(return_value=[])
+        # Act
+        result = graph._handle_list_items({})
+        # Assert
+        assert "The Shopping List is empty" not in result["output_list_items"], (
+            "English message must be replaced with a Portuguese equivalent"
+        )
+
+
+class TestHandleDeleteItemDoesNotLeakEntities:
+    def test_handle_delete_item__does_not_leak_entity_list_into_state(self):
+        """
+        After deleting, the handler must not place a raw List[ShoppingListItem]
+        under output_list_items. It may omit the key or carry a string.
+        FAILS with current implementation which injects the entity list.
+        """
+        # Arrange
+        graph = _make_graph()
+        item_leite = _sample_item(name="leite")
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item_leite])
+        graph.shopping_list_service.delete = MagicMock()
+        state = {"output_delete_item": "leite,1"}
+        # Act
+        result = graph._handle_delete_item(state)
+        # Assert — output_list_items must be absent or a string, never a list
+        out_list = result.get("output_list_items")
+        assert out_list is None or isinstance(out_list, str), (
+            f"output_list_items must be None or str, got "
+            f"{type(out_list).__name__}"
+        )
+        assert not isinstance(result.get("output_list_items"), list)
+
+    def test_handle_delete_item__delete_output_remains_string_with_removido(self):
+        # Arrange
+        graph = _make_graph()
+        item_leite = _sample_item(name="leite")
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item_leite])
+        graph.shopping_list_service.delete = MagicMock()
+        state = {"output_delete_item": "leite,1"}
+        # Act
+        result = graph._handle_delete_item(state)
+        # Assert
+        assert isinstance(result["output_delete_item"], str)
+        assert "Removido" in result["output_delete_item"], (
+            f"Expected 'Removido' in output, got: {result['output_delete_item']!r}"
+        )
+
+
+class TestHandleFinalResponseOnlyStrings:
+    def test_final_response__after_list_items__output_is_str_without_entity_repr(self):
+        """
+        Short flow: _handle_list_items -> _handle_final_response. The final
+        output must be a string with no leaked entity repr. FAILS today because
+        _handle_list_items leaks the entity list, which _handle_final_response
+        then serialises.
+        """
+        # Arrange
+        graph = _make_graph()
+        item_leite = _sample_item(name="leite")
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item_leite])
+        # Act
+        s1 = graph._handle_list_items({})
+        final = graph._handle_final_response(s1)
+        # Assert
+        assert isinstance(final["output"], str)
+        assert "ShoppingListItem(" not in final["output"], (
+            "Raw ShoppingListItem entity leaked into the final response"
+        )
+
+    def test_final_response__after_delete_item__output_is_str_without_entity_repr(self):
+        """
+        Short flow: _handle_delete_item -> _handle_final_response. The final
+        output must be a string with no leaked entity repr.
+        """
+        # Arrange
+        graph = _make_graph()
+        item_leite = _sample_item(name="leite")
+        graph.shopping_list_service.get_all = MagicMock(return_value=[item_leite])
+        graph.shopping_list_service.delete = MagicMock()
+        # Act
+        s1 = graph._handle_delete_item({"output_delete_item": "leite,1"})
+        final = graph._handle_final_response(s1)
+        # Assert
+        assert isinstance(final["output"], str)
+        assert "ShoppingListItem(" not in final["output"], (
+            "Raw ShoppingListItem entity leaked into the final response"
+        )
