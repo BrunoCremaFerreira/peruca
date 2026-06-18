@@ -813,6 +813,66 @@ class TestHandleAddItemExceptionLanguage:
         )
 
 
+# ---------------------------------------------------------------------------
+# Bug 4 — _handle_final_response must tolerate non-string / empty state values.
+#
+# _classify_intent stores the raw classifier fields in the state
+# (output_edit_item, output_check_item, ...). gemma sometimes returns one of
+# them as a list (e.g. []) or an empty string. The old filter kept every value
+# where ``e is not None``, so a list reached ``"\n\n".join(outputs)`` and blew
+# up with "TypeError: sequence item 0: expected str instance, list found"
+# (shopping_list_graph.py line 94), and empty strings polluted the reply with
+# blank lines. The filter must keep only non-empty strings.
+# ---------------------------------------------------------------------------
+
+
+class TestHandleFinalResponseFiltersNonStrings:
+    def test_final_response__list_value_in_state__does_not_raise_and_is_excluded(self):
+        """A list value (e.g. output_check_item == []) must be filtered out, not
+        joined — reproduces the TypeError at the join (line 94)."""
+        graph = _make_graph()
+        state = {
+            "output_add_item": "Adicionado: ovos",
+            "output_edit_item": [],  # gemma returned a list here
+            "output_check_item": [],
+        }
+
+        result = graph._handle_final_response(state)
+
+        assert isinstance(result["output"], str)
+        assert result["output"] == "Adicionado: ovos"
+
+    def test_final_response__empty_string_values__filtered_no_blank_lines(self):
+        """Empty/whitespace strings must not pollute the reply with blank lines."""
+        graph = _make_graph()
+        state = {
+            "output_add_item": "Adicionado: ovos",
+            "output_edit_item": "",
+            "output_delete_item": "   ",
+            "output_check_item": "",
+        }
+
+        result = graph._handle_final_response(state)
+
+        assert result["output"] == "Adicionado: ovos", (
+            f"Empty values leaked blank lines: {result['output']!r}"
+        )
+
+    def test_final_response__all_empty_or_none__returns_empty_string_no_indexerror(self):
+        """With nothing usable the node must return '' instead of raising
+        IndexError on outputs[0]."""
+        graph = _make_graph()
+        state = {
+            "output_add_item": None,
+            "output_edit_item": "",
+            "output_check_item": [],
+        }
+
+        result = graph._handle_final_response(state)
+
+        assert result["output"] == ""
+
+
 class TestHandleFinalResponseOnlyStrings:
     def test_final_response__after_list_items__output_is_str_without_entity_repr(self):
         """

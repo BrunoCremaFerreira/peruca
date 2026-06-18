@@ -87,13 +87,17 @@ class ShoppingListGraph(Graph):
                 data.get("output_clear_items"),
                 data.get("output_not_recognized"),
             ]
-            if e is not None
+            # The classifier stores its raw fields in the state, so a value may
+            # be an empty string or even a list (when gemma returns one). Keep
+            # only non-empty strings so the join never sees a non-str item and
+            # blank values do not pollute the reply with empty lines.
+            if isinstance(e, str) and e.strip()
         ]
 
         if len(outputs) > 1:
             response = "\n\n".join(outputs)
         else:
-            response = outputs[0]
+            response = outputs[0] if outputs else ""
 
         return {"output": response}
 
