@@ -18,7 +18,8 @@ Peruca is a self-hosted virtual assistant powered by local large language models
 6. [REST API](#rest-api)
 7. [Data Storage](#data-storage)
 8. [Home Assistant Integration](#home-assistant-integration)
-9. [Prerequisites](#prerequisites)
+9. [Music Assistant Integration](#music-assistant-integration)
+10. [Prerequisites](#prerequisites)
 10. [Setup](#setup)
 11. [Docker](#docker)
 12. [Environment Variables](#environment-variables)
@@ -40,6 +41,7 @@ Peruca is a self-hosted virtual assistant powered by local large language models
 | **Smart home climate** | Turn on/off, set temperature, set HVAC mode, and query state of climate entities |
 | **Smart home sensors** | Query current state and recent history of temperature, door, motion, and other sensors |
 | **Security cameras** | Retrieve live snapshots and check the status of camera entities |
+| **Music** | Play, pause, resume, skip, and adjust volume on [Music Assistant](https://music-assistant.io/) players (optional — enabled only when Music Assistant is configured) |
 
 ---
 
@@ -93,12 +95,13 @@ src/
 │       ├── graph.py              ← Abstract base class
 │       ├── main_graph.py         ← Intent classifier + dispatcher
 │       ├── memory_graph.py       ← Fact extraction (background, post-response)
-│       ├── only_talk_graph.py    ← Free conversation (RunnableWithMessageHistory)
+│       ├── only_talk_graph.py    ← Free conversation (prompt | llm chain, reads history)
 │       ├── shopping_list_graph.py
 │       ├── smart_home_lights_graph.py
 │       ├── smart_home_climate_graph.py
 │       ├── smart_home_sensors_graph.py
-│       └── smart_home_cameras_graph.py
+│       ├── smart_home_cameras_graph.py
+│       └── music_graph.py          ← Music Assistant control (optional)
 │
 ├── domain/
 │   ├── entities.py               ← Pure Python dataclasses
@@ -118,7 +121,8 @@ src/
         ├── sqlite/               ← SQLite repository implementations
         └── external/
             ├── redis/            ← RedisChatMessageHistory (conversation history)
-            └── smart_home/       ← Home Assistant HTTP & WebSocket adapters
+            ├── smart_home/       ← Home Assistant HTTP & WebSocket adapters
+            └── music/            ← Music Assistant adapter
 ```
 
 ---
@@ -131,11 +135,11 @@ Every chat request follows this flow:
 POST /llm/chat
       │
       ▼
-LlmAppService.chat()              ← loads existing memories from SQLite
-      │
+LlmAppService.chat()              ← loads memories from SQLite; probes Music
+      │                             Assistant to build context_hints
       ▼
 MainGraph.invoke()                    ← LLM call #1: classifies intent(s)
-      │                               (memories injected into context)
+      │                               (memories + context_hints injected)
       ├──► ShoppingListGraph.invoke()     ← LLM call: shopping list CRUD
       │
       ├──► SmartHomeLightsGraph.invoke()  ← LLM call: light control
@@ -146,10 +150,15 @@ MainGraph.invoke()                    ← LLM call #1: classifies intent(s)
       │
       ├──► SmartHomeCamerasGraph.invoke() ← LLM call: camera snapshots/status
       │
+      ├──► MusicGraph.invoke()            ← LLM call: music control (optional)
+      │
       └──► OnlyTalkGraph.invoke()         ← chain (no StateGraph): free conversation
                 │
                 ▼
       final_response node             ← LLM call #2 (only when multiple intents)
+                │
+                ▼
+      LlmAppService returns { "intents": [...], "output": "..." }
                 │
                 ▼ (FastAPI BackgroundTask)
       MemoryAppService.learn_from_message()
@@ -160,10 +169,12 @@ MainGraph.invoke()                    ← LLM call #1: classifies intent(s)
 
 `MainGraph` may activate **multiple sub-graphs in parallel** when a single message spans several intents (e.g. "turn off the lights and add milk to the shopping list"). The `final_response` node merges the sub-graph outputs into a single, coherent reply.
 
+The `MusicGraph` is wired only when Music Assistant is configured. On every request `LlmAppService` briefly probes Music Assistant for a "music is playing" hint and passes it through `context_hints`, so the classifier can disambiguate commands such as "pause" or "next".
+
 **Key design invariants:**
 - The `classify` node in each sub-graph both classifies the intent **and** extracts structured action data in a single LLM call. Downstream action nodes do not make additional LLM calls.
 - Intent strings returned by the LLM must match the `StateGraph` node names exactly. The `intent_router` function returns `state["intent"]` directly as edge targets.
-- Every `StateGraph` is recompiled on each `invoke()` call.
+- Each `StateGraph` is compiled once on the first `invoke()` and cached on the graph instance (`self._compiled_graph`) for subsequent calls.
 - `MemoryGraph` runs as a FastAPI `BackgroundTask` after every response — failures are silently swallowed so they never affect the user response.
 
 ---
@@ -270,9 +281,30 @@ START → classify → [show_snapshot | check_status | not_recognized]
 | `show_snapshot` | Fetches a JPEG snapshot and returns it as a Base64 data URI |
 | `check_status` | Returns the camera state (streaming/idle/unavailable) |
 
+### MusicGraph
+
+Controls [Music Assistant](https://music-assistant.io/) players. Wired only when
+`MUSIC_ASSISTANT_URL`/`MUSIC_ASSISTANT_TOKEN` are configured; otherwise the graph
+is not registered and music intents fall through to free conversation.
+
+```
+START → classify → [play | pause | resume | next | previous
+                    | set_volume | not_recognized]
+                                             → final_response → END
+```
+
+The classifier receives a `music_is_playing` hint (probed by `LlmAppService`
+before invocation via `context_hints`) so ambiguous commands like "pause" or
+"next" resolve correctly.
+
 ### OnlyTalkGraph
 
-Free-form conversational graph. Does **not** use `StateGraph` — it uses `RunnableWithMessageHistory` with per-user history keyed by `user.id`.
+Free-form conversational graph. Does **not** use `StateGraph` — it is a plain
+`prompt | llm` chain. It **reads** the per-user history (keyed by `user.id`) and
+injects it into a `MessagesPlaceholder`, along with the user's stored memories and
+the current date/time. It does **not** write history itself; the turn is persisted
+once, centrally, by `LlmAppService` after the response is produced (so reads and
+writes share the same `session_id = user.id`).
 
 History backend is selected at startup by `ioc.py`:
 - **Redis** (when `CACHE_DB_CONNECTION_STRING` is set): history survives process restarts and is shared across multiple workers. Optional TTL via `CHAT_HISTORY_TTL_SECONDS`.
@@ -306,6 +338,19 @@ The API runs on port **8000** by default. Interactive docs are available at `/do
   "external_user_id": "user-123"
 }
 ```
+
+**Response body** — `response` carries both the matched intent(s) and the final
+text so callers can act on the classification:
+```json
+{
+  "response": { "intents": ["smart_home_lights"], "output": "Done — kitchen lights are off." },
+  "chat_id": "optional-thread-id",
+  "external_user_id": "user-123"
+}
+```
+
+Every turn (user message + assistant reply) is persisted to the conversation
+history for **all** intents, not just free conversation.
 
 ### Users
 
@@ -352,7 +397,7 @@ The API runs on port **8000** by default. Interactive docs are available at `/do
 | Store | Technology | Purpose |
 |---|---|---|
 | Main database | SQLite | Users, shopping list items, entity aliases, user memories |
-| Conversation history | Redis / in-memory | Per-user chat history for `OnlyTalkGraph`; Redis when `CACHE_DB_CONNECTION_STRING` is set, in-memory otherwise |
+| Conversation history | Redis / in-memory | Per-user chat history (written for every turn, all intents); Redis when `CACHE_DB_CONNECTION_STRING` is set, in-memory otherwise |
 | Long-term memory | SQLite | Extracted facts per user, injected as context into every request |
 
 The SQLite file path is controlled by `PERUCA_DB_CONNECTION_STRING` (defaults to `src/peruca.db`; Docker mounts it at `/data/peruca.db`).
@@ -375,6 +420,14 @@ The WebSocket adapter has auto-reconnect logic and must be closed explicitly. `S
 
 > SSL verification is disabled for `wss://` connections — this is a known issue flagged with a `TODO` in the source.
 
+## Music Assistant Integration
+
+When configured, `MusicAssistantMusicRepository` talks to a
+[Music Assistant](https://music-assistant.io/) server over HTTP (`aiohttp`) to
+list players and issue playback commands. It is optional: if
+`MUSIC_ASSISTANT_URL`/`MUSIC_ASSISTANT_TOKEN` are unset, `ioc.py` does not wire
+the music service or `MusicGraph`, and music intents are ignored.
+
 ---
 
 ## Prerequisites
@@ -382,6 +435,7 @@ The WebSocket adapter has auto-reconnect logic and must be closed explicitly. `S
 - Python 3.12+
 - [Ollama](https://ollama.com) running and accessible **or** an OpenAI API key
 - [Home Assistant](https://www.home-assistant.io/) with a long-lived access token
+- [Music Assistant](https://music-assistant.io/) — optional, for music control
 - SQLite (bundled with Python)
 
 ---
@@ -435,19 +489,31 @@ LLM_PROVIDER_TYPE=OLLAMA
 LLM_PROVIDER_URL=http://<ollama-host>:11434
 LLM_PROVIDER_API_KEY=                        # required for OPENAI
 
-# Models (all default to qwen3:14b; use gpt-4o or similar for OpenAI)
-LLM_MAIN_GRAPH_CHAT_MODEL=qwen3:14b
-LLM_ONLY_TALK_GRAPH_CHAT_MODEL=qwen3:14b
-LLM_SHOPPING_LIST_GRAPH_CHAT_MODEL=qwen3:14b
-LLM_SMART_HOME_LIGHTS_GRAPH_CHAT_MODEL=qwen3:14b
-LLM_SMART_HOME_CLIMATE_GRAPH_CHAT_MODEL=qwen3:14b
-LLM_SMART_HOME_SENSORS_GRAPH_CHAT_MODEL=qwen3:14b
-LLM_SMART_HOME_CAMERAS_GRAPH_CHAT_MODEL=qwen3:14b
-LLM_MEMORY_GRAPH_CHAT_MODEL=qwen3:14b
+# Reasoning/thinking mode. Defaults to false (thinking off) so a thinking model
+# like gemma4 skips ~350–500 wasted reasoning tokens per call (cuts /chat
+# latency ~8x). Set true to enable thinking, or leave empty (LLM_REASONING=) to
+# omit the `think` param for models that reject it. Per-graph overrides exist,
+# e.g. LLM_MAIN_GRAPH_CHAT_REASONING=true.
+LLM_REASONING=false
+
+# Models (all default to gemma4:12b; use gpt-4o or similar for OpenAI)
+LLM_MAIN_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_ONLY_TALK_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_SHOPPING_LIST_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_SMART_HOME_LIGHTS_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_SMART_HOME_CLIMATE_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_SMART_HOME_SENSORS_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_SMART_HOME_CAMERAS_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_MEMORY_GRAPH_CHAT_MODEL=gemma4:12b
 
 # Home Assistant
 HOME_ASSISTANT_URL=http://<ha-host>:8123
 HOME_ASSISTANT_TOKEN=<long-lived-token>
+
+# Music Assistant (optional — omit to disable the music graph)
+MUSIC_ASSISTANT_URL=http://<music-assistant-host>:8095
+MUSIC_ASSISTANT_TOKEN=
+LLM_MUSIC_GRAPH_CHAT_MODEL=gemma4:12b
 
 # Databases
 PERUCA_DB_CONNECTION_STRING=sqlite:///path/to/peruca.db
@@ -543,6 +609,6 @@ peruca/
 | Persistent memory | Memory extraction may occasionally miss or duplicate facts depending on LLM output quality |
 | Conversation history (no Redis) | When `CACHE_DB_CONNECTION_STRING` is not set, history falls back to in-memory and is lost on restart |
 | Async/sync mixing | `SmartHomeLightsGraph` and other sync graphs call `asyncio.run()` per action, creating a new event loop each time — may conflict with an async FastAPI context |
-| Prompt inconsistency | `main_graph.md` uses `/no_think`; other prompts use `/no_thinking` — the model may emit `<think>` blocks that break parsing |
+| Parser sensitivity | Classifier output is parsed with `eval()`/`json.loads()`; prompts must emit straight quotes and valid literals. Stray `<think>` blocks are stripped defensively, but malformed output falls back to `only_talking`/`not_recognized` |
 | SSL | WebSocket adapter disables SSL verification for `wss://` connections |
 | Validator bug | `ShoppingListService.delete()`, `.check()`, and `.uncheck()` omit the mandatory `.validate()` call at the end of the fluent chain |

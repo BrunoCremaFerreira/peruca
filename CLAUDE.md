@@ -82,14 +82,24 @@ Copy `.env.example` (or create `.env` in `src/`) with these keys:
 ```
 LLM_PROVIDER_URL=http://<ollama-host>:11434
 LLM_PROVIDER_TYPE=OLLAMA                        # only OLLAMA is functional
-LLM_MAIN_GRAPH_CHAT_MODEL=qwen3:14b
-LLM_ONLY_TALK_GRAPH_CHAT_MODEL=qwen3:14b
-LLM_SHOPPING_LIST_GRAPH_CHAT_MODEL=qwen3:14b
-LLM_SMART_HOME_LIGHTS_GRAPH_CHAT_MODEL=qwen3:14b
+LLM_REASONING=false                             # thinking off by default (gemma4 is a thinking model); per-graph overrides like LLM_MAIN_GRAPH_CHAT_REASONING=true
+LLM_MAIN_GRAPH_CHAT_MODEL=gemma4:12b            # all graph models default to gemma4:12b
+LLM_ONLY_TALK_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_SHOPPING_LIST_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_SMART_HOME_LIGHTS_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_SMART_HOME_CLIMATE_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_SMART_HOME_SENSORS_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_SMART_HOME_CAMERAS_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_MEMORY_GRAPH_CHAT_MODEL=gemma4:12b
+NLP_SPACY_MODEL=pt_core_news_sm
 HOME_ASSISTANT_URL=http://<ha-host>:8123
 HOME_ASSISTANT_TOKEN=<long-lived-token>
+MUSIC_ASSISTANT_URL=http://<music-assistant-host>:8095   # optional; unset disables the music graph
+MUSIC_ASSISTANT_TOKEN=
+LLM_MUSIC_GRAPH_CHAT_MODEL=gemma4:12b
 PERUCA_DB_CONNECTION_STRING=<path>/peruca.db
 CACHE_DB_CONNECTION_STRING=<redis-url>          # Redis for conversation history; if empty, falls back to in-memory store
+CHAT_HISTORY_TTL_SECONDS=                        # empty or <=0 means no expiry
 ```
 
 ## Architecture
@@ -119,22 +129,29 @@ Current caveat: `Settings()` is instantiated multiple times per request (once pe
 ### LangGraph Graph Hierarchy
 
 ```
-LlmAppService.chat()
-      └─► MainGraph.invoke()                   ← classifies intent (LLM call #1)
+LlmAppService.chat()                           ← loads user memories; probes Music Assistant → context_hints
+      └─► MainGraph.invoke()                   ← classifies intent(s) (LLM call #1)
               ├─► ShoppingListGraph.invoke()   ← CRUD for shopping list (LLM call)
               ├─► SmartHomeLightsGraph.invoke() ← Home Assistant lights (LLM call)
+              ├─► SmartHomeClimateGraph.invoke() ← Home Assistant climate (LLM call)
+              ├─► SmartHomeSensorsGraph.invoke() ← Home Assistant sensors (LLM call)
+              ├─► SmartHomeCamerasGraph.invoke() ← Home Assistant cameras (LLM call)
+              ├─► MusicGraph.invoke()          ← Music Assistant control (optional; only wired when MA is configured)
               ├─► OnlyTalkGraph.invoke()        ← free conversation (chain, not StateGraph)
               └─► [final_response]              ← merges multiple outputs (LLM call #2, if needed)
+
+# After the response, as a FastAPI BackgroundTask:
+MemoryAppService.learn_from_message() ─► MemoryGraph.invoke()   ← extracts durable facts → SQLite
 ```
 
-All graphs inherit from `Graph` (ABC at `application/graphs/graph.py`) and implement `invoke(GraphInvokeRequest) -> dict`. `GraphInvokeRequest` carries `message: str` and `user: User` through the whole chain.
+All graphs inherit from `Graph` (ABC at `application/graphs/graph.py`) and implement `invoke(GraphInvokeRequest) -> dict`. `GraphInvokeRequest` carries `message: str`, `user: User`, `memories: list[str]`, and `context_hints: dict` (e.g. `music_is_playing`) through the whole chain. `LlmAppService.chat()` returns `{"intents": [...], "output": "..."}`, not a bare string.
 
 **Key design constraints for graphs:**
 - The `classify` node in each graph both classifies intent **and** extracts structured data in a single LLM call. Downstream action nodes consume what's already in the state — they do not re-call the LLM.
 - Intent strings returned by the LLM must match the node names in the `StateGraph` exactly. The `intent_router` function returns `state["intent"]` directly as edge targets.
-- `MainGraph` and the list/lights subgraphs use `eval()` to parse LLM output (a Python literal). `SmartHomeLightsGraph._classify_intent` uses `json.loads()`. Do not change this inconsistency without updating both the node code and the corresponding prompt.
-- `OnlyTalkGraph` does not use `StateGraph`. It is a plain `prompt | llm` chain that **reads** conversation history (read-only): it loads `get_session_history(user.id).messages` and injects them into the `MessagesPlaceholder("history")`. It does **not** write history. The turn is persisted once, centrally, in `LlmAppService.chat()` (see below) — so reads and writes share the same `session_id = user.id` key.
-- All graphs call `self._compile()` inside `invoke()`, recompiling the `StateGraph` on every request. This is known overhead; do not "fix" it without testing for thread-safety implications.
+- Every `classify` node first runs the shared `Graph._extract_structured_output()` (strips `<think>` blocks, normalizes curly quotes, extracts the first balanced `[...]`/`{...}` literal). It then parses that literal: `MainGraph` and `ShoppingListGraph` use `eval()`; the smart-home graphs (lights/climate/sensors/cameras) and `MusicGraph` use `json.loads()`; `MemoryGraph` uses `json.loads()` directly. Do not change a graph's parser without updating its corresponding prompt to match.
+- `OnlyTalkGraph` does not use `StateGraph`. It is a plain `prompt | llm` chain that **reads** conversation history (read-only): it loads `get_session_history(user.id).messages` and injects them into the `MessagesPlaceholder("history")` (alongside the user's memories and the current datetime). It does **not** write history. The turn is persisted once, centrally, in `LlmAppService._persist_turn()` for **every** intent — so reads and writes share the same `session_id = user.id` key.
+- Each graph compiles its `StateGraph` on the first `invoke()` and caches it on `self._compiled_graph` (see `Graph.__init__`); subsequent calls reuse the compiled graph. Do not reintroduce per-request recompilation.
 
 ### Fluent Validation Pattern
 
@@ -151,15 +168,17 @@ Known bug: `ShoppingListService.delete()` and `.check()`/`.uncheck()` omit the f
 
 ### Prompt Files
 
-Prompts live in `infra/prompts/` as `.md` files, loaded by name via `Graph.load_prompt(name)`. The `main_graph.md` uses `/no_think` (correct Qwen3 directive). The other prompts use `/no_thinking` — this inconsistency means the model may generate internal `<think>` blocks that break parsing.
+Prompts live in `infra/prompts/` as `.md` files, loaded (and cached) by name via `Graph.load_prompt(name)`. Classifier prompts must use **straight quotes** — their output is parsed by `eval()`/`json.loads()`, and curly quotes break parsing (the extractor normalizes them defensively, but prompts should not rely on that). `load_prompt` strips the `/no_think` directive automatically for non-Ollama providers or when `strip_think_directive` is set. Any stray `<think>…</think>` block a model still emits is removed by `Graph._remove_thinking_tag()` before parsing.
 
 ### Home Assistant Integration
 
-Two separate adapter classes handle two protocols:
-- `HomeAssistantSmartHomeLightRepository` — REST/HTTP via `aiohttp` for light control
-- `HomeAssistantSmartHomeConfigurationRepository` — WebSocket via `websockets` for entity discovery
+Adapters live in `infra/data/external/smart_home/home_assistant/`. Per-domain REST/HTTP repositories (via `aiohttp`) handle control and queries — `HomeAssistantSmartHomeLightRepository`, `...ClimateRepository`, `...SensorRepository`, `...CameraRepository` — while `HomeAssistantSmartHomeConfigurationRepository` uses WebSocket (via `websockets`) for entity discovery.
 
 The WebSocket adapter has auto-reconnect logic. Its `close()` must be called explicitly; `SmartHomeService.update_entity_aliases()` does this in a `finally` block. SSL verification is disabled for `wss://` connections (flagged with a `TODO`).
+
+### Music Assistant Integration
+
+`MusicAssistantMusicRepository` (`infra/data/external/music/music_assistant/`) talks to a Music Assistant server over HTTP (`aiohttp`). It is **optional**: `ioc.py` only wires the music service and `MusicGraph` when `MUSIC_ASSISTANT_URL`/`MUSIC_ASSISTANT_TOKEN` are set. On each request `LlmAppService.chat()` probes it (with a short timeout) to set the `music_is_playing` hint in `context_hints`.
 
 ### Async / Sync Mixing
 
@@ -178,6 +197,6 @@ Conventions in unit test files:
 ## Known Stubs (not implemented)
 
 These nodes exist in code but perform no real action:
-- `ShoppingListGraph`: `edit_item`, `check_item`, `uncheck_item`
-- `SmartHomeLightsGraph`: `change_color`, `change_bright`, `change_mode`
+- `ShoppingListGraph`: `edit_item` (`check_item`/`uncheck_item` are now implemented)
+- `SmartHomeLightsGraph`: `change_color`, `change_mode` (`change_bright` is now implemented)
 - `LlmAppService`: still receives `ContextRepository` in its constructor but never uses it — conversation persistence now goes through the injected `get_session_history` factory, not this field. The param is dead and can be removed when convenient.
