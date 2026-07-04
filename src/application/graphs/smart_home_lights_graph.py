@@ -33,6 +33,7 @@ class SmartHomeLightsGraphState(TypedDict):
     output_turn_on_all: Optional[str]
     output_turn_off_all: Optional[str]
     output_list_lights_status: Optional[str]
+    output_check_status: Optional[str]
     output_change_color: Optional[str]
     output_change_bright: Optional[str]
     output_change_mode: Optional[str]
@@ -129,6 +130,7 @@ class SmartHomeLightsGraph(Graph):
             "output_turn_on_all": parsed.get("turn_on_all") or None,
             "output_turn_off_all": parsed.get("turn_off_all") or None,
             "output_list_lights_status": parsed.get("list_lights_status") or None,
+            "output_check_status": parsed.get("check_status") or None,
             "output_change_color": parsed.get("change_color") or None,
             "output_change_bright": parsed.get("change_bright") or None,
             "output_change_mode": parsed.get("change_mode") or None,
@@ -307,6 +309,33 @@ class SmartHomeLightsGraph(Graph):
         formatted = self._format_lights_grouped(grouped)
         return {"output_list_lights_status": formatted}
 
+    def _handle_check_status(self, data):
+        payload = data.get("output_check_status")
+        print(f"[SmartHomeLightsGraph._handle_check_status]: {payload}")
+
+        if not payload:
+            return {}
+
+        light = async_runner.run(
+            self.smart_home_service.get_light_status_by_alias(payload)
+        )
+
+        if light is None:
+            return {
+                "output_check_status": f"Não encontrei o dispositivo '{payload}'."
+            }
+
+        name = light.friendly_name or payload
+
+        if light.is_available is False:
+            phrase = f"A luz {name} parece estar offline."
+        elif light.is_on:
+            phrase = f"Sim, a luz {name} está ligada."
+        else:
+            phrase = f"A luz {name} está desligada."
+
+        return {"output_check_status": phrase}
+
     def _handle_change_color(self, data):
         devices = data.get("output_change_color", "")
         if devices:
@@ -393,6 +422,8 @@ class SmartHomeLightsGraph(Graph):
             parts.append(str(data["output_turn_off_all"]))
         if data.get("output_list_lights_status"):
             parts.append(str(data["output_list_lights_status"]))
+        if data.get("output_check_status"):
+            parts.append(str(data["output_check_status"]))
         if data.get("output_change_color"):
             parts.append(f"Cor alterada: {data['output_change_color']}")
         if data.get("output_change_bright"):
@@ -430,6 +461,7 @@ class SmartHomeLightsGraph(Graph):
         workflow.add_node(
             "list_lights_status", RunnableLambda(self._handle_list_lights_status)
         )
+        workflow.add_node("check_status", RunnableLambda(self._handle_check_status))
         workflow.add_node("change_color", RunnableLambda(self._handle_change_color))
         workflow.add_node("change_bright", RunnableLambda(self._handle_change_bright))
         workflow.add_node("change_mode", RunnableLambda(self._handle_change_mode))
@@ -450,6 +482,7 @@ class SmartHomeLightsGraph(Graph):
             "turn_on_all",
             "turn_off_all",
             "list_lights_status",
+            "check_status",
             "change_color",
             "change_bright",
             "change_mode",

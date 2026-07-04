@@ -333,6 +333,28 @@ class SmartHomeService:
                 f"constructor."
             )
 
+    async def get_light_status_by_alias(
+        self, query_alias: str
+    ) -> Optional[SmartHomeLight]:
+        """
+        Resolve a single light by a spoken alias and return its current state,
+        without any LLM call. Builds an {alias: entity_id} catalog restricted to
+        light entities, resolves it deterministically, and only queries the
+        light repository when exactly one entity_id is matched.
+        """
+        aliases = self.smart_home_entity_alias_repository.get_all(
+            entity_id_starts_with="light."
+        )
+        available_entities = {item.alias: item.entity_id for item in aliases}
+
+        entity_ids = self.find_entity_ids_by_alias(
+            query_alias=query_alias, available_entities=available_entities
+        )
+        if len(entity_ids) != 1:
+            return None
+
+        return await self.smart_home_light_repository.get_state(entity_ids[0])
+
     async def light_turn_on(self, turn_on_command: LightTurnOn) -> dict:
         await self.smart_home_light_repository.turn_on(turn_on_command=turn_on_command)
 
