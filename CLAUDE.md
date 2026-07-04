@@ -53,6 +53,36 @@ The consultation order for most tasks:
 Do **not** produce a final plan or write any code until the relevant agents have
 been consulted and their output has been incorporated.
 
+## Plan Files
+
+Plans live under `docs/features/` in a `todo` → `doing` → `done` kanban:
+
+- **`todo/`** — planned but not started.
+- **`doing/`** — implementation in progress.
+- **`done/`** — implemented; kept as a historical record of the rationale and
+  discarded alternatives.
+
+**Whenever a plan is requested, it MUST be saved into `docs/features/todo/`** with
+the filename pattern:
+
+```
+{YYYY-MM-DD-HH-mm}-{plan_name}.md
+```
+
+Example: `2026-07-04-01-51-shopping-list-fuzzy-remove-disambiguation.md`. Use the
+current local date/time (zero-padded) for the timestamp and a short kebab-case
+`plan_name`.
+
+Each plan starts with a status header (`Status`, `Criado em`, `Implementado em`,
+`PR/commit`). Move the file to the matching folder as work progresses and fill in
+those fields on completion.
+
+**`done/` is a historical archive, not the current state of the system.** A plan
+describes intent *before* implementation and may have diverged from what was
+actually built. When reading any plan — especially in `done/` — treat the code as
+the source of truth. Only `todo/` and `doing/` plans are "active"; do not use
+`done/` plans as a specification of current behavior.
+
 ## Commands
 
 All commands run from `src/`:
