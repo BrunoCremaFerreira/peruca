@@ -15,6 +15,7 @@ from application.graphs.smart_home_climate_graph import SmartHomeClimateGraph
 from application.graphs.smart_home_sensors_graph import SmartHomeSensorsGraph
 from application.graphs.smart_home_cameras_graph import SmartHomeCamerasGraph
 from domain.entities import GraphInvokeRequest
+from infra.utils import is_null_or_whitespace
 
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,13 @@ class MainGraphState(TypedDict):
     output_sensors: Optional[str]
     output_music: Optional[str]
     output: Optional[str]
+    # Side channel: the factual image description produced by the only_talk
+    # graph. Consumed by LlmAppService for history persistence; deliberately
+    # NOT read by _handle_final_response so it never leaks into `output`.
+    image_description: Optional[str]
+    # Side channel: the #N handle of an image re-visited this turn (Fase C), so
+    # LlmAppService can persist the refreshed description under that handle.
+    revised_image_index: Optional[str]
 
 
 class MainGraph(Graph):
@@ -67,6 +75,13 @@ class MainGraph(Graph):
     # Graph Nodes
     # ===============================================
     def _classify_intent(self, data):
+        request = data["input"]
+        # Text-empty + image present: route straight to free conversation
+        # without spending an LLM call (and never feeding the image to the
+        # classifier). Images alone are always a "look at this" request.
+        if request.images and is_null_or_whitespace(request.message):
+            return {"intent": ["only_talking"], "input": request}
+
         music_is_playing = data["input"].context_hints.get("music_is_playing", False)
         hint_str = (
             "Sim, há música tocando no momento."
@@ -185,7 +200,21 @@ class MainGraph(Graph):
     def _handle_only_talking(self, data):
         logger.info("only_talking graph triggered")
         result = self.only_talk_graph.invoke(invoke_request=data["input"])
-        return {"output_only_talking": f"{self._remove_thinking_tag(result)}"}
+        # The only_talk graph now returns a dict {"output", "image_description"};
+        # a bare string is tolerated for backward compatibility.
+        if isinstance(result, dict):
+            output = result.get("output", "")
+            image_description = result.get("image_description")
+            revised_image_index = result.get("revised_image_index")
+        else:
+            output = result
+            image_description = None
+            revised_image_index = None
+        return {
+            "output_only_talking": f"{self._remove_thinking_tag(output or '')}",
+            "image_description": image_description,
+            "revised_image_index": revised_image_index,
+        }
 
     # ===============================================
     # Private Methods

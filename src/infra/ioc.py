@@ -17,6 +17,7 @@ from application.graphs.smart_home_sensors_graph import SmartHomeSensorsGraph
 from application.graphs.smart_home_cameras_graph import SmartHomeCamerasGraph
 from domain.interfaces.data_repository import (
     ContextRepository,
+    ImageStore,
     ShoppingListRepository,
     SmartHomeAreaRepository,
     SmartHomeEntityAliasRepository,
@@ -61,6 +62,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.chat_history import BaseChatMessageHistory, InMemoryChatMessageHistory
 from infra.data.external.redis.redis_chat_message_history import RedisChatMessageHistory
+from infra.data.external.redis.redis_image_store import RedisImageStore
 from infra.data.sqlite.sqlite_shopping_list_repository import (
     SqliteShoppingListRepository,
 )
@@ -192,6 +194,25 @@ def _get_session_history_factory() -> Callable[[str], BaseChatMessageHistory]:
     return _get_redis
 
 
+def get_image_store() -> Optional[ImageStore]:
+    """
+    IOC for the inbound-image blob store (Fase B).
+
+    Requires Redis: with CACHE_DB_CONNECTION_STRING set, returns a
+    RedisImageStore; otherwise returns None (re-vision disabled — base64 is too
+    heavy for an in-memory fallback and would not survive across workers).
+    """
+
+    settings = _get_settings()
+    if not settings.cache_db_connection_string:
+        return None
+    return RedisImageStore(
+        get_context_repository(),
+        ttl_seconds=settings.chat_image_store_ttl_seconds,
+        max_per_user=settings.chat_image_store_max_per_user,
+    )
+
+
 def get_only_talk_graph() -> OnlyTalkGraph:
     """
     IOC for Only Talk Graph
@@ -212,6 +233,7 @@ def get_only_talk_graph() -> OnlyTalkGraph:
             llm_chat=llm_chat,
             get_session_history=_get_session_history_factory(),
             provider=settings.llm_provider_type,
+            image_store=get_image_store(),
         )
     return _repo_cache[cache_key]
 
@@ -401,6 +423,8 @@ def get_llm_app_service() -> LlmAppService:
     IOC for LLMAppService class
     """
 
+    settings = _get_settings()
+
     # Instancing
     return LlmAppService(
         main_graph=get_main_graph(),
@@ -411,6 +435,10 @@ def get_llm_app_service() -> LlmAppService:
         get_session_history=_get_session_history_factory(),
         shopping_list_service=get_shopping_list_service(),
         disambiguation_service=get_disambiguation_service(),
+        image_store=get_image_store(),
+        chat_image_max_bytes=settings.chat_image_max_bytes,
+        chat_image_max_count=settings.chat_image_max_count,
+        chat_image_allowed_mimes=settings.chat_image_allowed_mimes,
     )
 
 

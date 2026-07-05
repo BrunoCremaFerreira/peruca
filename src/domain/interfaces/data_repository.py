@@ -211,6 +211,50 @@ class ContextRepository(ABC):
 
 
 # =====================================
+# Image Store (inbound chat images)
+# =====================================
+class ImageStore(ABC):
+    """
+    Blob store for inbound chat images (full data URIs), kept OUT of the
+    conversation history so a later turn can re-analyse the pixels on demand.
+
+    Separate from ContextRepository (ISP: a blob store is not a chat history).
+    All operations are scoped by ``user_id`` so an image_id from one user can
+    never resolve another user's blob.
+    """
+
+    @abstractmethod
+    def save(self, user_id: str, image_id: str, data_uri: str) -> None:
+        """
+        Store a data URI under a per-user, per-image handle.
+        """
+        pass
+
+    @abstractmethod
+    def get(self, user_id: str, image_id: str) -> Optional[str]:
+        """
+        Retrieve a stored data URI, or None when absent/expired.
+        """
+        pass
+
+    @abstractmethod
+    def next_index(self, user_id: str) -> int:
+        """
+        Return the next stable per-user handle N (the ``#N`` written in the
+        history line and used to resolve the blob later).
+        """
+        pass
+
+    @abstractmethod
+    def latest_id(self, user_id: str) -> Optional[str]:
+        """
+        Return the id of the most recently stored image for the user (the
+        "most recent" target of a re-vision request), or None when empty.
+        """
+        pass
+
+
+# =====================================
 # Smart Home Etity Data Repository
 # =====================================
 class SmartHomeEntityAliasRepository(ABC):

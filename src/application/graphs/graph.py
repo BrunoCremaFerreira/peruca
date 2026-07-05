@@ -56,6 +56,24 @@ class Graph(ABC):
                     return cleaned[start:i + 1]
         return None
 
+    def _build_human_content(self, message: str, images: list[str] | None):
+        """
+        Build the `content` for a HumanMessage.
+
+        Returns the plain string when there are no images (zero regression for
+        the text-only path), or a list of content blocks (a text block, when
+        there is text, followed by one image block per data URI) that ChatOllama
+        converts into a multimodal message.
+        """
+        if not images:
+            return message
+        blocks = []
+        if message and message.strip():
+            blocks.append({"type": "text", "text": message})
+        for image in images:
+            blocks.append({"type": "image_url", "image_url": {"url": image}})
+        return blocks
+
     def load_prompt(self, name: str, llm_strip_think_directive: bool = False) -> str:
         global _prompt_cache
         if name not in _prompt_cache:

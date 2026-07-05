@@ -1,9 +1,80 @@
 # Plano: Recebimento de imagens em base64 no chat (entrada multimodal)
 
-- **Status:** todo
+- **Status:** done (Fases A, B e C implementadas; segurança aprovada)
 - **Criado em:** 2026-07-05 03:07
-- **Implementado em:** —
-- **PR/commit:** —
+- **Implementado em:** Fases A, B e C — 2026-07-05
+- **PR/commit:** commit na branch `development` (2026-07-05)
+
+> **Progresso Fase A:** concluída em TDD (dataclasses + `images`, `ImageValidator`,
+> settings de limite, propagação e validação no `LlmAppService`, short-circuit e
+> canal lateral `image_description` no `MainGraph`, `_build_human_content` na base
+> `Graph`, `OnlyTalkGraph` multimodal com retorno `dict` e split do marcador
+> `<<<DESC_IMAGEM>>>`, persistência da descrição no `_persist_turn`, prompts
+> `main_graph.md`/`only_talk_graph.md`, wiring na `ioc.py`) + verificação e2e do
+> endpoint `/llm/chat`.
+>
+> **Progresso Fase B:** concluída em TDD. ABC `ImageStore`
+> (`save`/`get`/`next_index`) no domínio; `RedisImageStore` (facade síncrono sobre
+> `async_runner`, chave `image:{user_id}:{image_id}`, TTL, cap por usuário,
+> isolamento cross-user por construção); settings `chat_image_store_ttl_seconds`
+> (86400) e `chat_image_store_max_per_user`; factory `get_image_store()` (None sem
+> Redis, sem fallback in-memory). `LlmAppService` salva os blobs **antes** da
+> referência no histórico (atomicidade), grava a linha `[Imagem #N enviada pelo
+> usuário: <descrição>]` e degrada para linha sem `#N` quando o `save` falha ou não
+> há store. **Decisão de simplificação:** o contrato Fase A do `OnlyTalkGraph`/
+> `MainGraph` (uma `image_description` por turno) ficou **inalterado**; toda a
+> lógica de store vive no `LlmAppService`, e o `image_id` é o índice monotônico
+> por usuário (`#N`) — mapeia direto para a chave da store, deixando a Fase C
+> viável sem retrabalho. 1020 testes unitários verdes + verificação e2e da cadeia
+> `LlmAppService` + `RedisImageStore` concreto.
+>
+> **Progresso Fase C:** concluída em TDD. Gate de re-visão no `OnlyTalkGraph`:
+> `image_store` injetado; 1º passe pode emitir a sentinela
+> `<<<REVER_IMAGEM: #N | mais_recente>>>` (parsing por regex, `#N` reduzido a
+> dígitos puros); o graph resolve o base64 via `image_store.get(user.id, id)` /
+> `latest_id(user.id)` — **sempre** no escopo do `user.id` — e faz um 2º passe
+> multimodal com a imagem reinjetada, emitindo `<<<DESC_IMAGEM>>>` atualizado.
+> Salvaguardas: sem store / sem blob ⇒ sentinela stripada (no-op, 1 passe); teto
+> de 1 re-visão por turno (2ª saída não é re-avaliada); acesso à store via facade
+> síncrono (sem `asyncio.run` no nó). `MainGraph` transita `revised_image_index`
+> no canal lateral; `LlmAppService` persiste a descrição enriquecida sob `#N` no
+> turno de re-visão (follow-ups repetidos ficam baratos). Diretiva da sentinela
+> injetada **condicionalmente** (só quando há `[Imagem #` no histórico).
+> `main_graph.md` reforça follow-up de foto → `["only_talking"]` (sem intent novo).
+>
+> **Revisão de segurança (`especialista-de-seguranca`) — obrigatória:** aprovou o
+> isolamento cross-user (id sempre no escopo do `user.id`; `#N` só dígitos), o
+> parsing robusto do handle, o teto de re-visão e a não-persistência do base64.
+> Correções aplicadas antes do sign-off:
+> - **H-01 (alta, DoS):** `ImageValidator.validate_data_uri` agora estima o
+>   tamanho (O(1), sem alocar) e **recusa decodificar** payload acima do limite —
+>   o guard de tamanho passa a atuar de fato antes do `base64.b64decode`.
+> - **M-01 (média, prompt injection via OCR):** `LlmAppService._sanitize_description`
+>   colapsa whitespace/newlines e trunca em 500 chars antes de persistir a
+>   descrição (imagem é conteúdo controlável pelo atacante).
+> - **B-01 (baixa, log):** `logger.debug` deixou de logar o `ChatRequest` inteiro
+>   (base64); loga só `message`, ids e contagem de imagens.
+>
+> **Pré-existente / fora de escopo:** endpoint `/llm/chat` sem autenticação
+> (SEC-001) — todo o isolamento por imagem assume que o chamador é o dono do
+> `external_user_id`.
+>
+> Total: **1037 testes unitários verdes** + verificações e2e das três fases.
+>
+> **Testes de integração** (marcados `integration`; exigem Ollama gemma4
+> multimodal e/ou o Redis de teste, com skip gracioso):
+> - `tests/integration_tests/test_llm_app_service_chat__images_graph.py` —
+>   roteamento com imagem (texto vazio + imagem → `only_talking`; pergunta visual
+>   → `only_talking`) e output não-vazio; **validação de entrada** (base64
+>   malformado, mime não suportado, não-data-URI, e payload ~8 MiB rejeitado
+>   **sem decodificar** — guard DoS) que **roda offline** (levanta `ValidationError`
+>   antes de qualquer LLM); persistência Fase B (blob salvo em `image:{user_id}:1`;
+>   histórico com a descrição e **sem** base64); smoke de re-visão Fase C
+>   (follow-up de detalhe não quebra e mantém `only_talking`).
+> - `tests/integration_tests/test_redis_image_store_integration.py` —
+>   round-trip real do `RedisImageStore` sobre Redis vivo (save/get, isolamento
+>   cross-user, `next_index`/`latest_id`, cap com evicção). `conftest.py` estendido
+>   para limpar as chaves `image:*`/`image_ids:*`/`image_seq:*` entre testes.
 
 ## Objetivo
 

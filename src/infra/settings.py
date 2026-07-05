@@ -109,6 +109,22 @@ class Settings(BaseSettings):
 
     cache_db_connection_string: str = ""
     chat_history_ttl_seconds: int | None = None
+    # ===============================
+    # Chat Image Input Config
+    # ===============================
+    # Limits for inbound base64 images on POST /llm/chat. Enforced by
+    # ImageValidator BEFORE any LLM call (fail-fast, DoS guard). max_bytes is
+    # the decoded-image ceiling; max_count caps images per request; allowed
+    # mimes is the accepted allowlist.
+    chat_image_max_bytes: int = 5_242_880  # 5 MiB
+    chat_image_max_count: int = 4
+    chat_image_allowed_mimes: list[str] = ["image/jpeg", "image/png", "image/webp"]
+    # Image blob store (Fase B): keeps base64 out of the history but available
+    # for on-demand re-vision. TTL bounds RAM (base64 is heavy); 24h covers
+    # re-vision through the day and expires idle blobs. max_per_user is the
+    # second RAM-containment axis (cap of images kept per user).
+    chat_image_store_ttl_seconds: int = 86_400  # 24h
+    chat_image_store_max_per_user: int = 10
     # How long (seconds) a pending shopping-list disambiguation question stays
     # valid before the stored state is treated as expired and discarded.
     disambiguation_ttl_seconds: int = 120

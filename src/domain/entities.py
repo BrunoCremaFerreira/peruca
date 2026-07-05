@@ -112,6 +112,10 @@ class GraphInvokeRequest:
     user: User
     memories: list[str] = field(default_factory=list)
     context_hints: dict = field(default_factory=dict)
+    # Inbound images as full data URIs ("data:image/jpeg;base64,..."). Only the
+    # OnlyTalkGraph consumes them; action graphs ignore them. Default empty keeps
+    # every existing construction valid.
+    images: list[str] = field(default_factory=list)
 
 
 # ====================================

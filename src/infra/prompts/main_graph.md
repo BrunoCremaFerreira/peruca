@@ -38,6 +38,8 @@ Você deve classificar a entrada em **uma ou mais** das seguintes categorias:
     - Comentários ou observações que **apenas mencionam** música, sem pedir nenhuma ação ("supermercados tocam músicas lentas pra gente comprar", "casas que sincronizam luzes com música de Natal"), são `["only_talking"]` (ver instruções 2 e 6).
     - Use o contexto de música acima **apenas** para desambiguar **comandos curtos isolados, sem a palavra "música"** — como "próxima", "pausa", "para": classifique-os como `["music"]` somente quando houver música tocando; caso contrário, classifique como `["only_talking"]`.
 8. **Desambiguação câmera vs sensor de movimento**: se a mensagem mencionar uma **"câmera"** (ver, acessar, checar a câmera, ou verificar movimento *na câmera*), classifique como `smart_home_security_cams`, mesmo que cite "movimento". A categoria `smart_home_sensors` só vale para movimento/presença **sem** referência a câmera ("houve movimento na lavanderia?").
+9. **Perguntas visuais ou descritivas sobre uma imagem/foto** ("o que é isso?", "o que você vê?", "descreva esta foto", "que animal é esse?", "consegue ler o que está escrito aqui?") — quando o usuário comenta ou pergunta sobre algo visual **sem** pedir uma ação prática (controlar luz/clima, mexer na lista, câmeras) — são `["only_talking"]`. Você recebe apenas o **texto** da mensagem; a imagem em si é tratada na conversa livre.
+    - **Perguntas de acompanhamento sobre uma foto já enviada** ("qual o número de série na foto?", "e a cor exata da camisa?", "quantas pessoas aparecem ali?") também são `["only_talking"]` — não existe categoria nova para isso.
 
 📌 **Formato de saída obrigatório**: uma lista Python com as categorias detectadas. Exemplo:  
 `["only_talking"]`  

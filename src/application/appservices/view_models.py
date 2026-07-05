@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 
@@ -10,6 +10,9 @@ class ChatRequest:
     message: str = ""
     external_user_id: str = ""
     chat_id: str = ""
+    # Inbound images as full data URIs ("data:image/jpeg;base64,..."). Default
+    # empty preserves retro-compatibility with every existing positional call.
+    images: list[str] = field(default_factory=list)
 
 
 @dataclass

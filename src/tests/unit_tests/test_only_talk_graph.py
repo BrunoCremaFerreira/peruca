@@ -141,8 +141,11 @@ class TestOnlyTalkGraphReadOnlyHistory:
         request = GraphInvokeRequest(message="tudo bem?", user=user, memories=[])
         # Act
         captured = _invoke_capturing_chain_input(graph, request)
-        # Assert
-        assert captured["input"].get("input") == "tudo bem?"
+        # Assert — `input` is now a one-element list of HumanMessage whose
+        # content is the plain string (no image → string content, zero regression).
+        input_messages = captured["input"].get("input")
+        assert isinstance(input_messages, list) and len(input_messages) == 1
+        assert input_messages[0].content == "tudo bem?"
 
     def test_invoke__does_not_write_history(self):
         # Arrange
@@ -188,7 +191,8 @@ class TestOnlyTalkGraphReadOnlyHistory:
         request = GraphInvokeRequest(message="oi", user=user, memories=[])
         # Act
         captured = _invoke_capturing_chain_input(graph, request)
-        # Assert
+        # Assert — return is now a dict {"output", "image_description"}.
         assert captured["input"].get("history") == []
-        assert captured["result"] == "resposta"
+        assert captured["result"]["output"] == "resposta"
+        assert captured["result"]["image_description"] is None
         history.add_messages.assert_not_called()

@@ -89,10 +89,11 @@ def _capture_system_message(graph: OnlyTalkGraph, request: GraphInvokeRequest) -
     real_response.content = "ok"
 
     def fake_from_messages(messages):
-        # messages: [("system", <formatted>), MessagesPlaceholder, ("human", ...)]
+        # messages: [("system", <formatted>), MessagesPlaceholder("history"),
+        #            MessagesPlaceholder("input")]
         captured["system"] = messages[0][1]
         prompt_mock = MagicMock()
-        # prompt | llm  -> chain ; chain wrapped by RunnableWithMessageHistory
+        # prompt | llm -> chain, invoked directly (read-only history).
         chain_mock = MagicMock()
         chain_mock.invoke.return_value = real_response
         prompt_mock.__or__.return_value = chain_mock
@@ -101,10 +102,7 @@ def _capture_system_message(graph: OnlyTalkGraph, request: GraphInvokeRequest) -
     with patch(
         "application.graphs.only_talk_graph.ChatPromptTemplate.from_messages",
         side_effect=fake_from_messages,
-    ), patch(
-        "application.graphs.only_talk_graph.RunnableWithMessageHistory"
-    ) as rwmh:
-        rwmh.return_value.invoke.return_value = real_response
+    ):
         graph.invoke(request)
 
     return captured["system"]

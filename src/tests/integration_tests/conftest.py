@@ -98,8 +98,14 @@ def _clear_history_keys(connection_string: str) -> None:
 
     client = from_url(connection_string)
     try:
-        for key in client.scan_iter("chat_history:*"):
-            client.delete(key)
+        for pattern in (
+            "chat_history:*",
+            "image:*",
+            "image_ids:*",
+            "image_seq:*",
+        ):
+            for key in client.scan_iter(pattern):
+                client.delete(key)
     finally:
         client.close()
 
