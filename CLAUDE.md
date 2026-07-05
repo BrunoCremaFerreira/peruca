@@ -26,6 +26,10 @@ The **only** exception is `infra/prompts/` — prompt files may be written in an
 
 No implementation PR or commit may be created without a corresponding unit test written beforehand. Any code change that lacks test coverage is considered incomplete and must not be merged.
 
+## Entity IDs — Always UUID
+
+**Whenever an entity is created in the persistence layers, its `id` must be of type UUID.** This applies without exception to every domain entity that is stored (SQLite repositories, external adapters, or any other persistence). Do not use auto-increment integers, sequential counters, or other id schemes for persisted entities — always generate a UUID.
+
 ## Mandatory Agent Usage
 
 All analysis and implementation tasks **must** use the specialized agents defined in `.claude/agents/`:
