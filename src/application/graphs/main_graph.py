@@ -1,3 +1,4 @@
+import ast
 import logging
 
 from langchain_core.runnables import RunnableLambda
@@ -89,7 +90,7 @@ class MainGraph(Graph):
             )
             return {"intent": ["only_talking"], "input": data["input"]}
         try:
-            intents = eval(extracted)
+            intents = ast.literal_eval(extracted)
             if isinstance(intents, str):
                 intents = [intents]
         except Exception:

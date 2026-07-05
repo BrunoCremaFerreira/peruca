@@ -1,3 +1,4 @@
+import ast
 import logging
 import re
 from typing import List, Optional, TypedDict
@@ -71,7 +72,7 @@ class ShoppingListGraph(Graph):
                     "output_delete_item": None, "output_check_item": None,
                     "output_uncheck_item": None}
         try:
-            parsed = eval(extracted)
+            parsed = ast.literal_eval(extracted)
             intents = parsed.get("intents", ["not_recognized"])
         except Exception:
             parsed = {}
