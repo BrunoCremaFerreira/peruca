@@ -86,7 +86,7 @@ def user_get(
 
 
 @router.get("/user/external-id/{external_id}", tags=["User"])
-def user_get(
+def user_get_by_external_id(
     external_id: str, user_app_service: UserAppService = Depends(get_user_app_service)
 ) -> UserResponse:
     return user_app_service.get_by_external_id(user_external_id=external_id)
@@ -204,7 +204,7 @@ def shopping_list_clear(
 
 
 @router.put("/shopping-list/{id}/check", tags=["Shopping List"])
-def shopping_list_ckeck(
+def shopping_list_check(
     id: str,
     shopping_list_app_service: ShoppingListAppService = Depends(
         get_shopping_list_app_service
@@ -214,7 +214,7 @@ def shopping_list_ckeck(
 
 
 @router.put("/shopping-list/{id}/uncheck", tags=["Shopping List"])
-def shopping_list_ckeck(
+def shopping_list_uncheck(
     id: str,
     shopping_list_app_service: ShoppingListAppService = Depends(
         get_shopping_list_app_service
