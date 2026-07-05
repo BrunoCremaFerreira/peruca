@@ -240,6 +240,131 @@ class TestShoppingListServiceDelete:
         # Assert
         shopping_list_repo_mock.delete.assert_called_once_with(item_id=item_id)
 
+    def test_delete__invalid_id_empty_string__raises_validation_error(
+        self, shopping_list_repo_mock
+    ):
+        # Arrange
+        # Known bug: delete() calls validate_id() but omits the final .validate(),
+        # so ValidationError is never raised. Expected to FAIL until fixed.
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        # Act / Assert
+        with pytest.raises(ValidationError):
+            service.delete("")
+
+
+class TestShoppingListServiceFindItemsByName:
+    """
+    find_items_by_name(query, items) resolves a user-typed term against the
+    already-loaded shopping list, without touching the repository and without
+    any LLM. Matching layers, in priority order (first that matches wins):
+      1. exact normalized (accent/case-insensitive) — short-circuits
+      2. partial (query tokens are a subset of the item name tokens)
+      3. typo (difflib ratio >= 0.8, with a min-length guard)
+    """
+
+    def test_exact_baseline__returns_the_single_item(self, shopping_list_repo_mock):
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        leite = _sample_item(name="Leite")
+        items = [leite, _sample_item(name="Arroz")]
+
+        result = service.find_items_by_name("Leite", items)
+
+        assert result == [leite]
+
+    def test_exact_is_case_and_accent_insensitive(self, shopping_list_repo_mock):
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        cafe = _sample_item(name="Café")
+        result = service.find_items_by_name("cafe", [cafe])
+        assert result == [cafe]
+
+    def test_partial__single_token_query_matches_multiword_name(
+        self, shopping_list_repo_mock
+    ):
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        carne = _sample_item(name="Carne de panela")
+        result = service.find_items_by_name("carne", [carne])
+        assert result == [carne]
+
+    def test_partial__inner_token_query_matches_multiword_name(
+        self, shopping_list_repo_mock
+    ):
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        carne = _sample_item(name="Carne de panela")
+        result = service.find_items_by_name("panela", [carne])
+        assert result == [carne]
+
+    def test_multiple_partial_matches__returns_all(self, shopping_list_repo_mock):
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        panela = _sample_item(name="Carne de panela")
+        seca = _sample_item(name="Carne seca")
+        result = service.find_items_by_name("carne", [panela, seca])
+        assert set(id(i) for i in result) == {id(panela), id(seca)}
+        assert len(result) == 2
+
+    def test_exact_has_priority_over_partial(self, shopping_list_repo_mock):
+        # "Carne" exists literally AND is a token of "Carne de panela"; the exact
+        # match must short-circuit and return ONLY the literal item.
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        carne = _sample_item(name="Carne")
+        panela = _sample_item(name="Carne de panela")
+        result = service.find_items_by_name("carne", [carne, panela])
+        assert result == [carne]
+
+    def test_typo__fuzzy_match_below_edit_distance(self, shopping_list_repo_mock):
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        crepom = _sample_item(name="Crepom")
+        result = service.find_items_by_name("grepom", [crepom])
+        assert result == [crepom]
+
+    @pytest.mark.parametrize(
+        "query,name",
+        [
+            ("chocolatte", "Chocolate"),
+            ("banan", "Banana"),
+            ("tomatte", "Tomate"),
+        ],
+    )
+    def test_typo__parametrized(self, shopping_list_repo_mock, query, name):
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        item = _sample_item(name=name)
+        result = service.find_items_by_name(query, [item])
+        assert result == [item]
+
+    def test_exact_has_priority_over_fuzzy(self, shopping_list_repo_mock):
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        # "Crepom" (exact) and "Crespom" (a fuzzy neighbour) both present; exact wins.
+        crepom = _sample_item(name="Crepom")
+        crespom = _sample_item(name="Crespom")
+        result = service.find_items_by_name("Crepom", [crepom, crespom])
+        assert result == [crepom]
+
+    def test_no_match__returns_empty(self, shopping_list_repo_mock):
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        result = service.find_items_by_name("chocolate", [_sample_item(name="Leite")])
+        assert result == []
+
+    def test_different_word_below_threshold__returns_empty(
+        self, shopping_list_repo_mock
+    ):
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        result = service.find_items_by_name("carne", [_sample_item(name="leite")])
+        assert result == []
+
+    def test_empty_item_list__returns_empty(self, shopping_list_repo_mock):
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        assert service.find_items_by_name("carne", []) == []
+
+    def test_blank_query__returns_empty(self, shopping_list_repo_mock):
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        assert service.find_items_by_name("   ", [_sample_item(name="Leite")]) == []
+
+    def test_does_not_access_repository(self, shopping_list_repo_mock):
+        service = ShoppingListService(shopping_list_repository=shopping_list_repo_mock)
+        service.find_items_by_name("carne", [_sample_item(name="Carne de panela")])
+        shopping_list_repo_mock.get_all.assert_not_called()
+        shopping_list_repo_mock.get_by_id.assert_not_called()
+        shopping_list_repo_mock.get_by_name.assert_not_called()
+
 
 class TestShoppingListServiceClear:
     def test_clear_calls_repository_clear(self, shopping_list_repo_mock):

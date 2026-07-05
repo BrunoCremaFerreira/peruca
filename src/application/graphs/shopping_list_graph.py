@@ -7,9 +7,16 @@ from langchain_core.prompts import ChatPromptTemplate
 from application.graphs.graph import Graph
 from application.graphs.markers import SHOPPING_LIST_HEADER
 from domain.commands import ShoppingListItemAdd
-from domain.entities import GraphInvokeRequest, ShoppingListItem
+from domain.entities import (
+    DisambiguationCandidate,
+    GraphInvokeRequest,
+    PendingDisambiguation,
+    ShoppingListItem,
+)
 from domain.exceptions import ValidationError
+from domain.services.disambiguation_service import DisambiguationService
 from domain.services.shopping_list_service import ShoppingListService
+from infra import async_runner
 
 
 class ShoppingListGraphState(TypedDict):
@@ -35,12 +42,14 @@ class ShoppingListGraph(Graph):
         self,
         llm_chat: BaseChatModel,
         shopping_list_service: ShoppingListService,
+        disambiguation_service: Optional[DisambiguationService] = None,
         provider: str = "OLLAMA",
         strip_think_directive: bool = False,
     ):
         super().__init__(provider, strip_think_directive)
         self.llm_chat = llm_chat
         self.shopping_list_service = shopping_list_service
+        self.disambiguation_service = disambiguation_service
         self.classification_prompt = ChatPromptTemplate.from_template(
             self.load_prompt("shopping_list_graph.md")
         )
@@ -128,17 +137,25 @@ class ShoppingListGraph(Graph):
 
         all_items = self.shopping_list_service.get_all()
         if not all_items:
-            return {"output_delete_item": "A lista esta vazia"}
+            return {"output_delete_item": "A lista está vazia"}
 
-        items_to_delete = [e.split(",", 1)[0].strip() for e in payload.split("|")]
-        for item_name in items_to_delete:
-            item = next(
-                (e for e in all_items if e.name.lower() == item_name.lower()), None
-            )
-            if item:
-                self.shopping_list_service.delete(item.id)
+        deleted, not_found, question = self._resolve_and_apply(
+            data, payload, "delete", self.shopping_list_service.delete, all_items
+        )
 
-        return {"output_delete_item": f"Removido: {payload}"}
+        parts = []
+        if deleted:
+            parts.append(f"Removido: {', '.join(deleted)}")
+        if not_found:
+            parts.append(f"Não encontrei na lista: {', '.join(not_found)}")
+        if question:
+            parts.append(question)
+
+        return {
+            "output_delete_item": " ".join(parts)
+            if parts
+            else "Não encontrei esse item na lista."
+        }
 
     def _handle_edit_item(self, data):
         payload = data.get("output_edit_item")
@@ -155,28 +172,20 @@ class ShoppingListGraph(Graph):
         if not all_items:
             return {"output_check_item": "Nenhum item encontrado para marcar"}
 
-        names_to_check = [name.strip() for name in payload.split("|")]
-        checked_names = []
-        not_found_names = []
-
-        for name in names_to_check:
-            item = next((e for e in all_items if e.name.lower() == name.lower()), None)
-            if item:
-                self.shopping_list_service.check(item.id)
-                checked_names.append(item.name)
-            else:
-                not_found_names.append(name)
+        checked, not_found, question = self._resolve_and_apply(
+            data, payload, "check", self.shopping_list_service.check, all_items
+        )
 
         parts = []
-        if checked_names:
-            parts.append(f"Marcado como comprado: {', '.join(checked_names)}")
-        if not_found_names:
-            parts.append(
-                f"Itens não encontrados na lista: {', '.join(not_found_names)}"
-            )
+        if checked:
+            parts.append(f"Marcado como comprado: {', '.join(checked)}")
+        if not_found:
+            parts.append(f"Itens não encontrados na lista: {', '.join(not_found)}")
+        if question:
+            parts.append(question)
 
         return {
-            "output_check_item": "; ".join(parts)
+            "output_check_item": " ".join(parts)
             if parts
             else "Nenhum item encontrado para marcar"
         }
@@ -189,28 +198,20 @@ class ShoppingListGraph(Graph):
         if not all_items:
             return {"output_uncheck_item": "Nenhum item encontrado para desmarcar"}
 
-        names_to_uncheck = [name.strip() for name in payload.split("|")]
-        unchecked_names = []
-        not_found_names = []
-
-        for name in names_to_uncheck:
-            item = next((e for e in all_items if e.name.lower() == name.lower()), None)
-            if item:
-                self.shopping_list_service.uncheck(item.id)
-                unchecked_names.append(item.name)
-            else:
-                not_found_names.append(name)
+        unchecked, not_found, question = self._resolve_and_apply(
+            data, payload, "uncheck", self.shopping_list_service.uncheck, all_items
+        )
 
         parts = []
-        if unchecked_names:
-            parts.append(f"Desmarcado: {', '.join(unchecked_names)}")
-        if not_found_names:
-            parts.append(
-                f"Itens não encontrados na lista: {', '.join(not_found_names)}"
-            )
+        if unchecked:
+            parts.append(f"Desmarcado: {', '.join(unchecked)}")
+        if not_found:
+            parts.append(f"Itens não encontrados na lista: {', '.join(not_found)}")
+        if question:
+            parts.append(question)
 
         return {
-            "output_uncheck_item": "; ".join(parts)
+            "output_uncheck_item": " ".join(parts)
             if parts
             else "Nenhum item encontrado para desmarcar"
         }
@@ -240,6 +241,62 @@ class ShoppingListGraph(Graph):
     # ===============================================
     # Private Methods
     # ===============================================
+
+    def _resolve_and_apply(self, data, payload, operation, apply, all_items):
+        """
+        Resolve each term in the pipe-delimited payload against the loaded
+        items via the domain resolver (handles typos and partial names) and
+        apply ``operation`` on unambiguous matches. On the FIRST ambiguous term,
+        record a pending disambiguation and build a question instead of acting.
+
+        Returns (applied_names, not_found_names, question). ``question`` is None
+        when nothing was ambiguous.
+        """
+        applied_names: List[str] = []
+        not_found_names: List[str] = []
+        question: Optional[str] = None
+
+        terms = [e.split(",", 1)[0].strip() for e in payload.split("|")]
+        for term in terms:
+            if not term:
+                continue
+            candidates = self.shopping_list_service.find_items_by_name(term, all_items)
+            if not candidates:
+                not_found_names.append(term)
+            elif len(candidates) == 1:
+                apply(candidates[0].id)
+                applied_names.append(candidates[0].name)
+            elif question is None:
+                question = self._store_disambiguation(
+                    data, operation, term, candidates
+                )
+
+        return applied_names, not_found_names, question
+
+    def _store_disambiguation(self, data, operation, query, candidates) -> str:
+        """
+        Persist a pending disambiguation for the user (when a disambiguation
+        service is wired) and return the Portuguese question listing the
+        candidate names.
+        """
+        names = ", ".join(candidate.name for candidate in candidates)
+        question = f'Encontrei mais de um item para "{query}": {names}. Qual você quer?'
+
+        if self.disambiguation_service is not None:
+            pending = PendingDisambiguation(
+                operation=operation,
+                query=query,
+                candidates=[
+                    DisambiguationCandidate(id=candidate.id, name=candidate.name)
+                    for candidate in candidates
+                ],
+            )
+            user_id = data["input"].user.id
+            async_runner.run(
+                self.disambiguation_service.set_pending(user_id, pending)
+            )
+
+        return question
 
     def _format_items(self, items: List[ShoppingListItem]) -> str:
         lines = [SHOPPING_LIST_HEADER]

@@ -1,10 +1,11 @@
 import uuid
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from application.graphs.shopping_list_graph import ShoppingListGraph
-from domain.entities import ShoppingListItem
+from domain.entities import GraphInvokeRequest, ShoppingListItem, User
 from domain.exceptions import ValidationError
+from domain.services.shopping_list_service import ShoppingListService
 
 
 """
@@ -28,23 +29,34 @@ Covers the following behaviour changes (TDD — written before implementation):
 # ---------------------------------------------------------------------------
 
 
-def _make_graph() -> ShoppingListGraph:
+def _make_graph(disambiguation_service=None) -> ShoppingListGraph:
     """
     Build a ShoppingListGraph with all external dependencies mocked.
     load_prompt is patched to avoid filesystem access.
+
+    The mocked service delegates find_items_by_name to a real (pure)
+    ShoppingListService instance so handlers can resolve item names, while the
+    CRUD methods (add/delete/check/uncheck) stay MagicMocks for assertions.
     """
     llm_chat = MagicMock()
     shopping_list_service = MagicMock()
     shopping_list_service.get_by_name = MagicMock(return_value=None)
     shopping_list_service.get_all = MagicMock(return_value=[])
+    _matcher = ShoppingListService(shopping_list_repository=MagicMock())
+    shopping_list_service.find_items_by_name.side_effect = _matcher.find_items_by_name
 
     with patch.object(ShoppingListGraph, "load_prompt", return_value="{input}"):
         graph = ShoppingListGraph(
             llm_chat=llm_chat,
             shopping_list_service=shopping_list_service,
+            disambiguation_service=disambiguation_service,
         )
 
     return graph
+
+
+def _input(message="faça algo", user_id="user-1") -> GraphInvokeRequest:
+    return GraphInvokeRequest(message=message, user=User(id=user_id))
 
 
 def _sample_item(name="Leite", quantity=1.0) -> ShoppingListItem:
@@ -912,3 +924,178 @@ class TestHandleFinalResponseOnlyStrings:
         assert "ShoppingListItem(" not in final["output"], (
             "Raw ShoppingListItem entity leaked into the final response"
         )
+
+
+# ---------------------------------------------------------------------------
+# Feature — non-literal resolution + disambiguation with state.
+#
+# Handlers resolve item names via shopping_list_service.find_items_by_name:
+#   0 candidates -> "not found" (Portuguese), never a lying "Removido"
+#   1 candidate  -> apply on the matched item.id
+#   >1 candidates -> do NOT apply; store a pending disambiguation and ask.
+# ---------------------------------------------------------------------------
+
+
+def _two_carnes():
+    panela = ShoppingListItem(id="p-id", name="Carne de panela", quantity=1.0)
+    seca = ShoppingListItem(id="s-id", name="Carne seca", quantity=1.0)
+    return panela, seca
+
+
+class TestHandleDeleteItemResolution:
+    def test_typo__resolves_and_deletes_matched_item(self):
+        graph = _make_graph()
+        crepom = ShoppingListItem(id="c-id", name="Crepom", quantity=1.0)
+        graph.shopping_list_service.get_all.return_value = [crepom]
+        graph.shopping_list_service.delete = MagicMock()
+        state = {"output_delete_item": "grepom", "input": _input()}
+
+        result = graph._handle_delete_item(state)
+
+        graph.shopping_list_service.delete.assert_called_once_with("c-id")
+        assert "Removido" in result["output_delete_item"]
+        assert "Crepom" in result["output_delete_item"]
+
+    def test_partial__resolves_and_deletes_matched_item(self):
+        graph = _make_graph()
+        item = ShoppingListItem(id="c-id", name="Carne de panela", quantity=1.0)
+        graph.shopping_list_service.get_all.return_value = [item]
+        graph.shopping_list_service.delete = MagicMock()
+        state = {"output_delete_item": "panela", "input": _input()}
+
+        result = graph._handle_delete_item(state)
+
+        graph.shopping_list_service.delete.assert_called_once_with("c-id")
+        assert "Removido" in result["output_delete_item"]
+
+    def test_clean_term_passed_to_resolver__without_quantity(self):
+        graph = _make_graph()
+        item = ShoppingListItem(id="c-id", name="Crepom", quantity=1.0)
+        graph.shopping_list_service.get_all.return_value = [item]
+        graph.shopping_list_service.delete = MagicMock()
+        state = {"output_delete_item": "crepom, 2", "input": _input()}
+
+        graph._handle_delete_item(state)
+
+        first_call_query = (
+            graph.shopping_list_service.find_items_by_name.call_args_list[0][0][0]
+        )
+        assert first_call_query == "crepom"
+
+    def test_no_match__does_not_delete_and_does_not_say_removido(self):
+        graph = _make_graph()
+        graph.shopping_list_service.get_all.return_value = [
+            ShoppingListItem(id="x", name="Leite", quantity=1.0)
+        ]
+        graph.shopping_list_service.delete = MagicMock()
+        state = {"output_delete_item": "chocolate", "input": _input()}
+
+        result = graph._handle_delete_item(state)
+
+        graph.shopping_list_service.delete.assert_not_called()
+        out = result["output_delete_item"]
+        assert "Removido" not in out
+        # Portuguese "not found" message
+        assert any(kw in out.lower() for kw in ["não encontr", "nao encontr"])
+
+    def test_ambiguous__does_not_delete_asks_with_both_names_and_stores_pending(self):
+        disambig = MagicMock()
+        disambig.set_pending = AsyncMock()
+        graph = _make_graph(disambiguation_service=disambig)
+        panela, seca = _two_carnes()
+        graph.shopping_list_service.get_all.return_value = [panela, seca]
+        graph.shopping_list_service.delete = MagicMock()
+        state = {
+            "output_delete_item": "carne",
+            "input": _input(message="remova a carne", user_id="user-42"),
+        }
+
+        result = graph._handle_delete_item(state)
+
+        # Must not apply anything on an ambiguous match.
+        graph.shopping_list_service.delete.assert_not_called()
+        out = result["output_delete_item"]
+        assert "Carne de panela" in out
+        assert "Carne seca" in out
+        assert "?" in out
+        # Pending disambiguation stored for the user.
+        disambig.set_pending.assert_called_once()
+        stored_user_id = disambig.set_pending.call_args[0][0]
+        stored_pending = disambig.set_pending.call_args[0][1]
+        assert stored_user_id == "user-42"
+        assert stored_pending.operation == "delete"
+        assert {c.id for c in stored_pending.candidates} == {"p-id", "s-id"}
+
+    def test_mixed_payload__applies_unambiguous_and_reports_not_found(self):
+        graph = _make_graph()
+        leite = ShoppingListItem(id="l-id", name="Leite", quantity=1.0)
+        graph.shopping_list_service.get_all.return_value = [leite]
+        graph.shopping_list_service.delete = MagicMock()
+        state = {"output_delete_item": "leite|chocolate", "input": _input()}
+
+        result = graph._handle_delete_item(state)
+
+        graph.shopping_list_service.delete.assert_called_once_with("l-id")
+        out = result["output_delete_item"]
+        assert "Leite" in out
+        assert any(kw in out.lower() for kw in ["não encontr", "nao encontr"])
+
+
+class TestHandleCheckItemResolution:
+    def test_typo__resolves_and_checks_matched_item(self):
+        graph = _make_graph()
+        crepom = ShoppingListItem(id="c-id", name="Crepom", quantity=1.0)
+        graph.shopping_list_service.get_all.return_value = [crepom]
+        graph.shopping_list_service.check = MagicMock()
+        state = {"output_check_item": "grepom", "input": _input()}
+
+        result = graph._handle_check_item(state)
+
+        graph.shopping_list_service.check.assert_called_once_with("c-id")
+        assert "Marcado" in result["output_check_item"]
+
+    def test_ambiguous__does_not_check_and_stores_pending(self):
+        disambig = MagicMock()
+        disambig.set_pending = AsyncMock()
+        graph = _make_graph(disambiguation_service=disambig)
+        panela, seca = _two_carnes()
+        graph.shopping_list_service.get_all.return_value = [panela, seca]
+        graph.shopping_list_service.check = MagicMock()
+        state = {"output_check_item": "carne", "input": _input(user_id="u9")}
+
+        result = graph._handle_check_item(state)
+
+        graph.shopping_list_service.check.assert_not_called()
+        assert "?" in result["output_check_item"]
+        disambig.set_pending.assert_called_once()
+        assert disambig.set_pending.call_args[0][1].operation == "check"
+
+
+class TestHandleUncheckItemResolution:
+    def test_typo__resolves_and_unchecks_matched_item(self):
+        graph = _make_graph()
+        crepom = ShoppingListItem(id="c-id", name="Crepom", quantity=1.0, checked=True)
+        graph.shopping_list_service.get_all.return_value = [crepom]
+        graph.shopping_list_service.uncheck = MagicMock()
+        state = {"output_uncheck_item": "grepom", "input": _input()}
+
+        result = graph._handle_uncheck_item(state)
+
+        graph.shopping_list_service.uncheck.assert_called_once_with("c-id")
+        assert "Desmarcado" in result["output_uncheck_item"]
+
+    def test_ambiguous__does_not_uncheck_and_stores_pending(self):
+        disambig = MagicMock()
+        disambig.set_pending = AsyncMock()
+        graph = _make_graph(disambiguation_service=disambig)
+        panela, seca = _two_carnes()
+        graph.shopping_list_service.get_all.return_value = [panela, seca]
+        graph.shopping_list_service.uncheck = MagicMock()
+        state = {"output_uncheck_item": "carne", "input": _input(user_id="u9")}
+
+        result = graph._handle_uncheck_item(state)
+
+        graph.shopping_list_service.uncheck.assert_not_called()
+        assert "?" in result["output_uncheck_item"]
+        disambig.set_pending.assert_called_once()
+        assert disambig.set_pending.call_args[0][1].operation == "uncheck"

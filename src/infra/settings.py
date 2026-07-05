@@ -108,6 +108,9 @@ class Settings(BaseSettings):
 
     cache_db_connection_string: str = ""
     chat_history_ttl_seconds: int | None = None
+    # How long (seconds) a pending shopping-list disambiguation question stays
+    # valid before the stored state is treated as expired and discarded.
+    disambiguation_ttl_seconds: int = 120
     peruca_db_connection_string: str = (
         f"sqlite://{Path(__file__).parent.parent / 'peruca.db'}"
     )

@@ -1,9 +1,9 @@
 # Plano — Remoção/marcação inteligente de itens da lista de compras (matching não-literal + desambiguação com estado)
 
-> **Status:** todo — ainda não implementado
+> **Status:** done — implementado
 > **Criado em:** 2026-07-04 01:51
-> **Implementado em:** —
-> **PR/commit:** —
+> **Implementado em:** 2026-07-04
+> **PR/commit:** — (working tree; sem commit automático conforme CLAUDE.md)
 >
 > _Documento de intenção. Ao concluir, mover para `docs/features/done/`, preencher os campos acima e lembrar: **o código é a fonte da verdade**, não este plano._
 

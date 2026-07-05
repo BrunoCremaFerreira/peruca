@@ -32,6 +32,8 @@ class LlmAppService:
         get_session_history: Optional[
             Callable[[str], BaseChatMessageHistory]
         ] = None,
+        shopping_list_service=None,
+        disambiguation_service=None,
     ) -> None:
         self.main_graph = main_graph
         self.context_repository = context_repository
@@ -39,6 +41,8 @@ class LlmAppService:
         self.user_memory_service = user_memory_service
         self.music_service = music_service
         self.get_session_history = get_session_history
+        self.shopping_list_service = shopping_list_service
+        self.disambiguation_service = disambiguation_service
 
     # ===============================================
     # Public Methods
@@ -60,6 +64,20 @@ class LlmAppService:
                 key_name="external_id",
                 value=chat_request.external_user_id,
             )
+
+        # A pending disambiguation short-circuits normal routing: the user's
+        # reply ("a primeira" / "carne de panela" / "cancelar") is resolved
+        # deterministically without invoking the MainGraph (no extra LLM cost).
+        if self.disambiguation_service is not None:
+            pending = async_runner.run(
+                self.disambiguation_service.get_pending(user.id)
+            )
+            if pending is not None:
+                consumed = self._consume_disambiguation(
+                    user, pending, chat_request.message
+                )
+                if consumed is not None:
+                    return consumed
 
         memories = self.user_memory_service.get_all_by_user(user.id)
         memory_contents = [memory.content for memory in memories]
@@ -96,6 +114,54 @@ class LlmAppService:
     # ===============================================
     # Private Methods
     # ===============================================
+
+    _OPERATION_LABELS = {
+        "delete": "Removido",
+        "check": "Marcado como comprado",
+        "uncheck": "Desmarcado",
+    }
+
+    def _consume_disambiguation(self, user: User, pending, message: str):
+        """
+        Resolve a follow-up reply against a pending disambiguation.
+
+        Returns the final chat response dict for "match"/"cancel", or None for
+        "none" (the caller then falls through to the MainGraph with the original
+        message).
+        """
+        result = self.disambiguation_service.resolve_choice(
+            message, pending.candidates
+        )
+
+        if result.kind == "cancel":
+            async_runner.run(self.disambiguation_service.clear_pending(user.id))
+            output = "Ok, cancelei."
+            self._persist_turn(user=user, message=message, output=output)
+            return {"intents": ["shopping_list"], "output": output}
+
+        if result.kind == "match":
+            candidate = result.candidate
+            self._apply_operation(pending.operation, candidate.id)
+            async_runner.run(self.disambiguation_service.clear_pending(user.id))
+            label = self._OPERATION_LABELS.get(pending.operation, "Feito")
+            output = f"{label}: {candidate.name}"
+            self._persist_turn(user=user, message=message, output=output)
+            return {"intents": ["shopping_list"], "output": output}
+
+        # kind == "none": the user ignored the question — drop the pending state
+        # and let the original message route normally.
+        async_runner.run(self.disambiguation_service.clear_pending(user.id))
+        return None
+
+    def _apply_operation(self, operation: str, item_id: str) -> None:
+        operations = {
+            "delete": self.shopping_list_service.delete,
+            "check": self.shopping_list_service.check,
+            "uncheck": self.shopping_list_service.uncheck,
+        }
+        apply = operations.get(operation)
+        if apply is not None:
+            apply(item_id)
 
     def _persist_turn(self, user: User, message: str, output: Optional[str]) -> None:
         if self.get_session_history is None:

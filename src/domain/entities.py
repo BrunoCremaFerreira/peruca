@@ -44,6 +44,32 @@ class ShoppingListItem(BaseEntity):
 
 
 # ====================================
+# Disambiguation Related Classes
+# ====================================
+@dataclass
+class DisambiguationCandidate:
+    """A single item a pending disambiguation question refers to."""
+
+    id: str = ""
+    name: str = ""
+
+
+@dataclass
+class PendingDisambiguation:
+    """
+    A disambiguation question awaiting the user's next reply. Persisted between
+    turns so the follow-up ("a primeira", "carne de panela", "cancelar") can be
+    applied to the operation that raised it. The TTL is embedded in the payload
+    (expires_at, epoch seconds) so it survives both Redis and in-memory stores.
+    """
+
+    operation: str = ""  # "delete" | "check" | "uncheck"
+    query: str = ""
+    candidates: List["DisambiguationCandidate"] = field(default_factory=list)
+    expires_at: float = 0.0  # epoch seconds
+
+
+# ====================================
 # Smart Home Entity Alias
 # ====================================
 @dataclass

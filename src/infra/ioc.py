@@ -30,6 +30,7 @@ from domain.interfaces.smart_home_repository import (
     SmartHomeSensorRepository,
     SmartHomeCameraRepository,
 )
+from domain.services.disambiguation_service import DisambiguationService
 from domain.services.music_service import MusicService
 from domain.services.shopping_list_service import ShoppingListService
 from domain.services.smart_home_service import SmartHomeService
@@ -53,6 +54,7 @@ from infra.data.external.smart_home.home_assistant.home_assistant_smart_home_sen
 from infra.data.external.smart_home.home_assistant.home_assistant_smart_home_camera_repository import (
     HomeAssistantSmartHomeCameraRepository,
 )
+from infra.data.cache.in_memory_context_repository import InMemoryContextRepository
 from infra.data.sqlite.context_repository_redis import RedisContextRepository
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
@@ -237,6 +239,7 @@ def get_shopping_list_graph() -> ShoppingListGraph:
         _repo_cache[cache_key] = ShoppingListGraph(
             llm_chat=llm_chat,
             shopping_list_service=shopping_list_service,
+            disambiguation_service=get_disambiguation_service(),
             provider=settings.llm_provider_type,
             strip_think_directive=settings.llm_strip_think_directive,
         )
@@ -406,6 +409,8 @@ def get_llm_app_service() -> LlmAppService:
         user_memory_service=get_user_memory_service(),
         music_service=get_music_service(),
         get_session_history=_get_session_history_factory(),
+        shopping_list_service=get_shopping_list_service(),
+        disambiguation_service=get_disambiguation_service(),
     )
 
 
@@ -544,18 +549,40 @@ def get_smart_home_service() -> SmartHomeService:
 # ====================================
 
 
-def get_context_repository() -> Optional[ContextRepository]:
+def get_context_repository() -> ContextRepository:
     """
-    IOC for Cache Repository
+    IOC for Cache Repository.
+
+    Returns a Redis-backed repository when CACHE_DB_CONNECTION_STRING is set,
+    otherwise a process-local in-memory repository so features depending on the
+    ContextRepository (e.g. shopping-list disambiguation) still work without
+    Redis. Cached as a singleton so the in-memory store keeps its state across
+    turns.
     """
 
     settings = _get_settings()
     connection_string = settings.cache_db_connection_string
 
-    if not connection_string:
-        return None
+    cache_key = ("context_repository", connection_string)
+    if cache_key not in _repo_cache:
+        if connection_string:
+            _repo_cache[cache_key] = RedisContextRepository(connection_string)
+        else:
+            _repo_cache[cache_key] = InMemoryContextRepository()
+    return _repo_cache[cache_key]
 
-    return RedisContextRepository(connection_string)
+
+def get_disambiguation_service() -> DisambiguationService:
+    """
+    IOC for Disambiguation Service
+    """
+
+    settings = _get_settings()
+    return DisambiguationService(
+        context_repository=get_context_repository(),
+        shopping_list_service=get_shopping_list_service(),
+        ttl_seconds=settings.disambiguation_ttl_seconds,
+    )
 
 
 def get_user_repository() -> UserRepository:

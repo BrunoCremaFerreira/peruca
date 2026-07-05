@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
+from difflib import SequenceMatcher
 from typing import List
+import unicodedata
 import uuid
 from domain.commands import ShoppingListItemAdd, ShoppingListItemUpdate
 from domain.entities import ShoppingListItem
@@ -7,6 +9,47 @@ from domain.exceptions import ValidationError
 from domain.interfaces.data_repository import ShoppingListRepository
 from domain.validations.shopping_list_item_validation import ShoppingListItemValidator
 from infra.utils import auto_map
+
+
+# Generic Portuguese connective words to drop when tokenizing item names, so a
+# partial query like "carne" matches "Carne de panela". Kept intentionally
+# small and product-neutral (no climate/equipment terms — this is not the
+# smart-home tokenizer).
+_NAME_STOPWORDS = {
+    "a", "o", "as", "os", "de", "da", "do", "das", "dos",
+    "e", "com", "sem", "para", "por", "no", "na", "nos", "nas", "em",
+}
+
+# difflib ratio threshold for a typo to count as the same item.
+_FUZZY_THRESHOLD = 0.8
+# Words shorter than this are not fuzzy-matched — short tokens produce too many
+# false positives (e.g. "carne" vs "leite").
+_FUZZY_MIN_LENGTH = 4
+
+
+def _normalize(value: str) -> str:
+    """
+    Normalize a string for deterministic comparison: NFD-strip accents,
+    lowercase and trim. Mirrors SmartHomeService._normalize.
+    """
+    if not value:
+        return ""
+    decomposed = unicodedata.normalize("NFD", value)
+    stripped = decomposed.encode("ascii", "ignore").decode("ascii")
+    return stripped.lower().strip()
+
+
+def _name_tokens(value: str) -> set:
+    """
+    Break an item name/query into comparable tokens: normalize, split on
+    whitespace and hyphens, and drop generic Portuguese stopwords.
+    """
+    normalized = _normalize(value).replace("-", " ")
+    return {
+        token
+        for token in normalized.split()
+        if token and token not in _NAME_STOPWORDS
+    }
 
 
 class ShoppingListService:
@@ -70,9 +113,61 @@ class ShoppingListService:
         Delete a Shopping List Item
         """
 
-        ShoppingListItemValidator().validate_id(item_id)
+        ShoppingListItemValidator().validate_id(item_id).validate()
 
         self.shopping_list_repository.delete(item_id=item_id)
+
+    def find_items_by_name(
+        self, query: str, items: List[ShoppingListItem]
+    ) -> List[ShoppingListItem]:
+        """
+        Resolve a user-typed term against already-loaded shopping list items,
+        deterministically (no LLM, no repository access). Matching layers are
+        applied in priority order; the first non-empty layer wins:
+
+          1. exact normalized (accent/case-insensitive) — short-circuits, so a
+             literal name is never treated as ambiguous;
+          2. partial — the query tokens are a subset of an item's name tokens
+             ("carne"/"panela" -> "Carne de panela");
+          3. typo — difflib ratio >= threshold, guarded by a minimum length.
+
+        Returns every item matched by the winning layer: 0, 1 or many. The
+        caller uses the count to decide whether to act or ask.
+        """
+        normalized_query = _normalize(query)
+        if not normalized_query or not items:
+            return []
+
+        # 1. Exact normalized match — highest priority.
+        exact = [item for item in items if _normalize(item.name) == normalized_query]
+        if exact:
+            return exact
+
+        # 2. Partial (token subset) match.
+        query_tokens = _name_tokens(query)
+        if query_tokens:
+            partial = [
+                item
+                for item in items
+                if query_tokens <= _name_tokens(item.name)
+            ]
+            if partial:
+                return partial
+
+        # 3. Typo (fuzzy) match — only for long-enough queries.
+        if len(normalized_query) >= _FUZZY_MIN_LENGTH:
+            fuzzy = [
+                item
+                for item in items
+                if SequenceMatcher(
+                    None, normalized_query, _normalize(item.name)
+                ).ratio()
+                >= _FUZZY_THRESHOLD
+            ]
+            if fuzzy:
+                return fuzzy
+
+        return []
 
     def clear(self):
         """
