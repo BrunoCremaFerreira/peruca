@@ -110,6 +110,7 @@ Integration tests require a live Ollama instance at `LLM_PROVIDER_URL` and write
 Copy `.env.example` (or create `.env` in `src/`) with these keys:
 
 ```
+LOG_LEVEL=INFO                                  # DEBUG|INFO|WARNING|ERROR|CRITICAL; controls root logger verbosity
 LLM_PROVIDER_URL=http://<ollama-host>:11434
 LLM_PROVIDER_TYPE=OLLAMA                        # only OLLAMA is functional
 LLM_REASONING=false                             # thinking off by default (gemma4 is a thinking model); per-graph overrides like LLM_MAIN_GRAPH_CHAT_REASONING=true

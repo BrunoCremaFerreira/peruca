@@ -1,3 +1,5 @@
+import logging
+
 from langchain_core.runnables import RunnableLambda
 from langgraph.graph import StateGraph, START, END
 from langchain_core.prompts import ChatPromptTemplate
@@ -12,6 +14,9 @@ from application.graphs.smart_home_climate_graph import SmartHomeClimateGraph
 from application.graphs.smart_home_sensors_graph import SmartHomeSensorsGraph
 from application.graphs.smart_home_cameras_graph import SmartHomeCamerasGraph
 from domain.entities import GraphInvokeRequest
+
+
+logger = logging.getLogger(__name__)
 
 
 class MainGraphState(TypedDict):
@@ -79,19 +84,23 @@ class MainGraph(Graph):
         raw_content = response.content
         extracted = self._extract_structured_output(raw_content)
         if extracted is None:
-            print(f"[main_graph.classify_intent] fallback: no structure found. raw={raw_content!r}")
+            logger.warning(
+                "classify_intent fallback: no structure found. raw=%r", raw_content
+            )
             return {"intent": ["only_talking"], "input": data["input"]}
         try:
             intents = eval(extracted)
             if isinstance(intents, str):
                 intents = [intents]
         except Exception:
-            print(f"[main_graph.classify_intent] fallback: eval failed. extracted={extracted!r}")
+            logger.warning(
+                "classify_intent fallback: eval failed. extracted=%r", extracted
+            )
             intents = ["only_talking"]
         return {"intent": intents, "input": data["input"]}
 
     def _handle_music(self, data):
-        print(f"[main_graph.handle_music]: Triggered...")
+        logger.info("music graph triggered")
         result = self.music_graph.invoke(invoke_request=data["input"])
         return {"output_music": result.get("output")}
 
@@ -146,34 +155,34 @@ class MainGraph(Graph):
         return {"output": response}
 
     def _handle_smart_home_lights(self, data):
-        print(f"[main_graph.handle_smart_home_lights]: Triggered...")
+        logger.info("smart_home_lights graph triggered")
         result: str = self.smart_home_lights_graph.invoke(invoke_request=data["input"])
         return {"output_lights": result.get("output")}
 
     def _handle_smart_home_climate(self, data):
-        print(f"[main_graph.handle_smart_home_climate]: Triggered...")
+        logger.info("smart_home_climate graph triggered")
         result = self.smart_home_climate_graph.invoke(invoke_request=data["input"])
         return {"output_climate": result.get("output")}
 
     def _handle_smart_home_sensors(self, data):
-        print(f"[main_graph.handle_smart_home_sensors]: Triggered...")
+        logger.info("smart_home_sensors graph triggered")
         result = self.smart_home_sensors_graph.invoke(invoke_request=data["input"])
         return {"output_sensors": result.get("output")}
 
     def _handle_smart_home_security_cams(self, data):
-        print(f"[main_graph.handle_smart_home_security_cams]: Triggered...")
+        logger.info("smart_home_security_cams graph triggered")
         result = self.smart_home_cameras_graph.invoke(
             GraphInvokeRequest(message=data["input"].message, user=data["input"].user)
         )
         return {"output_cams": result.get("output", "")}
 
     def _handle_shopping_list(self, data):
-        print(f"[main_graph.handle_shopping_list]: : Triggered...")
+        logger.info("shopping_list graph triggered")
         result: str = self.shopping_list_graph.invoke(invoke_request=data["input"])
         return {"output_shopping": result.get("output")}
 
     def _handle_only_talking(self, data):
-        print(f"[main_graph.handle_only_talking]: Triggered...")
+        logger.info("only_talking graph triggered")
         result = self.only_talk_graph.invoke(invoke_request=data["input"])
         return {"output_only_talking": f"{self._remove_thinking_tag(result)}"}
 

@@ -1,3 +1,4 @@
+import logging
 import re
 from typing import List, Optional, TypedDict
 from langchain_core.runnables import RunnableLambda
@@ -17,6 +18,9 @@ from domain.exceptions import ValidationError
 from domain.services.disambiguation_service import DisambiguationService
 from domain.services.shopping_list_service import ShoppingListService
 from infra import async_runner
+
+
+logger = logging.getLogger(__name__)
 
 
 class ShoppingListGraphState(TypedDict):
@@ -112,7 +116,7 @@ class ShoppingListGraph(Graph):
 
     def _handle_add_item(self, data):
         payload: str = data.get("output_add_item")
-        print(f"[shopping_list_graph.handle_add_item]: {payload}")
+        logger.debug("handle_add_item payload=%r", payload)
 
         try:
             items_to_add = self._parse_shopping_list_add(payload)
@@ -126,14 +130,14 @@ class ShoppingListGraph(Graph):
         except ValidationError as validation_error:
             return {"output_add_item": validation_error.errors}
         except Exception as exception:
-            print(f"ERROR: {exception}")
+            logger.error("handle_add_item failed: %s", exception, exc_info=True)
             return {
                 "output_add_item": "Tive um problema interno aqui, tente de novo daqui a pouco."
             }
 
     def _handle_delete_item(self, data):
         payload: str = data.get("output_delete_item")
-        print(f"[shopping_list_graph.handle_delete_item]: {payload}")
+        logger.debug("handle_delete_item payload=%r", payload)
 
         all_items = self.shopping_list_service.get_all()
         if not all_items:
@@ -159,14 +163,14 @@ class ShoppingListGraph(Graph):
 
     def _handle_edit_item(self, data):
         payload = data.get("output_edit_item")
-        print(f"[shopping_list_graph.handle_edit_item]: {payload}")
+        logger.debug("handle_edit_item payload=%r", payload)
         return {
             "output_edit_item": "Ainda não sei editar item da lista, mas já já aprendo."
         }
 
     def _handle_check_item(self, data):
         payload: str = data.get("output_check_item")
-        print(f"[shopping_list_graph.handle_check_item]: {payload}")
+        logger.debug("handle_check_item payload=%r", payload)
 
         all_items = self.shopping_list_service.get_all()
         if not all_items:
@@ -192,7 +196,7 @@ class ShoppingListGraph(Graph):
 
     def _handle_uncheck_item(self, data):
         payload: str = data.get("output_uncheck_item")
-        print(f"[shopping_list_graph.handle_uncheck_item]: {payload}")
+        logger.debug("handle_uncheck_item payload=%r", payload)
 
         all_items = self.shopping_list_service.get_all()
         if not all_items:
@@ -217,7 +221,7 @@ class ShoppingListGraph(Graph):
         }
 
     def _handle_list_items(self, data):
-        print(f"[shopping_list_graph.handle_list_items]: Triggered...")
+        logger.info("handle_list_items triggered")
         items: ShoppingListItem = self.shopping_list_service.get_all()
 
         if not items:
@@ -226,14 +230,14 @@ class ShoppingListGraph(Graph):
         return {"output_list_items": self._format_items(items)}
 
     def _handle_clear_items(self, data):
-        print(f"[shopping_list_graph.handle_clear_items]: Triggered...")
+        logger.info("handle_clear_items triggered")
         self.shopping_list_service.clear()
         return {
             "output_clear_items": "Lista de compras limpa, todos os itens foram removidos"
         }
 
     def _handle_not_recognized(self, data):
-        print(f"[shopping_list_graph.handle_not_recognized]: Triggered...")
+        logger.info("handle_not_recognized triggered")
         return {
             "output_not_recognized": "Não entendi o que você quer fazer com a lista de compras."
         }
@@ -366,7 +370,7 @@ class ShoppingListGraph(Graph):
             name, _, quantity_raw = pair.partition(",")
             name = name.strip()
             if not name:
-                print(f"Warning: Item ignored: '{pair}'")
+                logger.warning("item ignored: %r", pair)
                 continue
             match = re.search(r"\d+(?:[.,]\d+)?", quantity_raw)
             quantity = float(match.group().replace(",", ".")) if match else 1.0

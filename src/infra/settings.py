@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     # ===============================
 
     cors_origin: str = "*"
+    log_level: str = "INFO"
 
     # ===============================
     # LLM Provider Configs
@@ -126,3 +127,21 @@ class Settings(BaseSettings):
         if isinstance(value, str) and value.strip() == "":
             return None
         return value
+
+    @field_validator("log_level", mode="before")
+    @classmethod
+    def _normalize_log_level(cls, value):
+        # An empty/blank/unset LOG_LEVEL means "use the default" (INFO) rather
+        # than failing validation. Any other value is normalized to uppercase
+        # and checked against the standard logging levels.
+        if value is None:
+            return "INFO"
+        if isinstance(value, str) and value.strip() == "":
+            return "INFO"
+        normalized = str(value).strip().upper()
+        allowed = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+        if normalized not in allowed:
+            raise ValueError(
+                f"log_level must be one of {sorted(allowed)}, got '{value}'"
+            )
+        return normalized

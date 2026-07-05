@@ -1,9 +1,13 @@
+import logging
 from typing import Optional, List
 import uuid
 
 from domain.entities import User
 from domain.interfaces.data_repository import UserRepository
 from infra.data.sqlite.sqlite_base_repository import SqliteBaseRepository
+
+
+logger = logging.getLogger(__name__)
 
 
 class SqliteUserRepository(SqliteBaseRepository, UserRepository):
@@ -18,11 +22,11 @@ class SqliteUserRepository(SqliteBaseRepository, UserRepository):
         self.connect()
         self._create_table()
         if not self.get_all():
-            print("[UserRepositorySqlite]: Creating Admin user...")
+            logger.info("creating admin user")
             user_id = str(uuid.uuid4())
             admin_user = User(id=user_id, external_id=user_id, name="Admin", summary="")
             self.add(admin_user)
-            print(f"[UserRepositorySqlite]: Admin user was created {admin_user}.")
+            logger.info("admin user created: %s", admin_user)
 
     def _create_table(self) -> None:
         with self.conn:

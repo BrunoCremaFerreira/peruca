@@ -1,5 +1,9 @@
 from abc import ABC, abstractmethod
+import logging
 import sqlite3
+
+
+logger = logging.getLogger(__name__)
 
 
 class SqliteBaseRepository(ABC):
@@ -31,7 +35,7 @@ class SqliteBaseRepository(ABC):
         """
         Connect to the database
         """
-        print(f"[{self.__class__.__name__}]: Connecting to '{self.db_path}'...")
+        logger.info("%s connecting to %r", self.__class__.__name__, self.db_path)
         self.conn = sqlite3.connect(database=self.db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA journal_mode=WAL")

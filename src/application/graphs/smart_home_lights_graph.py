@@ -1,6 +1,7 @@
 import asyncio
 from infra import async_runner
 import json
+import logging
 from typing import List, Optional, TypedDict
 from application.graphs.graph import Graph
 from application.graphs.markers import DEVICE_NOT_RECOGNIZED, NO_ACTION_PERFORMED
@@ -17,6 +18,8 @@ from domain.interfaces.data_repository import (
 )
 from domain.services.smart_home_service import SmartHomeService
 
+
+logger = logging.getLogger(__name__)
 
 _STATUS_LABEL_ON = "Ligada"
 _STATUS_LABEL_OFF = "Desligada"
@@ -73,7 +76,7 @@ class SmartHomeLightsGraph(Graph):
         """
         Classify the user's intent based on the input text.
         """
-        print(f"[SmartHomeLightsGraph._classify_intent]: input={data['input']}")
+        logger.debug("classify_intent input=%r", data["input"])
 
         try:
             entity_alias_list: List[SmartHomeEntityAlias] = (
@@ -85,9 +88,7 @@ class SmartHomeLightsGraph(Graph):
                 item.alias: item.entity_id for item in entity_alias_list
             }
         except Exception as error:
-            print(
-                f"[SmartHomeLightsGraph._classify_intent][ERROR][aliases]: {error}"
-            )
+            logger.warning("classify_intent alias lookup failed: %s", error)
             entity_alias_dict = {}
 
         available_areas_csv = self._load_available_areas_csv()
@@ -105,7 +106,7 @@ class SmartHomeLightsGraph(Graph):
             response = chain.invoke({"input": data["input"]})
         extracted = self._extract_structured_output(response.content)
 
-        print(f"[SmartHomeLightsGraph._classify_intent]: raw_output={extracted}")
+        logger.debug("classify_intent raw_output=%r", extracted)
 
         try:
             parsed = json.loads(extracted) if extracted else {}
@@ -140,7 +141,7 @@ class SmartHomeLightsGraph(Graph):
 
     def _handle_turn_on(self, data):
         devices = data.get("output_turn_on", "")
-        print(f"[SmartHomeLightsGraph._handle_turn_on]: {devices}")
+        logger.debug("handle_turn_on devices=%r", devices)
 
         if not devices:
             return {}
@@ -164,7 +165,7 @@ class SmartHomeLightsGraph(Graph):
 
     def _handle_turn_off(self, data):
         devices = data.get("output_turn_off", "")
-        print(f"[SmartHomeLightsGraph._handle_turn_off]: {devices}")
+        logger.debug("handle_turn_off devices=%r", devices)
 
         if not devices:
             return {}
@@ -188,7 +189,7 @@ class SmartHomeLightsGraph(Graph):
 
     def _handle_turn_on_by_area(self, data):
         payload = data.get("output_turn_on_by_area")
-        print(f"[SmartHomeLightsGraph._handle_turn_on_by_area]: {payload}")
+        logger.debug("handle_turn_on_by_area payload=%r", payload)
 
         areas = self._split_area_payload(payload)
         if not areas:
@@ -201,14 +202,14 @@ class SmartHomeLightsGraph(Graph):
         try:
             async_runner.run(_run_all())
         except ValidationError as error:
-            print(f"[SmartHomeLightsGraph._handle_turn_on_by_area][ERROR]: {error}")
+            logger.warning("handle_turn_on_by_area area not found: %s", error)
             return {
                 "output_turn_on_by_area": (
                     f"Cômodo não encontrado: {', '.join(areas)}"
                 )
             }
         except Exception as error:
-            print(f"[SmartHomeLightsGraph._handle_turn_on_by_area][ERROR]: {error}")
+            logger.error("handle_turn_on_by_area failed: %s", error, exc_info=True)
             return {
                 "output_turn_on_by_area": (
                     f"Falha ao ligar as luzes: {', '.join(areas)}"
@@ -219,7 +220,7 @@ class SmartHomeLightsGraph(Graph):
 
     def _handle_turn_off_by_area(self, data):
         payload = data.get("output_turn_off_by_area")
-        print(f"[SmartHomeLightsGraph._handle_turn_off_by_area]: {payload}")
+        logger.debug("handle_turn_off_by_area payload=%r", payload)
 
         areas = self._split_area_payload(payload)
         if not areas:
@@ -232,14 +233,14 @@ class SmartHomeLightsGraph(Graph):
         try:
             async_runner.run(_run_all())
         except ValidationError as error:
-            print(f"[SmartHomeLightsGraph._handle_turn_off_by_area][ERROR]: {error}")
+            logger.warning("handle_turn_off_by_area area not found: %s", error)
             return {
                 "output_turn_off_by_area": (
                     f"Cômodo não encontrado: {', '.join(areas)}"
                 )
             }
         except Exception as error:
-            print(f"[SmartHomeLightsGraph._handle_turn_off_by_area][ERROR]: {error}")
+            logger.error("handle_turn_off_by_area failed: %s", error, exc_info=True)
             return {
                 "output_turn_off_by_area": (
                     f"Falha ao desligar as luzes: {', '.join(areas)}"
@@ -250,7 +251,7 @@ class SmartHomeLightsGraph(Graph):
 
     def _handle_turn_on_all(self, data):
         payload = data.get("output_turn_on_all")
-        print(f"[SmartHomeLightsGraph._handle_turn_on_all]: {payload}")
+        logger.debug("handle_turn_on_all payload=%r", payload)
 
         if not payload:
             return {}
@@ -258,14 +259,14 @@ class SmartHomeLightsGraph(Graph):
         try:
             async_runner.run(self.smart_home_service.turn_on_all_house())
         except Exception as error:
-            print(f"[SmartHomeLightsGraph._handle_turn_on_all][ERROR]: {error}")
+            logger.error("handle_turn_on_all failed: %s", error, exc_info=True)
             return {"output_turn_on_all": "Falha ao ligar todas as luzes"}
 
         return {"output_turn_on_all": "Todas as luzes da casa foram ligadas"}
 
     def _handle_turn_off_all(self, data):
         payload = data.get("output_turn_off_all")
-        print(f"[SmartHomeLightsGraph._handle_turn_off_all]: {payload}")
+        logger.debug("handle_turn_off_all payload=%r", payload)
 
         if not payload:
             return {}
@@ -273,14 +274,14 @@ class SmartHomeLightsGraph(Graph):
         try:
             async_runner.run(self.smart_home_service.turn_off_all_house())
         except Exception as error:
-            print(f"[SmartHomeLightsGraph._handle_turn_off_all][ERROR]: {error}")
+            logger.error("handle_turn_off_all failed: %s", error, exc_info=True)
             return {"output_turn_off_all": "Falha ao desligar todas as luzes"}
 
         return {"output_turn_off_all": "Todas as luzes da casa foram desligadas"}
 
     def _handle_list_lights_status(self, data):
         payload = data.get("output_list_lights_status")
-        print(f"[SmartHomeLightsGraph._handle_list_lights_status]: {payload}")
+        logger.debug("handle_list_lights_status payload=%r", payload)
 
         if not payload:
             return {}
@@ -290,9 +291,7 @@ class SmartHomeLightsGraph(Graph):
                 self.smart_home_service.list_lights_grouped_by_area()
             )
         except Exception as error:
-            print(
-                f"[SmartHomeLightsGraph._handle_list_lights_status][ERROR]: {error}"
-            )
+            logger.error("handle_list_lights_status failed: %s", error, exc_info=True)
             return {
                 "output_list_lights_status": (
                     "Não consegui consultar o estado das luzes agora."
@@ -311,7 +310,7 @@ class SmartHomeLightsGraph(Graph):
 
     def _handle_check_status(self, data):
         payload = data.get("output_check_status")
-        print(f"[SmartHomeLightsGraph._handle_check_status]: {payload}")
+        logger.debug("handle_check_status payload=%r", payload)
 
         if not payload:
             return {}
@@ -339,7 +338,7 @@ class SmartHomeLightsGraph(Graph):
     def _handle_change_color(self, data):
         devices = data.get("output_change_color", "")
         if devices:
-            print(f"[SmartHomeLightsGraph._handle_change_color]: {devices}")
+            logger.debug("handle_change_color devices=%r", devices)
             return {"output_change_color": devices}
         return {}
 
@@ -348,7 +347,7 @@ class SmartHomeLightsGraph(Graph):
         if not devices:
             return {}
 
-        print(f"[SmartHomeLightsGraph._handle_change_bright]: {devices}")
+        logger.debug("handle_change_bright devices=%r", devices)
 
         available_entities = data.get("available_entities", {})
         segments = devices.split("|")
@@ -401,12 +400,12 @@ class SmartHomeLightsGraph(Graph):
     def _handle_change_mode(self, data):
         devices = data.get("output_change_mode", "")
         if devices:
-            print(f"[SmartHomeLightsGraph._handle_change_mode]: {devices}")
+            logger.debug("handle_change_mode devices=%r", devices)
             return {"output_change_mode": devices}
         return {}
 
     def _handle_final_response(self, data):
-        print(f"[SmartHomeLightsGraph._handle_final_response]: Aggregating response...")
+        logger.info("handle_final_response: aggregating response")
         parts = []
         if data.get("output_turn_on"):
             parts.append(f"Ligado: {data['output_turn_on']}")
@@ -437,7 +436,7 @@ class SmartHomeLightsGraph(Graph):
         return {"output": "\n".join(parts)}
 
     def _handle_not_recognized(self, data):
-        print(f"[SmartHomeLightsGraph.handle_not_recognized]: Triggered...")
+        logger.info("handle_not_recognized triggered")
         return {"output_not_recognized": DEVICE_NOT_RECOGNIZED}
 
     # ===============================================
@@ -507,9 +506,7 @@ class SmartHomeLightsGraph(Graph):
         try:
             areas = self.smart_home_area_repository.get_all()
         except Exception as error:
-            print(
-                f"[SmartHomeLightsGraph._load_available_areas_csv][ERROR]: {error}"
-            )
+            logger.warning("load_available_areas_csv failed: %s", error)
             return ""
         return ", ".join(area.name for area in areas if area.name)
 
@@ -592,7 +589,7 @@ class SmartHomeLightsGraph(Graph):
                 )
                 return self._remove_thinking_tag(response.content).strip()
             except asyncio.TimeoutError:
-                print("[_find_entity_ids][ERROR]: Timeout")
+                logger.warning("find_entity_ids timed out")
                 return "None"
 
         entity_ids_delimited_str = async_runner.run(_invoke_with_timeout())

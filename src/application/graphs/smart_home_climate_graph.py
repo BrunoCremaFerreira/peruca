@@ -1,6 +1,7 @@
 import asyncio
 from infra import async_runner
 import json
+import logging
 from typing import List, Optional, TypedDict
 from application.graphs.graph import Graph
 from application.graphs.markers import DEVICE_NOT_RECOGNIZED, NO_ACTION_PERFORMED
@@ -17,6 +18,8 @@ from domain.commands import (
 from domain.entities import GraphInvokeRequest, SmartHomeClimate, SmartHomeEntityAlias
 from domain.interfaces.data_repository import SmartHomeEntityAliasRepository
 from domain.services.smart_home_service import SmartHomeService
+
+logger = logging.getLogger(__name__)
 
 HVAC_MODE_MAP = {
     "frio": "cool",
@@ -66,13 +69,13 @@ class SmartHomeClimateGraph(Graph):
     # ===============================================
 
     def _classify_intent(self, data):
-        print(f"[SmartHomeClimateGraph._classify_intent]: input={data['input']}")
+        logger.debug("classify_intent input=%r", data["input"])
 
         chain = self.classification_prompt | self.llm_chat
         response = chain.invoke({"input": data["input"]})
         extracted = self._extract_structured_output(response.content)
 
-        print(f"[SmartHomeClimateGraph._classify_intent]: raw_output={extracted}")
+        logger.debug("classify_intent raw_output=%r", extracted)
 
         try:
             try:
@@ -91,7 +94,7 @@ class SmartHomeClimateGraph(Graph):
             }
 
         except Exception as e:
-            print(f"[SmartHomeClimateGraph._classify_intent][ERROR]: {e}")
+            logger.warning("classify_intent failed: %s", e)
             parsed = {}
             intents = ["not_recognized"]
             entity_alias_dict = {}
@@ -110,7 +113,7 @@ class SmartHomeClimateGraph(Graph):
 
     def _handle_turn_on(self, data):
         devices = data.get("output_turn_on", "")
-        print(f"[SmartHomeClimateGraph._handle_turn_on]: {devices}")
+        logger.debug("handle_turn_on devices=%r", devices)
 
         if not devices:
             return {}
@@ -134,7 +137,7 @@ class SmartHomeClimateGraph(Graph):
 
     def _handle_turn_off(self, data):
         devices = data.get("output_turn_off", "")
-        print(f"[SmartHomeClimateGraph._handle_turn_off]: {devices}")
+        logger.debug("handle_turn_off devices=%r", devices)
 
         if not devices:
             return {}
@@ -158,7 +161,7 @@ class SmartHomeClimateGraph(Graph):
 
     def _handle_set_temperature(self, data):
         raw = data.get("output_set_temperature", "")
-        print(f"[SmartHomeClimateGraph._handle_set_temperature]: {raw}")
+        logger.debug("handle_set_temperature raw=%r", raw)
 
         if not raw:
             return {}
@@ -204,7 +207,7 @@ class SmartHomeClimateGraph(Graph):
 
     def _handle_set_hvac_mode(self, data):
         raw = data.get("output_set_hvac_mode", "")
-        print(f"[SmartHomeClimateGraph._handle_set_hvac_mode]: {raw}")
+        logger.debug("handle_set_hvac_mode raw=%r", raw)
 
         if not raw:
             return {}
@@ -247,7 +250,7 @@ class SmartHomeClimateGraph(Graph):
 
     def _handle_query_state(self, data):
         raw = data.get("output_query_state", "")
-        print(f"[SmartHomeClimateGraph._handle_query_state]: {raw}")
+        logger.debug("handle_query_state raw=%r", raw)
 
         if not raw:
             return {}
@@ -275,7 +278,9 @@ class SmartHomeClimateGraph(Graph):
                 fetched = []
                 for state in results:
                     if isinstance(state, Exception):
-                        print(f"[SmartHomeClimateGraph._handle_query_state][ERROR]: {state}")
+                        logger.error(
+                            "handle_query_state failed: %s", state, exc_info=state
+                        )
                         fetched.append(f"{label}: estado indisponível")
                     else:
                         status = "ligado" if state.is_on else "desligado"
@@ -296,13 +301,11 @@ class SmartHomeClimateGraph(Graph):
         return {"output_query_state": "\n".join(lines) if lines else ""}
 
     def _handle_not_recognized(self, data):
-        print(f"[SmartHomeClimateGraph._handle_not_recognized]: Triggered...")
+        logger.info("handle_not_recognized triggered")
         return {"output_not_recognized": "Not Recognized Triggered"}
 
     def _handle_final_response(self, data):
-        print(
-            f"[SmartHomeClimateGraph._handle_final_response]: Aggregating response..."
-        )
+        logger.info("handle_final_response: aggregating response")
         parts = []
         if data.get("output_turn_on"):
             parts.append(f"Ligado: {data['output_turn_on']}")
@@ -382,7 +385,7 @@ class SmartHomeClimateGraph(Graph):
                 )
                 return self._remove_thinking_tag(response.content).strip()
             except asyncio.TimeoutError:
-                print("[_find_entity_ids][ERROR]: Timeout")
+                logger.warning("find_entity_ids timed out")
                 return "None"
 
         entity_ids_delimited_str = async_runner.run(_invoke_with_timeout())

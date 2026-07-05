@@ -1,7 +1,10 @@
+from contextlib import asynccontextmanager
+
 from domain.exceptions import ValidationError
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from fastapi.middleware.cors import CORSMiddleware
+from infra.logging_config import configure_logging
 from infra.settings import Settings
 from fastapi.responses import JSONResponse
 from fastapi.requests import Request
@@ -9,7 +12,14 @@ from routes import router
 
 settings = Settings()
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    configure_logging(settings.log_level)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 app.include_router(router)
 
 # CORS configuration

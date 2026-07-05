@@ -1,5 +1,6 @@
 from infra import async_runner
 import json
+import logging
 from typing import Annotated, List, Optional, TypedDict
 
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -10,6 +11,9 @@ from langgraph.graph import END, START, StateGraph
 from application.graphs.graph import Graph
 from domain.entities import GraphInvokeRequest
 from domain.services.music_service import MusicService
+
+
+logger = logging.getLogger(__name__)
 
 
 def _merge_output(existing: Optional[str], new: Optional[str]) -> Optional[str]:
@@ -61,12 +65,12 @@ class MusicGraph(Graph):
 
     def _classify_intent(self, data: dict) -> dict:
         invoke_request: GraphInvokeRequest = data["input"]
-        print(f"[MusicGraph._classify_intent]: input={invoke_request.message!r}")
+        logger.debug("classify_intent input=%r", invoke_request.message)
 
         try:
             players = async_runner.run(self.music_service.get_players())
         except Exception as error:
-            print(f"[MusicGraph._classify_intent][ERROR][get_players]: {error}")
+            logger.warning("classify_intent get_players failed: %s", error)
             players = []
 
         available_players_csv = ", ".join(p.name for p in players if p.name)
@@ -83,7 +87,7 @@ class MusicGraph(Graph):
             response = chain.invoke({"input": invoke_request})
 
         extracted = self._extract_structured_output(response.content)
-        print(f"[MusicGraph._classify_intent]: raw_output={extracted!r}")
+        logger.debug("classify_intent raw_output=%r", extracted)
 
         try:
             parsed = json.loads(extracted) if extracted else {}
@@ -143,9 +147,11 @@ class MusicGraph(Graph):
         query = data.get("play_media_query", "")
         media_type = data.get("play_media_type", "track") or "track"
         player_id = data.get("player_id", "")
-        print(
-            f"[MusicGraph._handle_play_media]: query={query!r}, "
-            f"media_type={media_type!r}, player_id={player_id!r}"
+        logger.debug(
+            "handle_play_media query=%r media_type=%r player_id=%r",
+            query,
+            media_type,
+            player_id,
         )
 
         if not query:
@@ -159,15 +165,14 @@ class MusicGraph(Graph):
             )
             return {"output": result}
         except Exception as error:
-            print(f"[MusicGraph._handle_play_media][ERROR]: {error}")
+            logger.error("handle_play_media failed: %s", error, exc_info=True)
             return {"output": f"Erro ao reproduzir: {error}"}
 
     def _handle_player_command(self, data: dict) -> dict:
         command = data.get("player_command_value", "")
         player_id = data.get("player_id", "")
-        print(
-            f"[MusicGraph._handle_player_command]: command={command!r}, "
-            f"player_id={player_id!r}"
+        logger.debug(
+            "handle_player_command command=%r player_id=%r", command, player_id
         )
 
         if not command:
@@ -181,16 +186,18 @@ class MusicGraph(Graph):
             )
             return {"output": result}
         except Exception as error:
-            print(f"[MusicGraph._handle_player_command][ERROR]: {error}")
+            logger.error("handle_player_command failed: %s", error, exc_info=True)
             return {"output": f"Erro ao executar comando: {error}"}
 
     def _handle_set_volume(self, data: dict) -> dict:
         player_id = data.get("player_id", "")
         volume_value = data.get("set_volume_value")
         direction = data.get("set_volume_direction")
-        print(
-            f"[MusicGraph._handle_set_volume]: value={volume_value!r}, "
-            f"direction={direction!r}, player_id={player_id!r}"
+        logger.debug(
+            "handle_set_volume value=%r direction=%r player_id=%r",
+            volume_value,
+            direction,
+            player_id,
         )
 
         try:
@@ -208,12 +215,12 @@ class MusicGraph(Graph):
             )
             return {"output": result}
         except Exception as error:
-            print(f"[MusicGraph._handle_set_volume][ERROR]: {error}")
+            logger.error("handle_set_volume failed: %s", error, exc_info=True)
             return {"output": f"Erro ao ajustar volume: {error}"}
 
     def _handle_now_playing(self, data: dict) -> dict:
         player_id = data.get("player_id", "")
-        print(f"[MusicGraph._handle_now_playing]: player_id={player_id!r}")
+        logger.debug("handle_now_playing player_id=%r", player_id)
 
         try:
             result = async_runner.run(
@@ -221,11 +228,11 @@ class MusicGraph(Graph):
             )
             return {"output": result}
         except Exception as error:
-            print(f"[MusicGraph._handle_now_playing][ERROR]: {error}")
+            logger.error("handle_now_playing failed: %s", error, exc_info=True)
             return {"output": f"Erro ao consultar reprodução: {error}"}
 
     def _handle_select_player(self, data: dict) -> dict:
-        print(f"[MusicGraph._handle_select_player]: Requesting player selection...")
+        logger.info("handle_select_player: requesting player selection")
         try:
             players = async_runner.run(self.music_service.get_players())
             names = ", ".join(p.name for p in players if p.name)
@@ -235,15 +242,15 @@ class MusicGraph(Graph):
                 )
             }
         except Exception as error:
-            print(f"[MusicGraph._handle_select_player][ERROR]: {error}")
+            logger.error("handle_select_player failed: %s", error, exc_info=True)
             return {"output": "Não consegui obter a lista de players disponíveis."}
 
     def _handle_not_recognized(self, data: dict) -> dict:
-        print(f"[MusicGraph._handle_not_recognized]: Triggered...")
+        logger.info("handle_not_recognized triggered")
         return {"output": "Não entendi o comando de música. Tente novamente."}
 
     def _handle_final_response(self, data: dict) -> dict:
-        print(f"[MusicGraph._handle_final_response]: Aggregating response...")
+        logger.info("handle_final_response: aggregating response")
         output = data.get("output")
         if output:
             return {"output": output}

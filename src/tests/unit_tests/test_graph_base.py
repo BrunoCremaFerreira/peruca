@@ -490,27 +490,32 @@ class TestMainGraphClassifyIntentMalformedOutput:
             f"got {result['intent']!r}"
         )
 
-    def test_classify_intent__malformed_output__prints_raw(self, capsys):
+    def test_classify_intent__malformed_output__logs_raw(self, caplog):
         """
         When the LLM output cannot be parsed into a valid intent, the node
-        must print diagnostic information that includes the raw LLM string,
-        so operators can diagnose model regressions.
+        must log diagnostic information that includes the raw LLM string, so
+        operators can diagnose model regressions. Emitted via ``logger.warning``
+        (not ``print``) per the structured-logging contract.
         """
+        import logging
+
         graph = self._make_main_graph()
         raw_output = "Não consigo classificar sua mensagem."
         # Simulate the full cleaning pipeline returning no structure
         graph._extract_structured_output = MagicMock(return_value=None)
-        # Make the LLM return the raw string so it can appear in print output
+        # Make the LLM return the raw string so it can appear in log output
         llm_response = MagicMock()
         llm_response.content = raw_output
         graph.llm_chat.return_value = llm_response
 
-        graph._classify_intent(self._make_invoke_data("???"))
+        with caplog.at_level(
+            logging.WARNING, logger="application.graphs.main_graph"
+        ):
+            graph._classify_intent(self._make_invoke_data("???"))
 
-        captured = capsys.readouterr()
-        assert raw_output in captured.out, (
-            f"Expected raw LLM output printed for diagnostics. "
-            f"stdout was: {captured.out!r}"
+        assert any(raw_output in r.getMessage() for r in caplog.records), (
+            f"Expected raw LLM output logged for diagnostics. "
+            f"records were: {[r.getMessage() for r in caplog.records]!r}"
         )
 
     def test_classify_intent__extract_returns_unparseable_eval__falls_back(self):

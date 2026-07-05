@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from infra import async_runner
 from typing import Callable, Optional
 
@@ -13,6 +14,8 @@ from domain.interfaces.data_repository import ContextRepository, UserRepository
 from domain.services.user_memory_service import UserMemoryService
 from infra.utils import is_null_or_whitespace
 
+
+logger = logging.getLogger(__name__)
 
 _MUSIC_PROBE_TIMEOUT = 2.0
 
@@ -49,7 +52,7 @@ class LlmAppService:
     # ===============================================
 
     def chat(self, chat_request: ChatRequest) -> str:
-        print(f"[LlmAppService.chat]: Request: {{ {chat_request} }}")
+        logger.debug("chat request: %s", chat_request)
 
         if is_null_or_whitespace(chat_request.external_user_id):
             raise EmptyParamValidationError(param_name="external_user_id")
@@ -108,7 +111,7 @@ class LlmAppService:
 
         self._persist_turn(user=user, message=chat_request.message, output=output)
 
-        print(f"[LlmAppService.chat]: Response: '{result}'")
+        logger.debug("chat response: %s", result)
         return {"intents": intents, "output": output}
 
     # ===============================================
@@ -176,4 +179,4 @@ class LlmAppService:
                 [HumanMessage(content=message), AIMessage(content=output)]
             )
         except Exception as error:
-            print(f"[LlmAppService.chat]: Failed to persist turn: {error}")
+            logger.error("Failed to persist turn: %s", error, exc_info=True)

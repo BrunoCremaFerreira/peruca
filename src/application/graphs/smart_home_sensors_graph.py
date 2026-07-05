@@ -1,6 +1,7 @@
 import asyncio
 from infra import async_runner
 import json
+import logging
 from typing import List, Optional, TypedDict
 
 from application.graphs.graph import Graph
@@ -12,6 +13,9 @@ from langgraph.graph import StateGraph, START, END
 from domain.entities import GraphInvokeRequest, SensorReading
 from domain.interfaces.data_repository import SmartHomeEntityAliasRepository
 from domain.services.smart_home_service import SmartHomeService
+
+
+logger = logging.getLogger(__name__)
 
 
 class SmartHomeSensorsGraphState(TypedDict):
@@ -50,13 +54,13 @@ class SmartHomeSensorsGraph(Graph):
     # ===============================================
 
     def _classify_intent(self, data):
-        print(f"[SmartHomeSensorsGraph._classify_intent]: input={data['input']}")
+        logger.debug("classify_intent input=%r", data["input"])
 
         chain = self.classification_prompt | self.llm_chat
         response = chain.invoke({"input": data["input"]})
         extracted = self._extract_structured_output(response.content)
 
-        print(f"[SmartHomeSensorsGraph._classify_intent]: raw_output={extracted}")
+        logger.debug("classify_intent raw_output=%r", extracted)
 
         try:
             try:
@@ -80,7 +84,7 @@ class SmartHomeSensorsGraph(Graph):
             }
 
         except Exception as exc:
-            print(f"[SmartHomeSensorsGraph._classify_intent][ERROR]: {exc}")
+            logger.warning("classify_intent failed: %s", exc)
             parsed = {}
             intents = ["not_recognized"]
             available_entities = {}
@@ -96,7 +100,7 @@ class SmartHomeSensorsGraph(Graph):
 
     def _handle_query_current_state(self, data):
         raw = data.get("output_query_current_state", "")
-        print(f"[SmartHomeSensorsGraph._handle_query_current_state]: {raw}")
+        logger.debug("handle_query_current_state raw=%r", raw)
 
         if not raw:
             return {}
@@ -112,8 +116,11 @@ class SmartHomeSensorsGraph(Graph):
             fetched = []
             for eid, reading in zip(ids, results):
                 if isinstance(reading, Exception):
-                    print(
-                        f"[SmartHomeSensorsGraph._handle_query_current_state][ERROR]: {reading}"
+                    logger.error(
+                        "handle_query_current_state failed for %s: %s",
+                        eid,
+                        reading,
+                        exc_info=reading,
                     )
                     fetched.append(f"{eid}: estado indisponível")
                 else:
@@ -129,7 +136,7 @@ class SmartHomeSensorsGraph(Graph):
 
     def _handle_query_history(self, data):
         raw = data.get("output_query_history", "")
-        print(f"[SmartHomeSensorsGraph._handle_query_history]: {raw}")
+        logger.debug("handle_query_history raw=%r", raw)
 
         if not raw:
             return {}
@@ -152,7 +159,12 @@ class SmartHomeSensorsGraph(Graph):
             fetched = []
             for eid, history in zip(ids, results):
                 if isinstance(history, Exception):
-                    print(f"[SmartHomeSensorsGraph._handle_query_history][ERROR]: {history}")
+                    logger.error(
+                        "handle_query_history failed for %s: %s",
+                        eid,
+                        history,
+                        exc_info=history,
+                    )
                     fetched.append(f"{eid}: histórico indisponível")
                 elif history:
                     entries = []
@@ -173,15 +185,13 @@ class SmartHomeSensorsGraph(Graph):
         return {"output_query_history": "\n".join(lines) if lines else ""}
 
     def _handle_not_recognized(self, data):
-        print(f"[SmartHomeSensorsGraph._handle_not_recognized]: Triggered...")
+        logger.info("handle_not_recognized triggered")
         return {
             "output_not_recognized": "Não consegui identificar qual sensor você quer consultar."
         }
 
     def _handle_final_response(self, data):
-        print(
-            f"[SmartHomeSensorsGraph._handle_final_response]: Aggregating response..."
-        )
+        logger.info("handle_final_response: aggregating response")
 
         sensor_data_parts = []
         if data.get("output_query_current_state"):
@@ -254,7 +264,7 @@ class SmartHomeSensorsGraph(Graph):
                 )
                 return self._remove_thinking_tag(response.content).strip()
             except asyncio.TimeoutError:
-                print("[SmartHomeSensorsGraph._find_entity_ids][ERROR]: Timeout")
+                logger.warning("find_entity_ids timed out")
                 return "None"
 
         entity_ids_str = async_runner.run(_invoke_with_timeout())

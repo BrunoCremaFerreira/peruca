@@ -1,3 +1,4 @@
+import logging
 from typing import Callable
 
 from application.graphs.memory_graph import MemoryGraph
@@ -5,6 +6,9 @@ from domain.commands import UserMemoryAdd
 from domain.entities import GraphInvokeRequest
 from domain.interfaces.data_repository import UserMemoryRepository, UserRepository
 from domain.services.user_memory_service import UserMemoryService
+
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryAppService:
@@ -51,4 +55,4 @@ class MemoryAppService:
             for fact in facts:
                 service.add(UserMemoryAdd(user_id=user.id, content=fact))
         except Exception as e:
-            print(f"[MemoryAppService.learn_from_message][ERROR]: {e}")
+            logger.error("learn_from_message failed: %s", e, exc_info=True)

@@ -2,6 +2,7 @@ import asyncio
 from infra import async_runner
 import base64
 import json
+import logging
 from typing import List, Optional, TypedDict
 
 from application.graphs.graph import Graph
@@ -13,6 +14,9 @@ from langgraph.graph import StateGraph, START, END
 from domain.entities import GraphInvokeRequest, SmartHomeCamera, SmartHomeCameraSnapshot
 from domain.interfaces.data_repository import SmartHomeEntityAliasRepository
 from domain.services.smart_home_service import SmartHomeService
+
+
+logger = logging.getLogger(__name__)
 
 
 class SmartHomeCamerasGraphState(TypedDict):
@@ -51,13 +55,13 @@ class SmartHomeCamerasGraph(Graph):
     # ===============================================
 
     def _classify_intent(self, data):
-        print(f"[SmartHomeCamerasGraph._classify_intent]: input={data['input']}")
+        logger.debug("classify_intent input=%r", data["input"])
 
         chain = self.classification_prompt | self.llm_chat
         response = chain.invoke({"input": data["input"]})
         extracted = self._extract_structured_output(response.content)
 
-        print(f"[SmartHomeCamerasGraph._classify_intent]: raw_output={extracted}")
+        logger.debug("classify_intent raw_output=%r", extracted)
 
         try:
             try:
@@ -75,7 +79,7 @@ class SmartHomeCamerasGraph(Graph):
             available_entities = {e.alias: e.entity_id for e in camera_entities}
 
         except Exception as exc:
-            print(f"[SmartHomeCamerasGraph._classify_intent][ERROR]: {exc}")
+            logger.warning("classify_intent failed: %s", exc)
             parsed = {}
             intents = ["not_recognized"]
             available_entities = {}
@@ -91,7 +95,7 @@ class SmartHomeCamerasGraph(Graph):
 
     def _handle_show_snapshot(self, data):
         raw = data.get("output_show_snapshot", "")
-        print(f"[SmartHomeCamerasGraph._handle_show_snapshot]: {raw}")
+        logger.debug("handle_show_snapshot raw=%r", raw)
 
         if not raw:
             return {}
@@ -110,12 +114,12 @@ class SmartHomeCamerasGraph(Graph):
             encoded = base64.b64encode(snapshot.image_bytes).decode()
             return {"output_show_snapshot": f"data:image/jpeg;base64,{encoded}"}
         except Exception as exc:
-            print(f"[SmartHomeCamerasGraph._handle_show_snapshot][ERROR]: {exc}")
+            logger.error("handle_show_snapshot failed: %s", exc, exc_info=True)
             return {"output_show_snapshot": f"{entity_id}: snapshot indisponível"}
 
     def _handle_check_status(self, data):
         raw = data.get("output_check_status", "")
-        print(f"[SmartHomeCamerasGraph._handle_check_status]: {raw}")
+        logger.debug("handle_check_status raw=%r", raw)
 
         if not raw:
             return {}
@@ -134,19 +138,17 @@ class SmartHomeCamerasGraph(Graph):
             name = camera.friendly_name or camera.entity_id
             return {"output_check_status": f"{name}: {camera.state}"}
         except Exception as exc:
-            print(f"[SmartHomeCamerasGraph._handle_check_status][ERROR]: {exc}")
+            logger.error("handle_check_status failed: %s", exc, exc_info=True)
             return {"output_check_status": f"{entity_id}: estado indisponível"}
 
     def _handle_not_recognized(self, data):
-        print(f"[SmartHomeCamerasGraph._handle_not_recognized]: Triggered...")
+        logger.info("handle_not_recognized triggered")
         return {
             "output_not_recognized": "Não consegui identificar qual câmera você quer consultar."
         }
 
     def _handle_final_response(self, data):
-        print(
-            f"[SmartHomeCamerasGraph._handle_final_response]: Aggregating response..."
-        )
+        logger.info("handle_final_response: aggregating response")
 
         if data.get("output_not_recognized"):
             return {
@@ -206,7 +208,7 @@ class SmartHomeCamerasGraph(Graph):
                 )
                 return self._remove_thinking_tag(response.content).strip()
             except asyncio.TimeoutError:
-                print("[SmartHomeCamerasGraph._find_entity_ids][ERROR]: Timeout")
+                logger.warning("find_entity_ids timed out")
                 return "None"
 
         entity_ids_str = async_runner.run(_invoke_with_timeout())

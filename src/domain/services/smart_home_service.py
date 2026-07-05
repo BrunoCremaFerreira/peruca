@@ -1,3 +1,4 @@
+import logging
 import unicodedata
 import uuid
 from typing import Dict, List, Optional
@@ -30,6 +31,8 @@ from domain.interfaces.smart_home_repository import (
     SmartHomeSensorRepository,
 )
 
+
+logger = logging.getLogger(__name__)
 
 _UNASSIGNED_AREA_LABEL = "Sem cômodo"
 
@@ -115,11 +118,11 @@ class SmartHomeService:
                     continue
 
             # Updating all Entity x Aliases on the database
-            print(f"[smart_home_service]: Removing all Entity X Alias")
+            logger.info("removing all entity-alias entries")
             self.smart_home_entity_alias_repository.delete_all()
             for item in entity_alias_to_add:
-                print(
-                    f"[smart_home_service]: Adding alias for entity '{item.entity_id}' => '{item.alias}'"
+                logger.debug(
+                    "adding alias for entity %r => %r", item.entity_id, item.alias
                 )
                 self.smart_home_entity_alias_repository.add(entity_alias=item)
 
@@ -130,15 +133,13 @@ class SmartHomeService:
                         await self.smart_home_configuration_repository.get_all_areas()
                     )
                 except Exception as error:
-                    print(f"[smart_home_service]: Failed to fetch areas: {error}")
+                    logger.warning("failed to fetch areas: %s", error)
                     areas = []
 
-                print(f"[smart_home_service]: Removing all SmartHomeArea entries")
+                logger.info("removing all smart home area entries")
                 self.smart_home_area_repository.delete_all()
                 for area in areas:
-                    print(
-                        f"[smart_home_service]: Adding area '{area.area_id}' => '{area.name}'"
-                    )
+                    logger.debug("adding area %r => %r", area.area_id, area.name)
                     self.smart_home_area_repository.add(area)
         finally:
             await self.smart_home_configuration_repository.close()
@@ -180,8 +181,8 @@ class SmartHomeService:
                     turn_on_command=LightTurnOn(entity_id=entity_id)
                 )
             except Exception as error:
-                print(
-                    f"[smart_home_service]: turn_on_by_area failed for '{entity_id}': {error}"
+                logger.warning(
+                    "turn_on_by_area failed for %r: %s", entity_id, error
                 )
                 continue
 
@@ -197,8 +198,8 @@ class SmartHomeService:
             try:
                 await self.smart_home_light_repository.turn_off(entity_id=entity_id)
             except Exception as error:
-                print(
-                    f"[smart_home_service]: turn_off_by_area failed for '{entity_id}': {error}"
+                logger.warning(
+                    "turn_off_by_area failed for %r: %s", entity_id, error
                 )
                 continue
 
@@ -214,8 +215,8 @@ class SmartHomeService:
                     turn_on_command=LightTurnOn(entity_id=light.entity_id)
                 )
             except Exception as error:
-                print(
-                    f"[smart_home_service]: turn_on_all_house failed for '{light.entity_id}': {error}"
+                logger.warning(
+                    "turn_on_all_house failed for %r: %s", light.entity_id, error
                 )
                 continue
 
@@ -231,8 +232,8 @@ class SmartHomeService:
                     entity_id=light.entity_id
                 )
             except Exception as error:
-                print(
-                    f"[smart_home_service]: turn_off_all_house failed for '{light.entity_id}': {error}"
+                logger.warning(
+                    "turn_off_all_house failed for %r: %s", light.entity_id, error
                 )
                 continue
 
