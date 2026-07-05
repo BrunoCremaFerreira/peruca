@@ -87,3 +87,44 @@ class TestChatSchedulesMemory:
         assert "ext-123" in positional
         assert "adoro café sem açúcar" in positional
         assert "resposta" in positional
+
+
+# ===========================================================================
+# TestChatResponseContract
+# ===========================================================================
+
+
+class TestChatResponseContract:
+    """
+    The ChatResponse.response field is typed `str` and must carry the plain
+    assistant text (result["output"]), not the whole {"intent":..,"output":..}
+    dict returned by llm_app_service.chat().
+    """
+
+    def test_chat__response_field_is_output_string(self):
+        # Arrange
+        request, llm, bg, memory = _make_args(output="olá mundo")
+        # Act
+        result = routes.chat(
+            request=request,
+            background_tasks=bg,
+            llm_app_service=llm,
+            memory_app_service=memory,
+        )
+        # Assert
+        assert result.response == "olá mundo"
+        assert isinstance(result.response, str)
+
+    def test_chat__propagates_identifiers(self):
+        # Arrange
+        request, llm, bg, memory = _make_args()
+        # Act
+        result = routes.chat(
+            request=request,
+            background_tasks=bg,
+            llm_app_service=llm,
+            memory_app_service=memory,
+        )
+        # Assert
+        assert result.external_user_id == "ext-123"
+        assert result.chat_id == "chat-1"

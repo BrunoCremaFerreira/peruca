@@ -51,7 +51,7 @@ class LlmAppService:
     # Public Methods
     # ===============================================
 
-    def chat(self, chat_request: ChatRequest) -> str:
+    def chat(self, chat_request: ChatRequest) -> dict:
         logger.debug("chat request: %s", chat_request)
 
         if is_null_or_whitespace(chat_request.external_user_id):

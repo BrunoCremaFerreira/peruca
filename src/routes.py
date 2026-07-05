@@ -59,7 +59,7 @@ def chat(
         output,
     )
     response = ChatResponse(
-        response=result,
+        response=output,
         chat_id=request.chat_id,
         external_user_id=request.external_user_id,
     )
