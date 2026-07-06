@@ -16,6 +16,24 @@ Intenções possíveis:
 
 ---
 
+**Regra do verbo de ação (leia com atenção):**
+
+A intenção é definida pelo **verbo de ação**, NUNCA pela forma como a frase começa. Aberturas como "Não esquece", "Não esquece de", "Por favor", "Ah", "Lembra", "Olha" são apenas ruído — ignore-as e olhe para o **verbo** que vem depois.
+
+- Verbos de **remoção** → `delete_item`: tirar, retirar, remover, apagar, excluir, riscar, "pode tirar", "não precisa mais de", "já comprei" (já comprou, então sai da lista).  
+- Verbos de **adição** → `add_item`: adicionar, colocar, botar, comprar, pegar, anotar, "precisa de"; ou uma lista de itens logo após "Não esquece:" / "Anota aí:" quando **não houver** verbo de remoção.
+
+Contraste importante (mesma abertura, intenções opostas):
+- "Não esquece de **tirar** maçã e banana." → `delete_item`  
+- "Não esquece de **comprar** maçã e banana." → `add_item`  
+- "Não esquece: maçã e banana." → `add_item`
+
+**Itens que devem ser mantidos (não remover):**
+
+Quando o usuário pede para **remover** alguns itens mas manda **deixar / manter / não tirar** outro item (ex.: "a laranja ainda deixa por enquanto", "deixa só o açúcar", "mantém a granola que ainda tem pouca"), extraia em `delete_item` **apenas** os itens que devem ser removidos. **NÃO** inclua na remoção os itens que o usuário quer manter.
+
+---
+
 **Exemplos de entrada e saída esperada:**
 
 **Usuário:**  
@@ -58,6 +76,21 @@ Cerveja e carvão já comprei, pode apagar da lista.
 **Resposta:**  
 ["delete_item"]
 
+**Usuário:**  
+Não esquece de tirar maçã e banana. A laranja ainda deixa por enquanto.  
+**Resposta:**  
+["delete_item"]
+
+**Usuário:**  
+Não esquece de comprar maçã e banana.  
+**Resposta:**  
+["add_item"]
+
+**Usuário:**  
+Só tira o iogurte natural, mas mantém a granola que ainda tem pouca.  
+**Resposta:**  
+["delete_item"]
+
 ---
 
 Depois de identificar as intenções, extraia os dados relevantes de acordo com o seguinte formato:
@@ -93,6 +126,22 @@ Exemplo com check_item e uncheck_item:
   "delete_item": "",
   "check_item": "leite|ovos",
   "uncheck_item": "azeite",
+  "list_items": "",
+  "clear_items": "",
+  "not_recognized": ""
+}}
+
+Exemplo de remoção com item a manter (repare que "laranja" NÃO entra em delete_item, pois o usuário quer mantê-la):
+
+Mensagem: "Não esquece de tirar maçã e banana. A laranja ainda deixa por enquanto."
+
+{{
+  "intents": ["delete_item"],
+  "add_item": "",
+  "edit_item": "",
+  "delete_item": "maçã,1|banana,1",
+  "check_item": "",
+  "uncheck_item": "",
   "list_items": "",
   "clear_items": "",
   "not_recognized": ""
