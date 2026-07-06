@@ -17,11 +17,15 @@ Veículos cadastrados do usuário: {available_vehicles}
   realizada (troca de óleo, pneus, peças, fluidos, rodízio, revisão...).
 - "query_maintenance": o usuário quer consultar o histórico de manutenções (datas,
   quilometragem, "últimas manutenções", "quando troquei...").
-- "edit_maintenance": o usuário quer corrigir/alterar um registro já existente.
-- "delete_maintenance": o usuário quer remover um registro existente.
+- "edit_maintenance": o usuário quer corrigir/alterar um REGISTRO DE MANUTENÇÃO já
+  existente (ex.: a quilometragem ou a data de uma troca). NÃO inclui alterar
+  dados do veículo.
+- "delete_maintenance": o usuário quer remover um REGISTRO DE MANUTENÇÃO existente.
 - "vehicle_write_forbidden": o usuário tentou ADICIONAR, EDITAR ou EXCLUIR um
-  VEÍCULO (não uma manutenção). Ex.: "cadastre meu carro novo", "apague o Pajero
-  dos meus carros".
+  VEÍCULO em si (não uma manutenção) — inclui alterar o nome, a marca, o modelo
+  ou o ano de um veículo, ou cadastrar/remover um veículo. Ex.: "cadastre meu
+  carro novo", "apague o Pajero dos meus carros", "edite o modelo do meu
+  Outlander", "muda o ano do meu Pajero".
 - "not_recognized": nenhuma das anteriores, ou apenas um comentário/opinião.
 
 ## REGRA DE DATAS (importante)

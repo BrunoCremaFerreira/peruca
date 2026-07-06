@@ -1,9 +1,9 @@
 # Plano: Gestor de Manutenção Veicular
 
-- **Status:** doing (Fases A, B e C implementadas em TDD; D scaffolded; E mitigações aplicadas)
+- **Status:** done (Fases A–E concluídas)
 - **Criado em:** 2026-07-05 20:31
-- **Implementado em:** Fases A/B/C — 2026-07-06 (branch `feature/vehicle-maintenance-manager`)
-- **PR/commit:** —
+- **Implementado em:** 2026-07-06 (branch `feature/vehicle-maintenance-manager`)
+- **PR/commit:** 53761f6 (Fases A/B/C + registro em foco) + correções Fase D/E (segurança + prompt)
 - **Origem:** `docs/features/todo/sketch.txt`
 - **Consultorias realizadas (obrigatórias):** `arquiteto`, `especialista-de-prompt`, `programador-tester`
 
@@ -38,16 +38,26 @@
 > M-01 e reusado. IoC completa (smoke de build OK; roteamento do grafo compilado
 > verificado). **1229 testes unitários verdes.**
 >
-> **Fase D (integração LLM) — scaffolded, execução pendente de ambiente.** Bateria
-> `test_llm_app_service_chat__vehicle_maintenance_graph.py` (B1 positiva, B2
-> anti-falso-positivo, negação) + `integration_vehicles` + env do modelo no
-> `conftest`. **Requer Ollama vivo** (`unix.rtx-server:11434`) para rodar e ajustar
-> os prompts pelo processo de iteração de §9.1 — não é gate de TDD.
+> **Fase D (integração LLM) — executada contra Ollama vivo (gemma4:12b, 2026-07-06).**
+> Bateria `test_llm_app_service_chat__vehicle_maintenance_graph.py`. Resultado após
+> ajuste de prompt: **B1 positiva 10/10, B2 anti-falso-positivo 10/10, negação 3/3.**
+> O único caso que falhou na 1ª rodada ("Edite o modelo do meu Outlander" classificado
+> como `edit_maintenance` em vez de `vehicle_write_forbidden`) foi corrigido reforçando
+> a distinção veículo-vs-registro no `vehicle_maintenance_graph.md` (§9.1, passo de
+> iteração de prompt). B2 (o guard mais crítico do sketch) passou 100% de primeira,
+> incluindo "Gosto do meu Outlander", "O Outlander dá muita manutenção?", "câmbio do
+> Porsche" e "intervalo recomendado de troca de óleo".
 >
-> **Fase E (segurança) — mitigações aplicadas; sign-off formal pendente.** M-SEC-1
-> (API key), M-SEC-2 (ownership no caminho do chat, testado), M-SEC-3 (sanitização de
-> descrições/nomes reinjetados), M-SEC-4 (limites de entrada) implementadas e
-> testadas. Falta a revisão formal do `especialista-de-seguranca`.
+> **Fase E (segurança) — auditada pelo `especialista-de-seguranca`; 2 achados Média
+> corrigidos.** M-SEC-1..4 confirmadas corretas. Corrigido: (1) a garantia ISP §2.4
+> nível 1 era só nominal — a IoC injetava o `SqliteVehicleRepository` completo no
+> caminho do chat; criado `ReadOnlyVehicleRepository` (infra) e injetado no grafo,
+> `MaintenanceService` e `LlmAppService` (o repo completo fica só no
+> `VehicleAppService` REST), tornando a impossibilidade de escrita **estrutural**;
+> (2) `query_limit` do LLM burlava o teto de 20 (`max()` sem cap) — agora busca e
+> renderiza no máximo `_QUERY_RECORD_LIMIT`. Achados Baixa/Informativo (max_length em
+> `ChatRequest`, `SecretStr` nos segredos legados, key obrigatória em produção) ficam
+> como follow-up já previsto no §9.6. **1242 testes unitários verdes.**
 >
 > **Refinamento §2.7 "registro em foco" — concluído (2026-07-06, TDD).**
 > `MaintenanceFlowService.set_focus/get_focus/clear_focus` (chave

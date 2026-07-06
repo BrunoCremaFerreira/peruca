@@ -208,6 +208,26 @@ class TestFocusedQuerySetsFocus:
         assert stored["record_id"] == "r-top"
 
 
+class TestQueryLimitCap:
+    def test_huge_query_limit_is_capped_to_20(self):
+        user = _user()
+        maintenance = MagicMock()
+        maintenance.get_by_vehicle.return_value = [
+            MaintenanceRecord(id=f"r{i}", vehicle_id="id-out", description="troca",
+                              performed_at=date(2026, 1, 1), odometer_km=1000 + i)
+            for i in range(50)
+        ]
+        graph = _make_graph(fleet=_fleet(user.id), maintenance_service=maintenance)
+        state = {"input": _req(user), "vehicle_term": "outlander",
+                 "query_kind": "list", "query_limit": 100000, "resolved_period": None,
+                 "query": ""}
+        out = graph._handle_query_maintenance(state)
+        # Never fetches more than the hard ceiling from the store...
+        assert maintenance.get_by_vehicle.call_args.kwargs["limit"] == 20
+        # ...and never renders more than the hard ceiling, whatever the LLM emitted.
+        assert out["output_query"].count("\n- ") <= 20
+
+
 class TestEdit:
     def test_edit_km_applies_update(self):
         user = _user()

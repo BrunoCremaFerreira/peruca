@@ -85,6 +85,7 @@ from infra.data.sqlite.sqlite_user_memory_repository import (
     SqliteUserMemoryRepository,
 )
 from infra.data.sqlite.sqlite_user_repository import SqliteUserRepository
+from infra.data.read_only_vehicle_repository import ReadOnlyVehicleRepository
 from infra.data.sqlite.sqlite_vehicle_repository import SqliteVehicleRepository
 from infra.data.sqlite.sqlite_maintenance_record_repository import (
     SqliteMaintenanceRecordRepository,
@@ -185,7 +186,7 @@ def get_vehicle_maintenance_graph() -> VehicleMaintenanceGraph:
 
         _repo_cache[cache_key] = VehicleMaintenanceGraph(
             llm_chat=llm_chat,
-            vehicle_read_repository=get_vehicle_repository(),
+            vehicle_read_repository=get_vehicle_read_repository(),
             maintenance_service=get_maintenance_service(),
             maintenance_flow_service=get_maintenance_flow_service(),
             get_session_history=_get_session_history_factory(),
@@ -483,7 +484,7 @@ def get_llm_app_service() -> LlmAppService:
         image_store=get_image_store(),
         maintenance_flow_service=get_maintenance_flow_service(),
         maintenance_service=get_maintenance_service(),
-        vehicle_read_repository=get_vehicle_repository(),
+        vehicle_read_repository=get_vehicle_read_repository(),
         chat_image_max_bytes=settings.chat_image_max_bytes,
         chat_image_max_count=settings.chat_image_max_count,
         chat_image_allowed_mimes=settings.chat_image_allowed_mimes,
@@ -618,7 +619,7 @@ def get_maintenance_service() -> MaintenanceService:
 
     return MaintenanceService(
         maintenance_record_repository=get_maintenance_record_repository(),
-        vehicle_read_repository=get_vehicle_repository(),
+        vehicle_read_repository=get_vehicle_read_repository(),
     )
 
 
@@ -756,6 +757,21 @@ def get_vehicle_repository() -> VehicleRepository:
         _repo_cache[cache_key] = SqliteVehicleRepository(
             db_path=settings.peruca_db_connection_string
         )
+    return _repo_cache[cache_key]
+
+
+def get_vehicle_read_repository() -> ReadOnlyVehicleRepository:
+    """
+    Read-only vehicle repository for the chat/graph path (§2.4, level 1). It
+    physically lacks add/update/delete, so no code reachable from chat — even a
+    future one — can mutate vehicles. The full repository is reserved for the REST
+    app service (get_vehicle_app_service).
+    """
+
+    settings = _get_settings()
+    cache_key = ("readonly_vehicle", settings.peruca_db_connection_string)
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = ReadOnlyVehicleRepository(get_vehicle_repository())
     return _repo_cache[cache_key]
 
 

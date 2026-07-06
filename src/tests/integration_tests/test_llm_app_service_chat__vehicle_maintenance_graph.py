@@ -27,7 +27,7 @@ def integration_vehicles(integration_user, integration_db_path):
     """Register Outlander + Pajero for the integration user."""
     user_app_service = get_user_app_service()
     user = user_app_service.get_by_external_id(
-        user_external_id=integration_user.external_id
+        external_id=integration_user.external_id
     )
     vehicle_app_service = get_vehicle_app_service()
     vehicle_app_service.add(

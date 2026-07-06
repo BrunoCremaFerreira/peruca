@@ -234,9 +234,13 @@ class VehicleMaintenanceGraph(Graph):
             return {"output_query": ask}
         vehicle = matched[0]
 
-        limit = data.get("query_limit") or _QUERY_RECORD_LIMIT
+        # Hard ceiling: never fetch or render more than _QUERY_RECORD_LIMIT records,
+        # regardless of the query_limit the LLM emits — an inflated value (e.g. from
+        # "as últimas 100000 manutenções", or a hallucination) must not blow up the
+        # prompt/response (§9.5).
+        requested = data.get("query_limit") or 0
         records = self.maintenance_service.get_by_vehicle(
-            vehicle.id, user.id, limit=max(limit, _QUERY_RECORD_LIMIT)
+            vehicle.id, user.id, limit=_QUERY_RECORD_LIMIT
         )
 
         period = data.get("resolved_period")
@@ -246,8 +250,8 @@ class VehicleMaintenanceGraph(Graph):
                 r for r in records if r.performed_at and start <= r.performed_at <= end
             ]
 
-        if data.get("query_limit"):
-            records = records[: data["query_limit"]]
+        if requested:
+            records = records[: min(requested, _QUERY_RECORD_LIMIT)]
 
         if not records:
             return {
