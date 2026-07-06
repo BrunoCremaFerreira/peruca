@@ -58,3 +58,25 @@ class ShoppingListItemResponse:
 class ShoppingListCleanType(Enum):
     ALL = "ALL"
     CHECKED = "CHECKED"
+
+
+# =====================================
+# Vehicle Maintenance
+# =====================================
+@dataclass
+class VehicleResponse:
+    id: str = ""
+    user_id: str = ""
+    name: str = ""
+    brand: str = ""
+    model: str = ""
+    year: int = None
+
+
+@dataclass
+class MaintenanceRecordResponse:
+    id: str = ""
+    vehicle_id: str = ""
+    description: str = ""
+    performed_at: str = ""
+    odometer_km: int = None

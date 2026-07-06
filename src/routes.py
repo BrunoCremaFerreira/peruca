@@ -6,19 +6,24 @@ from application.appservices.shopping_list_app_service import ShoppingListAppSer
 from application.appservices.smart_home_app_service import SmartHomeAppService
 from application.appservices.user_app_service import UserAppService
 from application.appservices.user_memory_app_service import UserMemoryAppService
+from application.appservices.vehicle_app_service import VehicleAppService
 from application.appservices.view_models import (
     ChatRequest,
     ChatResponse,
+    MaintenanceRecordResponse,
     ShoppingListCleanType,
     ShoppingListItemResponse,
     UserMemoryResponse,
     UserResponse,
+    VehicleResponse,
 )
 from domain.commands import (
     ShoppingListItemAdd,
     ShoppingListItemUpdate,
     UserAdd,
     UserUpdate,
+    VehicleAdd,
+    VehicleUpdate,
 )
 from domain.entities import SmartHomeEntityAlias
 from infra.ioc import (
@@ -28,12 +33,18 @@ from infra.ioc import (
     get_smart_home_app_service,
     get_user_app_service,
     get_user_memory_app_service,
+    get_vehicle_app_service,
 )
+
+# Public router: routes that must stay reachable without the API key (health
+# checks for containers / Home Assistant). Everything else lives on `router`,
+# which app.py mounts behind the require_api_key dependency.
+public_router = APIRouter()
 
 router = APIRouter()
 
 
-@router.get("/health")
+@public_router.get("/health")
 async def health():
     return {"status": "ok"}
 
@@ -240,3 +251,57 @@ async def smart_home_back_end_update_aliases(
     smart_home_app_service: SmartHomeAppService = Depends(get_smart_home_app_service),
 ) -> None:
     await smart_home_app_service.update_entity_aliases()
+
+
+# =====================================
+# Vehicle Routes (write is REST-only — never via chat)
+# =====================================
+
+
+@router.get("/user/{id}/vehicle", tags=["Vehicle"])
+def vehicle_get_all_by_user(
+    id: str,
+    vehicle_app_service: VehicleAppService = Depends(get_vehicle_app_service),
+) -> List[VehicleResponse]:
+    return vehicle_app_service.get_all_by_user(user_id=id)
+
+
+@router.get("/vehicle/{id}", tags=["Vehicle"])
+def vehicle_get(
+    id: str,
+    vehicle_app_service: VehicleAppService = Depends(get_vehicle_app_service),
+) -> VehicleResponse:
+    return vehicle_app_service.get_by_id(vehicle_id=id)
+
+
+@router.get("/vehicle/{id}/maintenance", tags=["Vehicle"])
+def vehicle_get_maintenance(
+    id: str,
+    vehicle_app_service: VehicleAppService = Depends(get_vehicle_app_service),
+) -> List[MaintenanceRecordResponse]:
+    return vehicle_app_service.get_maintenance(vehicle_id=id)
+
+
+@router.post("/vehicle", tags=["Vehicle"])
+def vehicle_add(
+    request: VehicleAdd,
+    vehicle_app_service: VehicleAppService = Depends(get_vehicle_app_service),
+) -> dict:
+    vehicle_id = vehicle_app_service.add(vehicle_add=request)
+    return {"vehicle_id": vehicle_id}
+
+
+@router.put("/vehicle", tags=["Vehicle"])
+def vehicle_update(
+    request: VehicleUpdate,
+    vehicle_app_service: VehicleAppService = Depends(get_vehicle_app_service),
+) -> None:
+    vehicle_app_service.update(vehicle_update=request)
+
+
+@router.delete("/vehicle/{id}", tags=["Vehicle"])
+def vehicle_delete(
+    id: str,
+    vehicle_app_service: VehicleAppService = Depends(get_vehicle_app_service),
+) -> None:
+    vehicle_app_service.delete(vehicle_id=id)

@@ -1,55 +1,26 @@
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from typing import List
-import unicodedata
 import uuid
 from domain.commands import ShoppingListItemAdd, ShoppingListItemUpdate
 from domain.entities import ShoppingListItem
 from domain.exceptions import ValidationError
 from domain.interfaces.data_repository import ShoppingListRepository
 from domain.validations.shopping_list_item_validation import ShoppingListItemValidator
+from domain.services.text_matching import normalize as _normalize
+from domain.services.text_matching import name_tokens as _name_tokens
 from infra.utils import auto_map
 
 
-# Generic Portuguese connective words to drop when tokenizing item names, so a
-# partial query like "carne" matches "Carne de panela". Kept intentionally
-# small and product-neutral (no climate/equipment terms — this is not the
-# smart-home tokenizer).
-_NAME_STOPWORDS = {
-    "a", "o", "as", "os", "de", "da", "do", "das", "dos",
-    "e", "com", "sem", "para", "por", "no", "na", "nos", "nas", "em",
-}
+# Normalization/tokenization now live in domain.services.text_matching; the
+# module-level aliases above are kept so existing importers (and this module)
+# keep working unchanged.
 
 # difflib ratio threshold for a typo to count as the same item.
 _FUZZY_THRESHOLD = 0.8
 # Words shorter than this are not fuzzy-matched — short tokens produce too many
 # false positives (e.g. "carne" vs "leite").
 _FUZZY_MIN_LENGTH = 4
-
-
-def _normalize(value: str) -> str:
-    """
-    Normalize a string for deterministic comparison: NFD-strip accents,
-    lowercase and trim. Mirrors SmartHomeService._normalize.
-    """
-    if not value:
-        return ""
-    decomposed = unicodedata.normalize("NFD", value)
-    stripped = decomposed.encode("ascii", "ignore").decode("ascii")
-    return stripped.lower().strip()
-
-
-def _name_tokens(value: str) -> set:
-    """
-    Break an item name/query into comparable tokens: normalize, split on
-    whitespace and hyphens, and drop generic Portuguese stopwords.
-    """
-    normalized = _normalize(value).replace("-", " ")
-    return {
-        token
-        for token in normalized.split()
-        if token and token not in _NAME_STOPWORDS
-    }
 
 
 class ShoppingListService:

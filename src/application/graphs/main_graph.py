@@ -31,6 +31,7 @@ class MainGraphState(TypedDict):
     output_climate: Optional[str]
     output_sensors: Optional[str]
     output_music: Optional[str]
+    output_vehicle: Optional[str]
     output: Optional[str]
     # Side channel: the factual image description produced by the only_talk
     # graph. Consumed by LlmAppService for history persistence; deliberately
@@ -52,6 +53,7 @@ class MainGraph(Graph):
         smart_home_sensors_graph: SmartHomeSensorsGraph,
         smart_home_cameras_graph: SmartHomeCamerasGraph = None,
         music_graph=None,
+        vehicle_maintenance_graph=None,
         provider: str = "OLLAMA",
         strip_think_directive: bool = False,
     ):
@@ -64,6 +66,7 @@ class MainGraph(Graph):
         self.smart_home_sensors_graph = smart_home_sensors_graph
         self.smart_home_cameras_graph = smart_home_cameras_graph
         self.music_graph = music_graph
+        self.vehicle_maintenance_graph = vehicle_maintenance_graph
         self.classification_prompt = ChatPromptTemplate.from_template(
             self.load_prompt("main_graph.md")
         )
@@ -88,9 +91,11 @@ class MainGraph(Graph):
             if music_is_playing
             else "Não."
         )
+        user_vehicles = data["input"].context_hints.get("user_vehicles") or "nenhum"
         invoke_payload = {
             "input": data["input"].message,
             "music_is_playing": hint_str,
+            "user_vehicles": user_vehicles,
         }
         chain = self.classification_prompt | self.llm_chat
         try:
@@ -120,6 +125,19 @@ class MainGraph(Graph):
         result = self.music_graph.invoke(invoke_request=data["input"])
         return {"output_music": result.get("output")}
 
+    def _handle_vehicle_maintenance(self, data):
+        logger.info("vehicle_maintenance graph triggered")
+        result = self.vehicle_maintenance_graph.invoke(invoke_request=data["input"])
+        # Main-classifier false positive: the sub-classifier found no actionable
+        # maintenance intent. Degrade to free conversation instead of replying
+        # "I did not understand" (§9.1). Only +1 LLM call, and only on this path.
+        if result.get("intent") == ["not_recognized"]:
+            logger.info("vehicle_maintenance not_recognized — falling back to only_talk")
+            fallback = self.only_talk_graph.invoke(invoke_request=data["input"])
+            output = fallback.get("output") if isinstance(fallback, dict) else fallback
+            return {"output_vehicle": self._remove_thinking_tag(output or "")}
+        return {"output_vehicle": result.get("output")}
+
     def _handle_final_response(self, data):
         output_shopping = data.get("output_shopping")
         listing = (
@@ -142,6 +160,7 @@ class MainGraph(Graph):
                 data.get("output_climate"),
                 data.get("output_sensors"),
                 data.get("output_music"),
+                data.get("output_vehicle"),
             ]
             if e is not None and e.strip()
         ]
@@ -252,6 +271,13 @@ class MainGraph(Graph):
         if self.music_graph is not None:
             workflow.add_node("music", RunnableLambda(self._handle_music))
             action_nodes.append("music")
+
+        if self.vehicle_maintenance_graph is not None:
+            workflow.add_node(
+                "vehicle_maintenance",
+                RunnableLambda(self._handle_vehicle_maintenance),
+            )
+            action_nodes.append("vehicle_maintenance")
 
         workflow.add_node("final_response", RunnableLambda(self._handle_final_response))
         workflow.add_edge(START, "classify")

@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from enum import Enum
 from typing import List, Optional, Tuple
 
@@ -65,6 +65,45 @@ class PendingDisambiguation:
 
     operation: str = ""  # "delete" | "check" | "uncheck"
     query: str = ""
+    candidates: List["DisambiguationCandidate"] = field(default_factory=list)
+    expires_at: float = 0.0  # epoch seconds
+
+
+# ====================================
+# Vehicle Maintenance Related Classes
+# ====================================
+@dataclass
+class Vehicle(BaseEntity):
+    user_id: str = ""
+    name: str = ""
+    brand: str = ""
+    model: str = ""
+    year: Optional[int] = None
+
+
+@dataclass
+class MaintenanceRecord(BaseEntity):
+    vehicle_id: str = ""
+    description: str = ""
+    performed_at: Optional[date] = None
+    odometer_km: Optional[int] = None
+
+
+@dataclass
+class PendingMaintenanceFlow:
+    """
+    A multi-turn maintenance operation awaiting the user's next reply, persisted
+    between turns (JSON payload with an embedded TTL, mirroring
+    PendingDisambiguation). ``slots`` holds the data gathered so far
+    (description, vehicle_id, performed_at ISO string, odometer_km, record_id);
+    ``missing_slots`` is the ordered queue of what to ask next (veículo -> data
+    -> km); ``candidates`` reuses the disambiguation candidate shape for the
+    "choose_vehicle" operation.
+    """
+
+    operation: str = ""  # "register" | "edit" | "delete_confirm" | "choose_vehicle"
+    slots: dict = field(default_factory=dict)
+    missing_slots: List[str] = field(default_factory=list)
     candidates: List["DisambiguationCandidate"] = field(default_factory=list)
     expires_at: float = 0.0  # epoch seconds
 

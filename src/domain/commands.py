@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import date
 from typing import Optional, Tuple
 
 
@@ -40,6 +41,44 @@ class ShoppingListItemUpdate:
     id: str = ""
     name: str = ""
     quantity: float = 1
+
+
+# =====================================
+# Vehicle Maintenance Commands
+# =====================================
+@dataclass
+class VehicleAdd:
+    user_id: str = ""
+    name: str = ""
+    brand: str = ""
+    model: str = ""
+    year: Optional[int] = None
+
+
+@dataclass
+class VehicleUpdate:
+    id: str = ""
+    user_id: str = ""
+    name: str = ""
+    brand: str = ""
+    model: str = ""
+    year: Optional[int] = None
+
+
+@dataclass
+class MaintenanceRecordAdd:
+    vehicle_id: str = ""
+    description: str = ""
+    performed_at: Optional[date] = None
+    odometer_km: Optional[int] = None
+
+
+@dataclass
+class MaintenanceRecordUpdate:
+    id: str = ""
+    description: Optional[str] = None
+    performed_at: Optional[date] = None
+    odometer_km: Optional[int] = None
 
 
 # =====================================

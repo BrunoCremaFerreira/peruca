@@ -1,11 +1,63 @@
 # Plano: Gestor de Manutenção Veicular
 
-- **Status:** todo
+- **Status:** doing (Fases A, B e C implementadas em TDD; D scaffolded; E mitigações aplicadas)
 - **Criado em:** 2026-07-05 20:31
-- **Implementado em:** —
+- **Implementado em:** Fases A/B/C — 2026-07-06 (branch `feature/vehicle-maintenance-manager`)
 - **PR/commit:** —
 - **Origem:** `docs/features/todo/sketch.txt`
 - **Consultorias realizadas (obrigatórias):** `arquiteto`, `especialista-de-prompt`, `programador-tester`
+
+> **Progresso da implementação (2026-07-06, branch `feature/vehicle-maintenance-manager`):**
+>
+> **Fase A (domínio) — concluída, TDD.** Entidades `Vehicle`/`MaintenanceRecord`/
+> `PendingMaintenanceFlow`; commands; `VehicleValidator`/`MaintenanceRecordValidator`
+> (com limites §9.6); `text_matching.py` (extração de normalize/tokens + guardas de
+> comprimento §9.3, **com backport das correções de 2 bugs latentes ao
+> `DisambiguationService`** e testes de regressão); `date_resolver.py` (§9.2, tokens
+> fechados + never-future + bissexto); `VehicleService` (CRUD + unicidade por usuário
+> + cascata filhos-primeiro §9.4 + `find_vehicles_by_term`); `MaintenanceService`
+> (ownership em toda operação); `MaintenanceFlowService.parse_slot_reply` (§9.3, todos
+> os slots). Interface `vehicle_repository.py` com ISP read/write.
+>
+> **Fase B (infra + API + segurança) — concluída, TDD.** Repos SQLite
+> `vehicles`/`maintenance_records` (índice DESC, performed_at ISO); `PERUCA_API_KEY`
+> (`SecretStr`), `infra/security.py` (`require_api_key`, constant-time, modo de
+> migração), split `public_router`/`router` no `app.py` (auth em tudo exceto
+> `/health`), fix CORS `allow_credentials`; `VehicleAppService` + ViewModels + rotas
+> `/vehicle` (write REST-only); settings do graph + `MAINTENANCE_FLOW_TTL_SECONDS`;
+> factories IoC (grafo recebe só o read repo). `.env.example` atualizado.
+>
+> **Fase C (graph + prompts + wiring) — concluída, TDD (LLM mockado).**
+> `VehicleMaintenanceGraph` (classify JSON + resolução de veículo/data em Python;
+> handlers de list/register/query/forbidden/not_recognized; render determinístico
+> para list/vazio, 2ª chamada LLM só p/ query aberta); prompts
+> `vehicle_maintenance_graph.md` e `..._query_response.md`; `main_graph.md` (categoria
+> + regra 10 + few-shot + `{user_vehicles}`); wiring no MainGraph **com fallback
+> `not_recognized → only_talk`** (§9.1); `LlmAppService` (hint `user_vehicles` +
+> short-circuit `_consume_maintenance_flow` §9.3); `prompt_sanitizer.py` extraído do
+> M-01 e reusado. IoC completa (smoke de build OK; roteamento do grafo compilado
+> verificado). **1229 testes unitários verdes.**
+>
+> **Fase D (integração LLM) — scaffolded, execução pendente de ambiente.** Bateria
+> `test_llm_app_service_chat__vehicle_maintenance_graph.py` (B1 positiva, B2
+> anti-falso-positivo, negação) + `integration_vehicles` + env do modelo no
+> `conftest`. **Requer Ollama vivo** (`unix.rtx-server:11434`) para rodar e ajustar
+> os prompts pelo processo de iteração de §9.1 — não é gate de TDD.
+>
+> **Fase E (segurança) — mitigações aplicadas; sign-off formal pendente.** M-SEC-1
+> (API key), M-SEC-2 (ownership no caminho do chat, testado), M-SEC-3 (sanitização de
+> descrições/nomes reinjetados), M-SEC-4 (limites de entrada) implementadas e
+> testadas. Falta a revisão formal do `especialista-de-seguranca`.
+>
+> **Refinamento §2.7 "registro em foco" — concluído (2026-07-06, TDD).**
+> `MaintenanceFlowService.set_focus/get_focus/clear_focus` (chave
+> `maintenance_focus:{user_id}`, TTL). O `query_maintenance` memoriza o registro mais
+> recente reportado; `edit_maintenance` aplica a alteração no registro em foco
+> (EX1: "altere a km desse registro para 100821" → `MaintenanceRecordUpdate`);
+> `delete_maintenance` grava um `delete_confirm` com o `record_id` e pergunta
+> (EX2), consumido no turno seguinte pelo short-circuit (`_delete_focused_record`,
+> que também limpa o foco). Verificado por unit + smoke de runtime do grafo compilado.
+> Prompt ganhou exemplos de edit/delete. **1238 testes unitários verdes.**
 
 ---
 

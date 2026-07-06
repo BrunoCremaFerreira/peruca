@@ -6,6 +6,7 @@ from application.appservices.shopping_list_app_service import ShoppingListAppSer
 from application.appservices.smart_home_app_service import SmartHomeAppService
 from application.appservices.user_app_service import UserAppService
 from application.appservices.user_memory_app_service import UserMemoryAppService
+from application.appservices.vehicle_app_service import VehicleAppService
 from application.graphs.main_graph import MainGraph
 from application.graphs.memory_graph import MemoryGraph
 from application.graphs.music_graph import MusicGraph
@@ -15,6 +16,7 @@ from application.graphs.smart_home_lights_graph import SmartHomeLightsGraph
 from application.graphs.smart_home_climate_graph import SmartHomeClimateGraph
 from application.graphs.smart_home_sensors_graph import SmartHomeSensorsGraph
 from application.graphs.smart_home_cameras_graph import SmartHomeCamerasGraph
+from application.graphs.vehicle_maintenance_graph import VehicleMaintenanceGraph
 from domain.interfaces.data_repository import (
     ContextRepository,
     ImageStore,
@@ -31,9 +33,16 @@ from domain.interfaces.smart_home_repository import (
     SmartHomeSensorRepository,
     SmartHomeCameraRepository,
 )
+from domain.interfaces.vehicle_repository import (
+    MaintenanceRecordRepository,
+    VehicleRepository,
+)
 from domain.services.disambiguation_service import DisambiguationService
+from domain.services.maintenance_flow_service import MaintenanceFlowService
+from domain.services.maintenance_service import MaintenanceService
 from domain.services.music_service import MusicService
 from domain.services.shopping_list_service import ShoppingListService
+from domain.services.vehicle_service import VehicleService
 from domain.services.smart_home_service import SmartHomeService
 from domain.services.user_memory_service import UserMemoryService
 from domain.services.user_service import UserService
@@ -76,6 +85,10 @@ from infra.data.sqlite.sqlite_user_memory_repository import (
     SqliteUserMemoryRepository,
 )
 from infra.data.sqlite.sqlite_user_repository import SqliteUserRepository
+from infra.data.sqlite.sqlite_vehicle_repository import SqliteVehicleRepository
+from infra.data.sqlite.sqlite_maintenance_record_repository import (
+    SqliteMaintenanceRecordRepository,
+)
 import hashlib
 import os
 
@@ -134,6 +147,7 @@ def get_main_graph() -> MainGraph:
         smart_home_sensors_graph = get_smart_home_sensors_graph()
         smart_home_cameras_graph = get_smart_home_cameras_graph()
         music_graph = get_music_graph()
+        vehicle_maintenance_graph = get_vehicle_maintenance_graph()
 
         _repo_cache[cache_key] = MainGraph(
             llm_chat=llm_chat,
@@ -144,6 +158,37 @@ def get_main_graph() -> MainGraph:
             smart_home_sensors_graph=smart_home_sensors_graph,
             smart_home_cameras_graph=smart_home_cameras_graph,
             music_graph=music_graph,
+            vehicle_maintenance_graph=vehicle_maintenance_graph,
+            provider=settings.llm_provider_type,
+            strip_think_directive=settings.llm_strip_think_directive,
+        )
+    return _repo_cache[cache_key]
+
+
+def get_vehicle_maintenance_graph() -> VehicleMaintenanceGraph:
+    """
+    IOC for Vehicle Maintenance Graph. Receives the vehicle repo as READ-only
+    (write is REST-only, §2.4).
+    """
+
+    settings = _get_settings()
+
+    cache_key = ("graph", "vehicle_maintenance")
+    if cache_key not in _repo_cache:
+        llm_chat = get_llm_chat(
+            model=settings.llm_vehicle_maintenance_graph_chat_model,
+            temperature=settings.llm_vehicle_maintenance_graph_chat_temperature,
+            reasoning=_resolve_reasoning(
+                settings.llm_vehicle_maintenance_graph_chat_reasoning
+            ),
+        )
+
+        _repo_cache[cache_key] = VehicleMaintenanceGraph(
+            llm_chat=llm_chat,
+            vehicle_read_repository=get_vehicle_repository(),
+            maintenance_service=get_maintenance_service(),
+            maintenance_flow_service=get_maintenance_flow_service(),
+            get_session_history=_get_session_history_factory(),
             provider=settings.llm_provider_type,
             strip_think_directive=settings.llm_strip_think_directive,
         )
@@ -436,6 +481,9 @@ def get_llm_app_service() -> LlmAppService:
         shopping_list_service=get_shopping_list_service(),
         disambiguation_service=get_disambiguation_service(),
         image_store=get_image_store(),
+        maintenance_flow_service=get_maintenance_flow_service(),
+        maintenance_service=get_maintenance_service(),
+        vehicle_read_repository=get_vehicle_repository(),
         chat_image_max_bytes=settings.chat_image_max_bytes,
         chat_image_max_count=settings.chat_image_max_count,
         chat_image_allowed_mimes=settings.chat_image_allowed_mimes,
@@ -496,6 +544,19 @@ def get_smart_home_app_service() -> SmartHomeAppService:
     )
 
 
+def get_vehicle_app_service() -> VehicleAppService:
+    """
+    IOC for VehicleAppService (the only vehicle WRITE path — REST only).
+    """
+
+    return VehicleAppService(
+        vehicle_service=get_vehicle_service(),
+        vehicle_repository=get_vehicle_repository(),
+        maintenance_record_repository=get_maintenance_record_repository(),
+        user_repository=get_user_repository(),
+    )
+
+
 # ====================================
 # Domain Services
 # ====================================
@@ -536,6 +597,41 @@ def get_user_service() -> UserService:
     """
 
     return UserService(user_repository=get_user_repository())
+
+
+def get_vehicle_service() -> VehicleService:
+    """
+    IOC for Vehicle Service (full read/write repo — REST side).
+    """
+
+    return VehicleService(
+        vehicle_repository=get_vehicle_repository(),
+        maintenance_record_repository=get_maintenance_record_repository(),
+    )
+
+
+def get_maintenance_service() -> MaintenanceService:
+    """
+    IOC for Maintenance Service. Receives the vehicle repo as the READ-only
+    view so the chat path can never write a vehicle.
+    """
+
+    return MaintenanceService(
+        maintenance_record_repository=get_maintenance_record_repository(),
+        vehicle_read_repository=get_vehicle_repository(),
+    )
+
+
+def get_maintenance_flow_service() -> MaintenanceFlowService:
+    """
+    IOC for Maintenance Flow Service (multi-turn pending state).
+    """
+
+    settings = _get_settings()
+    return MaintenanceFlowService(
+        context_repository=get_context_repository(),
+        ttl_seconds=settings.maintenance_flow_ttl_seconds,
+    )
 
 
 def get_user_memory_service() -> UserMemoryService:
@@ -646,6 +742,34 @@ def get_shopping_list_repository() -> ShoppingListRepository:
     cache_key = ("sqlite_shopping_list", settings.peruca_db_connection_string)
     if cache_key not in _repo_cache:
         _repo_cache[cache_key] = SqliteShoppingListRepository(db_path=settings.peruca_db_connection_string)
+    return _repo_cache[cache_key]
+
+
+def get_vehicle_repository() -> VehicleRepository:
+    """
+    Vehicle Repository
+    """
+
+    settings = _get_settings()
+    cache_key = ("sqlite_vehicle", settings.peruca_db_connection_string)
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = SqliteVehicleRepository(
+            db_path=settings.peruca_db_connection_string
+        )
+    return _repo_cache[cache_key]
+
+
+def get_maintenance_record_repository() -> MaintenanceRecordRepository:
+    """
+    Maintenance Record Repository
+    """
+
+    settings = _get_settings()
+    cache_key = ("sqlite_maintenance_record", settings.peruca_db_connection_string)
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = SqliteMaintenanceRecordRepository(
+            db_path=settings.peruca_db_connection_string
+        )
     return _repo_cache[cache_key]
 
 

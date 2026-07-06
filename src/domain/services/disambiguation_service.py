@@ -5,26 +5,8 @@ from typing import List, Optional
 
 from domain.entities import DisambiguationCandidate, PendingDisambiguation
 from domain.interfaces.data_repository import ContextRepository
-from domain.services.shopping_list_service import ShoppingListService, _normalize
-
-
-# Words that cancel a pending disambiguation.
-_CANCEL_WORDS = {
-    "cancelar", "cancela", "cancele", "deixa", "nenhum", "nenhuma",
-    "esquece", "esqueci", "para",
-}
-
-# Portuguese ordinal words mapped to a zero-based position.
-_ORDINAL_WORDS = {
-    "primeiro": 0, "primeira": 0,
-    "segundo": 1, "segunda": 1,
-    "terceiro": 2, "terceira": 2,
-    "quarto": 3, "quarta": 3,
-    "quinto": 4, "quinta": 4,
-}
-
-# Words selecting the last candidate.
-_LAST_WORDS = {"ultimo", "ultima"}
+from domain.services.shopping_list_service import ShoppingListService
+from domain.services.text_matching import is_cancel, resolve_ordinal
 
 
 @dataclass
@@ -118,17 +100,19 @@ class DisambiguationService:
         """
         Resolve a follow-up reply against the candidates. Pure and synchronous.
         Precedence: cancel > ordinal > literal name; otherwise "none".
+
+        Cancel words and ordinals are only honored in short, content-poor
+        replies (the length guards in text_matching), so a long legitimate
+        command that merely contains a digit or a cancel word no longer hijacks
+        the choice.
         """
         if not candidates:
             return ChoiceResult(kind="none")
 
-        normalized = _normalize(message)
-        tokens = set(normalized.split())
-
-        if tokens & _CANCEL_WORDS:
+        if is_cancel(message):
             return ChoiceResult(kind="cancel")
 
-        index = self._parse_ordinal(tokens, len(candidates))
+        index = resolve_ordinal(message, len(candidates))
         if index is not None:
             return ChoiceResult(kind="match", candidate=candidates[index])
 
@@ -137,16 +121,3 @@ class DisambiguationService:
             return ChoiceResult(kind="match", candidate=matched[0])
 
         return ChoiceResult(kind="none")
-
-    @staticmethod
-    def _parse_ordinal(tokens: set, count: int) -> Optional[int]:
-        for token in tokens:
-            if token in _LAST_WORDS:
-                return count - 1
-            if token in _ORDINAL_WORDS and _ORDINAL_WORDS[token] < count:
-                return _ORDINAL_WORDS[token]
-            if token.isdigit():
-                position = int(token)
-                if 1 <= position <= count:
-                    return position - 1
-        return None

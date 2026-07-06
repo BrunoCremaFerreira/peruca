@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -15,6 +15,10 @@ class Settings(BaseSettings):
 
     cors_origin: str = "*"
     log_level: str = "INFO"
+    # Static API key for the REST API (header X-API-Key). Empty = migration mode:
+    # the API stays open and a warning is logged at startup. Set it to require
+    # the key on every route except /health. SecretStr keeps it out of logs/repr.
+    peruca_api_key: SecretStr = SecretStr("")
 
     # ===============================
     # LLM Provider Configs
@@ -81,6 +85,12 @@ class Settings(BaseSettings):
     llm_memory_graph_chat_temperature: float = 0.1
     llm_memory_graph_chat_reasoning: bool | None = None
 
+    # Vehicle maintenance classifier: near-deterministic like the other
+    # classifier graphs. Default to the same model so it stays VRAM-resident.
+    llm_vehicle_maintenance_graph_chat_model: str = "gemma4:12b"
+    llm_vehicle_maintenance_graph_chat_temperature: float = 0.1
+    llm_vehicle_maintenance_graph_chat_reasoning: bool | None = None
+
     # ===============================
     # NLP Models config
     # ===============================
@@ -128,6 +138,11 @@ class Settings(BaseSettings):
     # How long (seconds) a pending shopping-list disambiguation question stays
     # valid before the stored state is treated as expired and discarded.
     disambiguation_ttl_seconds: int = 120
+    # How long a pending multi-turn maintenance flow (register/edit/delete/
+    # choose_vehicle) stays valid before it is discarded. Longer than the
+    # shopping-list disambiguation TTL because collecting vehicle -> date -> km
+    # spans several turns.
+    maintenance_flow_ttl_seconds: int = 600
     peruca_db_connection_string: str = (
         f"sqlite://{Path(__file__).parent.parent / 'peruca.db'}"
     )

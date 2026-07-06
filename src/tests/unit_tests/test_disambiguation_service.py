@@ -165,3 +165,18 @@ class TestResolveChoiceNone:
         result = service.resolve_choice("acende a luz da sala", _candidates())
         assert result.kind == "none"
         assert result.candidate is None
+
+
+class TestResolveChoiceLengthGuards:
+    """Backport of the §9.3 guards: a long command carrying a digit or a cancel
+    word must not hijack a pending choice."""
+
+    def test_digit_in_long_message__returns_none(self):
+        service = _service()
+        result = service.resolve_choice("coloca 3 leites na lista", _candidates())
+        assert result.kind == "none"
+
+    def test_para_inside_long_message__does_not_cancel(self):
+        service = _service()
+        result = service.resolve_choice("põe leite na lista para amanhã", _candidates())
+        assert result.kind != "cancel"
