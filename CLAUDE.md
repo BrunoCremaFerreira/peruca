@@ -132,6 +132,9 @@ HOME_ASSISTANT_TOKEN=<long-lived-token>
 MUSIC_ASSISTANT_URL=http://<music-assistant-host>:8095   # optional; unset disables the music graph
 MUSIC_ASSISTANT_TOKEN=
 LLM_MUSIC_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_VEHICLE_MAINTENANCE_GRAPH_CHAT_MODEL=gemma4:12b
+MAINTENANCE_FLOW_TTL_SECONDS=600                # TTL for the pending multi-turn maintenance flow / focused record
+PERUCA_API_KEY=                                 # X-API-Key required on every route except /health; empty = migration mode (open, logs a warning)
 PERUCA_DB_CONNECTION_STRING=<path>/peruca.db
 CACHE_DB_CONNECTION_STRING=<redis-url>          # Redis for conversation history; if empty, falls back to in-memory store
 CHAT_HISTORY_TTL_SECONDS=                        # empty or <=0 means no expiry
@@ -172,6 +175,7 @@ LlmAppService.chat()                           ← loads user memories; probes M
               ├─► SmartHomeSensorsGraph.invoke() ← Home Assistant sensors (LLM call)
               ├─► SmartHomeCamerasGraph.invoke() ← Home Assistant cameras (LLM call)
               ├─► MusicGraph.invoke()          ← Music Assistant control (optional; only wired when MA is configured)
+              ├─► VehicleMaintenanceGraph.invoke() ← vehicle maintenance records (LLM call); vehicle CRUD is REST-only
               ├─► OnlyTalkGraph.invoke()        ← free conversation (chain, not StateGraph)
               └─► [final_response]              ← merges multiple outputs (LLM call #2, if needed)
 
@@ -184,7 +188,7 @@ All graphs inherit from `Graph` (ABC at `application/graphs/graph.py`) and imple
 **Key design constraints for graphs:**
 - The `classify` node in each graph both classifies intent **and** extracts structured data in a single LLM call. Downstream action nodes consume what's already in the state — they do not re-call the LLM.
 - Intent strings returned by the LLM must match the node names in the `StateGraph` exactly. The `intent_router` function returns `state["intent"]` directly as edge targets.
-- Every `classify` node first runs the shared `Graph._extract_structured_output()` (strips `<think>` blocks, normalizes curly quotes, extracts the first balanced `[...]`/`{...}` literal). It then parses that literal: `MainGraph` and `ShoppingListGraph` use `ast.literal_eval()` (their prompts emit single-quoted Python literals — never `eval()`, which would execute injected expressions); the smart-home graphs (lights/climate/sensors/cameras) and `MusicGraph` use `json.loads()`; `MemoryGraph` uses `json.loads()` directly. Do not change a graph's parser without updating its corresponding prompt to match.
+- Every `classify` node first runs the shared `Graph._extract_structured_output()` (strips `<think>` blocks, normalizes curly quotes, extracts the first balanced `[...]`/`{...}` literal). It then parses that literal: `MainGraph` and `ShoppingListGraph` use `ast.literal_eval()` (their prompts emit single-quoted Python literals — never `eval()`, which would execute injected expressions); the smart-home graphs (lights/climate/sensors/cameras), `MusicGraph`, and `VehicleMaintenanceGraph` use `json.loads()`; `MemoryGraph` uses `json.loads()` directly. Do not change a graph's parser without updating its corresponding prompt to match.
 - `OnlyTalkGraph` does not use `StateGraph`. It is a plain `prompt | llm` chain that **reads** conversation history (read-only): it loads `get_session_history(user.id).messages` and injects them into the `MessagesPlaceholder("history")` (alongside the user's memories and the current datetime). It does **not** write history. The turn is persisted once, centrally, in `LlmAppService._persist_turn()` for **every** intent — so reads and writes share the same `session_id = user.id` key.
 - Each graph compiles its `StateGraph` on the first `invoke()` and caches it on `self._compiled_graph` (see `Graph.__init__`); subsequent calls reuse the compiled graph. Do not reintroduce per-request recompilation.
 
@@ -215,6 +219,19 @@ The WebSocket adapter has auto-reconnect logic. Its `close()` must be called exp
 
 `MusicAssistantMusicRepository` (`infra/data/external/music/music_assistant/`) talks to a Music Assistant server over HTTP (`aiohttp`). It is **optional**: `ioc.py` only wires the music service and `MusicGraph` when `MUSIC_ASSISTANT_URL`/`MUSIC_ASSISTANT_TOKEN` are set. On each request `LlmAppService.chat()` probes it (with a short timeout) to set the `music_is_playing` hint in `context_hints`.
 
+### Vehicle Maintenance
+
+Lets the user register/query/edit/remove **maintenance records** for their vehicles via chat, while **vehicle CRUD itself is REST-only**. Key pieces:
+
+- **Domain**: `Vehicle`/`MaintenanceRecord` entities, `VehicleService` (per-user name uniqueness; delete cascades children-first) and `MaintenanceService` (validates `vehicle.user_id == user_id` on **every** operation). `date_resolver.py` resolves closed date tokens/periods in Python — **the LLM never does calendar arithmetic**; it only emits tokens like `today`/`yesterday`/`this_week` and explicit `YYYY-MM-DD`. `text_matching.py` (shared with shopping-list disambiguation) fuzzy-matches vehicle terms.
+- **REST-only writes, enforced structurally (ISP)**: the vehicle interface is split into `VehicleReadRepository` (read) and `VehicleRepository` (read+write) in `domain/interfaces/vehicle_repository.py`. The chat path (graph, `MaintenanceService`, `LlmAppService`) is wired with `ReadOnlyVehicleRepository` (`infra/data/read_only_vehicle_repository.py`), which **physically lacks** `add`/`update`/`delete`. The full repo is reserved for `VehicleAppService` (the `/vehicle` REST routes). So even under prompt injection, no chat-reachable code can mutate a vehicle. Chat attempts to write a vehicle hit the `vehicle_write_forbidden` node → fixed reply "Não tenho permissão para realizar esta operação".
+- **Multi-turn slot-filling + focused record**: `MaintenanceFlowService` (backed by `ContextRepository`, keyed by `user_id` with embedded TTL) persists a `PendingMaintenanceFlow` for register slot collection (vehicle→date→km) and a "focused record" (the record a query last reported on) so a follow-up "altere a km desse registro" / "remova este registro" knows its target. `LlmAppService` short-circuits a pending flow **before** `MainGraph` (mirrors the shopping-list `DisambiguationService` pattern); deletes go through a `delete_confirm` yes/no turn.
+- **Prompt-injection hardening**: free-text reinjected into prompts (record descriptions, history) is passed through `sanitize_for_prompt` (`application/appservices/prompt_sanitizer.py`); `query_limit` from the LLM is hard-capped at `_QUERY_RECORD_LIMIT` (20).
+
+### API Authentication
+
+Every route except `/health` requires the `X-API-Key` header. `infra/security.py::require_api_key` compares it against `PERUCA_API_KEY` with `secrets.compare_digest` (constant-time). `app.py` splits the routers: `public_router` (holds `/health`) is mounted openly, while `router` (everything else) is mounted behind `Depends(require_api_key)`. **Migration mode**: when `PERUCA_API_KEY` is empty the check is a no-op and the app logs a startup warning — so existing deployments keep working until an operator sets the key. CORS `allow_credentials` is disabled when `CORS_ORIGIN` is `*`.
+
 ### Async / Sync Mixing
 
 `SmartHomeLightsGraph` is synchronous (LangGraph node constraint) but calls async methods on `SmartHomeService`. It uses `asyncio.run()` for each call, which creates a new event loop per invocation. This works but conflicts with running inside an async FastAPI context. Do not introduce additional `asyncio.run()` calls inside graph nodes.
@@ -228,6 +245,8 @@ Conventions in unit test files:
 - `_sample_*()` — returns a pre-built domain entity
 - Test class names: `TestXxxYyy` grouping related scenarios
 - Async calls via `asyncio.get_event_loop().run_until_complete(coro)`
+
+Integration tests (`-m integration`) require a live Ollama and write to a SQLite file in `/dev/shm` (per-xdist-worker). Batteries that need an external backend **skip gracefully** when it is unreachable, so the suite stays green without the hardware: `redis_backed_env` (Redis history/image store), and `home_assistant_available` / `music_assistant_available` (the four smart-home batteries and the music battery) probe the configured URL with a short cached HTTP check and `pytest.skip` if it does not answer. `test_llm_app_service_chat__main_graph.py` is a mixed file — its smart-home/camera-routing cases still execute the sub-graph and thus need Home Assistant.
 
 ## Known Stubs (not implemented)
 

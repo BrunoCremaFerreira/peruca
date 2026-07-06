@@ -42,6 +42,7 @@ Peruca is a self-hosted virtual assistant powered by local large language models
 | **Smart home sensors** | Query current state and recent history of temperature, door, motion, and other sensors |
 | **Security cameras** | Retrieve live snapshots and check the status of camera entities |
 | **Music** | Play, pause, resume, skip, and adjust volume on [Music Assistant](https://music-assistant.io/) players (optional — enabled only when Music Assistant is configured) |
+| **Vehicle maintenance** | Register, query, edit, and remove maintenance records for the user's vehicles via natural language (multi-turn slot-filling). Vehicle CRUD itself is REST-only — chat can never create/edit/delete a vehicle |
 
 ---
 
@@ -101,7 +102,8 @@ src/
 │       ├── smart_home_climate_graph.py
 │       ├── smart_home_sensors_graph.py
 │       ├── smart_home_cameras_graph.py
-│       └── music_graph.py          ← Music Assistant control (optional)
+│       ├── music_graph.py            ← Music Assistant control (optional)
+│       └── vehicle_maintenance_graph.py ← vehicle maintenance records (vehicle CRUD is REST-only)
 │
 ├── domain/
 │   ├── entities.py               ← Pure Python dataclasses
@@ -152,6 +154,8 @@ MainGraph.invoke()                    ← LLM call #1: classifies intent(s)
       │
       ├──► MusicGraph.invoke()            ← LLM call: music control (optional)
       │
+      ├──► VehicleMaintenanceGraph.invoke() ← LLM call: maintenance records (vehicle CRUD is REST-only)
+      │
       └──► OnlyTalkGraph.invoke()         ← chain (no StateGraph): free conversation
                 │
                 ▼
@@ -187,7 +191,8 @@ Classifies the user message into one or more intents and routes to the appropria
 
 ```
 START → classify → [smart_home_lights | smart_home_climate | smart_home_sensors
-                    | smart_home_security_cams | shopping_list | only_talking]
+                    | smart_home_security_cams | shopping_list | music
+                    | vehicle_maintenance | only_talking]
                                              → final_response → END
 ```
 
@@ -297,6 +302,33 @@ The classifier receives a `music_is_playing` hint (probed by `LlmAppService`
 before invocation via `context_hints`) so ambiguous commands like "pause" or
 "next" resolve correctly.
 
+### VehicleMaintenanceGraph
+
+Manages **maintenance records** for the user's vehicles. Vehicle CRUD itself is
+**REST-only** — the chat path receives a read-only vehicle repository, so no
+message (even a malicious one) can create, edit, or delete a vehicle.
+
+```
+START → classify → [list_vehicles | register_maintenance | query_maintenance
+                    | edit_maintenance | delete_maintenance
+                    | vehicle_write_forbidden | not_recognized]
+                                             → final_response → END
+```
+
+| Intent | Action |
+|---|---|
+| `list_vehicles` | Lists the user's registered vehicles |
+| `register_maintenance` | Records a maintenance (multi-turn: asks for vehicle → date → odometer when missing) |
+| `query_maintenance` | Answers history questions; remembers the reported record as the "focused" one |
+| `edit_maintenance` / `delete_maintenance` | Edits/removes the focused record (delete asks a yes/no confirmation) |
+| `vehicle_write_forbidden` | Any attempt to create/edit/delete a **vehicle** via chat → fixed refusal |
+
+Dates are resolved deterministically in Python (`date_resolver.py`) — the LLM only
+emits closed tokens (`today`, `yesterday`, `this_week`, …) or explicit `YYYY-MM-DD`,
+never computed dates. The multi-turn state (pending slots + focused record) lives in
+`MaintenanceFlowService`, keyed by `user_id` with a TTL, and is short-circuited by
+`LlmAppService` before `MainGraph` — mirroring the shopping-list disambiguation flow.
+
 ### OnlyTalkGraph
 
 Free-form conversational graph. Does **not** use `StateGraph` — it is a plain
@@ -317,6 +349,11 @@ History backend is selected at startup by `ioc.py`:
 ## REST API
 
 The API runs on port **8000** by default. Interactive docs are available at `/docs` (Swagger UI) and `/redoc`.
+
+> **Authentication:** every route except `GET /health` requires an `X-API-Key`
+> header matching `PERUCA_API_KEY`. If `PERUCA_API_KEY` is left empty the check is
+> disabled (migration mode) and the app logs a startup warning — set the key to
+> enforce authentication.
 
 ### Health
 
@@ -390,13 +427,26 @@ history for **all** intents, not just free conversation.
 | `GET` | `/smart-home/backend/entity/aliases` | List all entity aliases |
 | `PUT` | `/smart-home/backend/update-aliases` | Synchronise aliases from Home Assistant via WebSocket |
 
+### Vehicles
+
+Vehicle create/update/delete is **REST-only** (never reachable from chat). Deleting a vehicle cascades to its maintenance records.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/user/{id}/vehicle` | List a user's vehicles |
+| `GET` | `/vehicle/{id}` | Get a vehicle by ID |
+| `GET` | `/vehicle/{id}/maintenance` | List a vehicle's maintenance records |
+| `POST` | `/vehicle` | Create a vehicle |
+| `PUT` | `/vehicle` | Update a vehicle |
+| `DELETE` | `/vehicle/{id}` | Delete a vehicle (and its maintenance records) |
+
 ---
 
 ## Data Storage
 
 | Store | Technology | Purpose |
 |---|---|---|
-| Main database | SQLite | Users, shopping list items, entity aliases, user memories |
+| Main database | SQLite | Users, shopping list items, entity aliases, user memories, vehicles, maintenance records |
 | Conversation history | Redis / in-memory | Per-user chat history (written for every turn, all intents); Redis when `CACHE_DB_CONNECTION_STRING` is set, in-memory otherwise |
 | Long-term memory | SQLite | Extracted facts per user, injected as context into every request |
 
@@ -505,6 +555,14 @@ LLM_SMART_HOME_CLIMATE_GRAPH_CHAT_MODEL=gemma4:12b
 LLM_SMART_HOME_SENSORS_GRAPH_CHAT_MODEL=gemma4:12b
 LLM_SMART_HOME_CAMERAS_GRAPH_CHAT_MODEL=gemma4:12b
 LLM_MEMORY_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_VEHICLE_MAINTENANCE_GRAPH_CHAT_MODEL=gemma4:12b
+
+# API authentication — X-API-Key required on every route except /health.
+# Empty = migration mode (open, logs a startup warning).
+PERUCA_API_KEY=
+
+# Vehicle maintenance — TTL (seconds) of the pending multi-turn flow / focused record
+MAINTENANCE_FLOW_TTL_SECONDS=600
 
 # Home Assistant
 HOME_ASSISTANT_URL=http://<ha-host>:8123
@@ -569,7 +627,12 @@ python -m pytest tests/unit_tests/test_user_service.py -v
 python -m pytest tests/unit_tests/test_user_service.py::TestUserServiceAdd::test_add_valid_user_returns_uuid -v
 ```
 
-Integration tests write to a SQLite file at `~/tests/data/tests.db` and require `LLM_PROVIDER_URL` to be set.
+Integration tests require a live Ollama instance and write to a SQLite file under
+`/dev/shm` (per xdist worker). Batteries that need an external backend **skip
+gracefully** when it is unreachable, so the suite stays green without the hardware:
+Redis (history/image store) via `redis_backed_env`, and Home Assistant / Music
+Assistant (the four smart-home batteries and the music battery) via short cached
+connectivity probes.
 
 ---
 
@@ -609,6 +672,6 @@ peruca/
 | Persistent memory | Memory extraction may occasionally miss or duplicate facts depending on LLM output quality |
 | Conversation history (no Redis) | When `CACHE_DB_CONNECTION_STRING` is not set, history falls back to in-memory and is lost on restart |
 | Async/sync mixing | `SmartHomeLightsGraph` and other sync graphs call `asyncio.run()` per action, creating a new event loop each time — may conflict with an async FastAPI context |
-| Parser sensitivity | Classifier output is parsed with `eval()`/`json.loads()`; prompts must emit straight quotes and valid literals. Stray `<think>` blocks are stripped defensively, but malformed output falls back to `only_talking`/`not_recognized` |
+| Parser sensitivity | Classifier output is parsed with `ast.literal_eval()`/`json.loads()` (never `eval()`); prompts must emit straight quotes and valid literals. Stray `<think>` blocks are stripped defensively, but malformed output falls back to `only_talking`/`not_recognized` |
 | SSL | WebSocket adapter disables SSL verification for `wss://` connections |
 | Validator bug | `ShoppingListService.delete()`, `.check()`, and `.uncheck()` omit the mandatory `.validate()` call at the end of the fluent chain |
