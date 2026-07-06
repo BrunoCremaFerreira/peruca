@@ -15,6 +15,12 @@ from application.appservices.view_models import ChatRequest
 pytestmark = pytest.mark.integration
 
 
+@pytest.fixture(autouse=True)
+def _require_music_assistant(music_assistant_available):
+    # Skip the whole module early (before any LLM call) when MA is unreachable.
+    pass
+
+
 # ======================================================
 # play_media — tocar música / artista / playlist / álbum
 # ======================================================

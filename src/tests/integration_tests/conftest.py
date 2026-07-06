@@ -39,7 +39,7 @@ INTEGRATION_ENV = {
     "MUSIC_ASSISTANT_URL": "http://unix.rtx-server:8095",
     "MUSIC_ASSISTANT_TOKEN": "",
     "NLP_SPACY_MODEL": "pt_core_news_sm",
-    "HOME_ASSISTANT_URL": "unix.kubernetes:8123",
+    "HOME_ASSISTANT_URL": "http://unix.kubernetes:8123",
     "CACHE_DB_CONNECTION_STRING": "",
     "PERUCA_DB_CONNECTION_STRING": f"sqlite://{DB_PATH}",
 }
@@ -141,3 +141,56 @@ def redis_backed_env(integration_env):
 @pytest.fixture
 def llm_app_service_redis(redis_backed_env, integration_user, integration_db_path):
     return get_llm_app_service()
+
+
+# ---------------------------------------------------------------------------
+# External backend availability (Home Assistant / Music Assistant)
+#
+# The smart-home batteries depend on a reachable Home Assistant instance and
+# the music battery depends on a reachable Music Assistant instance. These
+# backends are not accessible in every environment. Mirroring the
+# `redis_backed_env` pattern, these fixtures do a short connectivity probe and
+# `pytest.skip(...)` when the backend does not respond — so the suite stays
+# green (skipped, not failed) where HA/MA are offline.
+#
+# The probe only checks connectivity: any HTTP response (even 401 Unauthorized)
+# means the backend is up. A valid token is NOT required.
+# ---------------------------------------------------------------------------
+# Probe results are cached per URL for the whole session so the timeout is paid
+# at most once per backend, not once per test.
+_probe_cache: dict[str, bool] = {}
+
+
+def _probe_http(url: str, timeout: float = 3.0) -> bool:
+    """Return True if the host answers any HTTP response, False if unreachable."""
+    if url in _probe_cache:
+        return _probe_cache[url]
+
+    import urllib.error
+    import urllib.request
+
+    try:
+        urllib.request.urlopen(url, timeout=timeout)  # noqa: S310 - test-only probe
+        reachable = True
+    except urllib.error.HTTPError:
+        # Server responded with an HTTP error (e.g. 401) — it is up.
+        reachable = True
+    except (urllib.error.URLError, OSError, ValueError):
+        reachable = False
+
+    _probe_cache[url] = reachable
+    return reachable
+
+
+@pytest.fixture
+def home_assistant_available(integration_env):
+    url = INTEGRATION_ENV["HOME_ASSISTANT_URL"]
+    if not _probe_http(url):
+        pytest.skip(f"Home Assistant não acessível em {url}")
+
+
+@pytest.fixture
+def music_assistant_available(integration_env):
+    url = INTEGRATION_ENV["MUSIC_ASSISTANT_URL"]
+    if not _probe_http(url):
+        pytest.skip(f"Music Assistant não acessível em {url}")

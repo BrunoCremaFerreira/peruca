@@ -6,6 +6,12 @@ from application.appservices.view_models import ChatRequest
 pytestmark = pytest.mark.integration
 
 
+@pytest.fixture(autouse=True)
+def _require_home_assistant(home_assistant_available):
+    # Skip the whole module early (before any LLM call) when HA is unreachable.
+    pass
+
+
 # ======================================================
 # Turn On
 # ======================================================
