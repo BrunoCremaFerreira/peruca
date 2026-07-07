@@ -159,7 +159,12 @@ class SmartHomeLightsGraph(Graph):
                 self.smart_home_service.light_turn_on(turn_on_command=LightTurnOn(entity_id=eid))
                 for eid in entity_ids
             ])
-        async_runner.run(_run())
+
+        try:
+            async_runner.run(_run())
+        except Exception as error:
+            logger.error("handle_turn_on failed: %s", error, exc_info=True)
+            return {"output_turn_on": "Falha ao ligar as luzes"}
 
         return {"output_turn_on": devices}
 
@@ -183,7 +188,12 @@ class SmartHomeLightsGraph(Graph):
                 self.smart_home_service.light_turn_off(entity_id=eid)
                 for eid in entity_ids
             ])
-        async_runner.run(_run())
+
+        try:
+            async_runner.run(_run())
+        except Exception as error:
+            logger.error("handle_turn_off failed: %s", error, exc_info=True)
+            return {"output_turn_off": "Falha ao desligar as luzes"}
 
         return {"output_turn_off": devices}
 

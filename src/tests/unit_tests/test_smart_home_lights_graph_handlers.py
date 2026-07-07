@@ -390,3 +390,152 @@ class TestHandleChangeBright:
             f"Expected 2 calls to light_turn_on, got: "
             f"{graph.smart_home_service.light_turn_on.call_count}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Robustez — _handle_turn_on / _handle_turn_off must degrade gracefully when
+# the smart_home_service raises (e.g. Home Assistant returns HTTP 400 for a
+# non-existent entity). Today these per-entity handlers wrap NO try/except
+# around async_runner.run(...) (unlike the by-area / all handlers), so the
+# exception propagates out of the node and crashes the whole chat() call.
+#
+# TDD — written BEFORE the fix. These tests must FAIL today because the
+# exception propagates out of the handler instead of being caught.
+# ---------------------------------------------------------------------------
+
+
+def _make_ha_client_response_error(status: int = 400, message: str = "Bad Request"):
+    """
+    Build a realistic aiohttp.ClientResponseError like the one Home Assistant
+    raises when the target entity does not exist. Falls back to a plain
+    Exception if aiohttp is somehow unavailable.
+    """
+    try:
+        import aiohttp
+
+        return aiohttp.ClientResponseError(
+            request_info=MagicMock(),
+            history=(),
+            status=status,
+            message=message,
+        )
+    except Exception:  # pragma: no cover - aiohttp always present in this project
+        return Exception(f"{status} {message}")
+
+
+class TestHandleTurnOnServiceRaises:
+    def test_handle_turn_on__service_raises__does_not_propagate(self):
+        """The exception from light_turn_on must be swallowed by the node."""
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(return_value=["light.entrada"])
+        graph.smart_home_service.light_turn_on = AsyncMock(
+            side_effect=Exception("400")
+        )
+        state = _state(
+            output_turn_on="entrada",
+            available_entities={"entrada": "light.entrada"},
+        )
+
+        # Must not raise.
+        result = graph._handle_turn_on(state)
+
+        assert isinstance(result, dict)
+
+    def test_handle_turn_on__service_raises__returns_non_empty_string(self):
+        """The node must return a graceful, non-empty output_turn_on message."""
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(return_value=["light.entrada"])
+        graph.smart_home_service.light_turn_on = AsyncMock(
+            side_effect=Exception("400")
+        )
+        state = _state(
+            output_turn_on="entrada",
+            available_entities={"entrada": "light.entrada"},
+        )
+
+        result = graph._handle_turn_on(state)
+
+        assert "output_turn_on" in result
+        value = result["output_turn_on"]
+        assert isinstance(value, str) and value.strip() != "", (
+            f"Expected a non-empty graceful failure message, got: {value!r}"
+        )
+
+    def test_handle_turn_on__ha_client_response_error__degrades_gracefully(self):
+        """Realistic aiohttp 400 from Home Assistant must not crash the node."""
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(return_value=["light.entrada"])
+        graph.smart_home_service.light_turn_on = AsyncMock(
+            side_effect=_make_ha_client_response_error(400, "Bad Request")
+        )
+        state = _state(
+            output_turn_on="entrada",
+            available_entities={"entrada": "light.entrada"},
+        )
+
+        result = graph._handle_turn_on(state)
+
+        assert isinstance(result, dict)
+        value = result.get("output_turn_on")
+        assert isinstance(value, str) and value.strip() != "", (
+            f"Expected a non-empty graceful failure message, got: {value!r}"
+        )
+
+
+class TestHandleTurnOffServiceRaises:
+    def test_handle_turn_off__service_raises__does_not_propagate(self):
+        """The exception from light_turn_off must be swallowed by the node."""
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(return_value=["light.entrada"])
+        graph.smart_home_service.light_turn_off = AsyncMock(
+            side_effect=Exception("400")
+        )
+        state = _state(
+            output_turn_off="entrada",
+            available_entities={"entrada": "light.entrada"},
+        )
+
+        # Must not raise.
+        result = graph._handle_turn_off(state)
+
+        assert isinstance(result, dict)
+
+    def test_handle_turn_off__service_raises__returns_non_empty_string(self):
+        """The node must return a graceful, non-empty output_turn_off message."""
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(return_value=["light.entrada"])
+        graph.smart_home_service.light_turn_off = AsyncMock(
+            side_effect=Exception("400")
+        )
+        state = _state(
+            output_turn_off="entrada",
+            available_entities={"entrada": "light.entrada"},
+        )
+
+        result = graph._handle_turn_off(state)
+
+        assert "output_turn_off" in result
+        value = result["output_turn_off"]
+        assert isinstance(value, str) and value.strip() != "", (
+            f"Expected a non-empty graceful failure message, got: {value!r}"
+        )
+
+    def test_handle_turn_off__ha_client_response_error__degrades_gracefully(self):
+        """Realistic aiohttp 400 from Home Assistant must not crash the node."""
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(return_value=["light.entrada"])
+        graph.smart_home_service.light_turn_off = AsyncMock(
+            side_effect=_make_ha_client_response_error(400, "Bad Request")
+        )
+        state = _state(
+            output_turn_off="entrada",
+            available_entities={"entrada": "light.entrada"},
+        )
+
+        result = graph._handle_turn_off(state)
+
+        assert isinstance(result, dict)
+        value = result.get("output_turn_off")
+        assert isinstance(value, str) and value.strip() != "", (
+            f"Expected a non-empty graceful failure message, got: {value!r}"
+        )

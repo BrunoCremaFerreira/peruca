@@ -18,6 +18,7 @@ Regras:
 - Campos de intents não presentes devem ter valor `""`.
 - Use o nome da câmera exatamente como o usuário disse.
 - Se não for possível identificar qual câmera, use `""` no campo (o intent ainda deve aparecer em `"intents"`).
+- Se o pedido for genérico/plural, sem nomear uma câmera específica (ex.: "as câmeras", "todas as câmeras", "o que as câmeras estão captando"), o campo DEVE ser `""`. Nunca coloque a frase do usuário, uma pergunta, um pedido de esclarecimento nem termos como "câmeras"/"todas" no campo — apenas `""`.
 
 ## Exemplos:
 
@@ -29,6 +30,12 @@ Usuário: Mostre a câmera do portão e verifique se a câmera da garagem está 
 
 Usuário: A câmera da sala está ativa?
 {{"intents": ["check_status"], "show_snapshot": "", "check_status": "sala", "not_recognized": ""}}
+
+Usuário: Quero ver o que as câmeras estão captando agora.
+{{"intents": ["show_snapshot"], "show_snapshot": "", "check_status": "", "not_recognized": ""}}
+
+Usuário: Mostre todas as câmeras.
+{{"intents": ["show_snapshot"], "show_snapshot": "", "check_status": "", "not_recognized": ""}}
 
 Usuário: Mostre a câmera da cozinha e a do portão.
 {{"intents": ["show_snapshot"], "show_snapshot": "cozinha|portão", "check_status": "", "not_recognized": ""}}

@@ -161,7 +161,7 @@ class SmartHomeCamerasGraph(Graph):
         if data.get("output_check_status"):
             parts.append(data["output_check_status"])
 
-        return {"output": "\n".join(parts) if parts else ""}
+        return {"output": "\n".join(parts) if parts else "Dispositivo não encontrado."}
 
     # ===============================================
     # Private Methods
@@ -213,8 +213,14 @@ class SmartHomeCamerasGraph(Graph):
 
         entity_ids_str = async_runner.run(_invoke_with_timeout())
 
+        valid_entity_ids = set(available_entities.values())
+
         entity_ids = entity_ids_str.split("|")
-        entity_ids = [e for e in entity_ids if e.upper() != "NONE" and e.strip() != ""]
+        entity_ids = [
+            e.strip()
+            for e in entity_ids
+            if e.upper() != "NONE" and e.strip() != "" and e.strip() in valid_entity_ids
+        ]
 
         return entity_ids
 
