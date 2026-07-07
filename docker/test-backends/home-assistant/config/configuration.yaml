@@ -1,0 +1,21 @@
+# Home Assistant configuration for the Peruca integration-test backend.
+#
+# The helper/template entities live in packages/test_entities.yaml. Their
+# registry metadata (area assignment, aliases, exposure to the conversation
+# assistant) is NOT declared here — it is applied idempotently at runtime by
+# bootstrap_ha.py via the WebSocket admin API, so no secret (token, .storage)
+# ever needs to be committed.
+
+default_config:
+
+# Bind to all interfaces so the published container port is reachable.
+http:
+  server_host: 0.0.0.0
+
+homeassistant:
+  # Allow the local_file camera (created by bootstrap_ha.py via a config entry)
+  # to read the bundled still image.
+  allowlist_external_dirs:
+    - /config
+  # Named packages: every file under packages/ is loaded as an isolated package.
+  packages: !include_dir_named packages

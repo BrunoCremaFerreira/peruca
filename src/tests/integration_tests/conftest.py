@@ -36,10 +36,19 @@ INTEGRATION_ENV = {
     "LLM_MUSIC_GRAPH_CHAT_TEMPERATURE": "0.3",
     "LLM_VEHICLE_MAINTENANCE_GRAPH_CHAT_MODEL": "gemma4:12b",
     "LLM_VEHICLE_MAINTENANCE_GRAPH_CHAT_TEMPERATURE": "0.1",
-    "MUSIC_ASSISTANT_URL": "http://unix.rtx-server:8095",
-    "MUSIC_ASSISTANT_TOKEN": "",
+    # Backend endpoints are env-overridable (default to the local
+    # docker/test-backends stack), mirroring the TEST_REDIS_URL convention.
+    "MUSIC_ASSISTANT_URL": os.environ.get(
+        "MUSIC_ASSISTANT_URL", "http://localhost:8095"
+    ),
+    "MUSIC_ASSISTANT_TOKEN": os.environ.get("MUSIC_ASSISTANT_TOKEN", ""),
     "NLP_SPACY_MODEL": "pt_core_news_sm",
-    "HOME_ASSISTANT_URL": "http://unix.kubernetes:8123",
+    "HOME_ASSISTANT_URL": os.environ.get(
+        "HOME_ASSISTANT_URL", "http://localhost:8123"
+    ),
+    # Long-lived token minted by docker/test-backends/bootstrap_ha.py. Empty
+    # falls back to the graceful-degradation path (HA returns 401).
+    "HOME_ASSISTANT_TOKEN": os.environ.get("HOME_ASSISTANT_TOKEN", ""),
     "CACHE_DB_CONNECTION_STRING": "",
     "PERUCA_DB_CONNECTION_STRING": f"sqlite://{DB_PATH}",
 }

@@ -634,6 +634,30 @@ Redis (history/image store) via `redis_backed_env`, and Home Assistant / Music
 Assistant (the four smart-home batteries and the music battery) via short cached
 connectivity probes.
 
+### Local backends with Docker Compose
+
+To run the integration suite **without** those batteries skipping, spin up local
+Redis, Home Assistant and Music Assistant containers. Ollama still comes from the
+remote host (`unix.rtx-server`) already configured in `conftest.py`.
+
+```bash
+# From inside the project virtualenv:
+docker/test-backends/run-integration-tests.sh
+```
+
+The wrapper brings up `docker/test-backends/docker-compose.dev.yml`, runs the
+idempotent `bootstrap_ha.py` (onboarding, helper/template entities across
+`light.`/`sensor.`/`climate.`/`camera.`, area assignment, aliases, Assist
+exposure and a minted long-lived token), sources the generated (git-ignored)
+`.env.test`, then runs `pytest tests/integration_tests/`. Extra args are
+forwarded to pytest (`run-integration-tests.sh -k lights`).
+
+The backend endpoints and `HOME_ASSISTANT_TOKEN` are env-overridable in
+`conftest.py` (defaulting to `localhost`); see
+`docker/test-backends/.env.test.example`. No token or `.storage/` is ever
+committed. Tear the stack down with
+`docker compose -f docker/test-backends/docker-compose.dev.yml down`.
+
 ---
 
 ## Project Structure

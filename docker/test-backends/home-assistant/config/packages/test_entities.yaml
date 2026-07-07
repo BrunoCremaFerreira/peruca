@@ -1,0 +1,88 @@
+# Deterministic helper/template entities for the integration tests.
+#
+# Every entity declares a `unique_id` so it lands in the entity registry —
+# which is a hard requirement for bootstrap_ha.py to assign an area, aliases
+# and Assist exposure to it. Names are stable so entity_ids are predictable:
+#   light.sala / light.quarto / light.cozinha
+#   sensor.temperatura_sala / sensor.umidade_quarto
+#   climate.clima_sala
+#   camera.demo_camera (from the demo platform)
+
+# ---------------------------------------------------------------------------
+# Backing helpers (the "state" the template lights and thermostat toggle).
+# ---------------------------------------------------------------------------
+input_boolean:
+  luz_sala:
+    name: Luz Sala
+  luz_quarto:
+    name: Luz Quarto
+  luz_cozinha:
+    name: Luz Cozinha
+  aquecedor_sala:
+    name: Aquecedor Sala
+
+# ---------------------------------------------------------------------------
+# Lights + Sensors — modern `template:` integration. Lights mirror an
+# input_boolean, so turn_on/turn_off actually flip state. Each entity declares
+# a unique_id so it lands in the entity registry (required for area/exposure).
+# ---------------------------------------------------------------------------
+template:
+  - light:
+      - name: Sala
+        unique_id: light_sala
+        state: "{{ is_state('input_boolean.luz_sala', 'on') }}"
+        turn_on:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.luz_sala
+        turn_off:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.luz_sala
+      - name: Quarto
+        unique_id: light_quarto
+        state: "{{ is_state('input_boolean.luz_quarto', 'on') }}"
+        turn_on:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.luz_quarto
+        turn_off:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.luz_quarto
+      - name: Cozinha
+        unique_id: light_cozinha
+        state: "{{ is_state('input_boolean.luz_cozinha', 'on') }}"
+        turn_on:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.luz_cozinha
+        turn_off:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.luz_cozinha
+  - sensor:
+      - name: Temperatura Sala
+        unique_id: sensor_temperatura_sala
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state: "22.5"
+      - name: Umidade Quarto
+        unique_id: sensor_umidade_quarto
+        unit_of_measurement: "%"
+        device_class: humidity
+        state: "55"
+
+# ---------------------------------------------------------------------------
+# Climate — generic_thermostat backed by the heater helper + temperature sensor.
+# ---------------------------------------------------------------------------
+climate:
+  - platform: generic_thermostat
+    name: Clima Sala
+    unique_id: climate_sala
+    heater: input_boolean.aquecedor_sala
+    target_sensor: sensor.temperatura_sala
+
+# Camera is NOT declared here: Home Assistant no longer supports YAML platform
+# setup for cameras. bootstrap_ha.py creates a local_file camera (reading the
+# bundled test_camera.png) via its config-entry flow instead.

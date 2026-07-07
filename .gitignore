@@ -66,6 +66,16 @@ peruca.db
 peruca.db-shm
 peruca.db-wal
 
+# Integration-test backends (docker/test-backends): secrets + HA runtime state.
+# Track only the authored HA config; ignore everything Home Assistant generates
+# at runtime (.storage secrets, logs, db, blueprints, .HA_VERSION, locks, ...).
+docker/test-backends/.env.test
+docker/test-backends/home-assistant/config/*
+!docker/test-backends/home-assistant/config/configuration.yaml
+!docker/test-backends/home-assistant/config/test_camera.png
+!docker/test-backends/home-assistant/config/packages/
+!docker/test-backends/home-assistant/config/packages/**
+
 # Flask stuff:
 instance/
 .webassets-cache

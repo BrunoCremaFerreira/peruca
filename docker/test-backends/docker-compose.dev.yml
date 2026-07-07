@@ -1,0 +1,62 @@
+# Test backends for running the Peruca integration test suite locally.
+#
+# This is a SEPARATE compose project (see `name:` below) from the app's
+# docker-compose.yml / docker-compose.override.yml — docker compose never
+# auto-loads this file, so there is no collision and a `compose down` on one
+# project never tears down the other.
+#
+# Ollama is NOT containerised here: the integration tests keep pointing at the
+# remote host (unix.rtx-server:11434), as configured in conftest.py.
+#
+# Usage:
+#   docker compose -f docker/test-backends/docker-compose.dev.yml up -d
+#   python docker/test-backends/bootstrap_ha.py
+# or simply: docker/test-backends/run-integration-tests.sh
+name: peruca-test-backends
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: peruca-test-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  home-assistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: peruca-test-ha
+    ports:
+      - "8123:8123"
+    volumes:
+      - ./home-assistant/config:/config
+    environment:
+      TZ: America/Sao_Paulo
+    healthcheck:
+      # /manifest.json is served without auth once the frontend is up.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import sys,urllib.request; urllib.request.urlopen('http://localhost:8123/manifest.json', timeout=3); sys.exit(0)"
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 45s
+
+  music-assistant:
+    image: ghcr.io/music-assistant/server:latest
+    container_name: peruca-test-ma
+    ports:
+      - "8095:8095"
+    volumes:
+      - ma_data:/data
+    environment:
+      TZ: America/Sao_Paulo
+    restart: unless-stopped
+
+volumes:
+  ma_data:
