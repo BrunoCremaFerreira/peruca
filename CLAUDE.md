@@ -133,7 +133,8 @@ MUSIC_ASSISTANT_URL=http://<music-assistant-host>:8095   # optional; unset disab
 MUSIC_ASSISTANT_TOKEN=
 LLM_MUSIC_GRAPH_CHAT_MODEL=gemma4:12b
 LLM_VEHICLE_MAINTENANCE_GRAPH_CHAT_MODEL=gemma4:12b
-MAINTENANCE_FLOW_TTL_SECONDS=600                # TTL for the pending multi-turn maintenance flow / focused record
+LLM_PET_HEALTH_GRAPH_CHAT_MODEL=gemma4:12b
+MAINTENANCE_FLOW_TTL_SECONDS=600                # TTL for the pending multi-turn maintenance flow AND the pet-health flow (shared; it is the flow mechanism's TTL, not a per-domain one) / focused record
 PERUCA_API_KEY=                                 # X-API-Key required on every route except /health; empty = migration mode (open, logs a warning)
 PERUCA_DB_CONNECTION_STRING=<path>/peruca.db
 CACHE_DB_CONNECTION_STRING=<redis-url>          # Redis for conversation history; if empty, falls back to in-memory store
@@ -176,7 +177,8 @@ LlmAppService.chat()                           ← loads user memories; probes M
               ├─► SmartHomeCamerasGraph.invoke() ← Home Assistant cameras (LLM call)
               ├─► MusicGraph.invoke()          ← Music Assistant control (optional; only wired when MA is configured)
               ├─► VehicleMaintenanceGraph.invoke() ← vehicle maintenance records (LLM call); vehicle CRUD is REST-only
-              ├─► OnlyTalkGraph.invoke()        ← free conversation (chain, not StateGraph)
+              ├─► PetHealthGraph.invoke()      ← pet vaccines/health events (LLM call); pet CRUD is REST-only
+              ├─► OnlyTalkGraph.invoke()        ← free conversation (chain, not StateGraph); pets are injected as "siblings" via context_hints
               └─► [final_response]              ← merges multiple outputs (LLM call #2, if needed)
 
 # After the response, as a FastAPI BackgroundTask:
@@ -188,7 +190,7 @@ All graphs inherit from `Graph` (ABC at `application/graphs/graph.py`) and imple
 **Key design constraints for graphs:**
 - The `classify` node in each graph both classifies intent **and** extracts structured data in a single LLM call. Downstream action nodes consume what's already in the state — they do not re-call the LLM.
 - Intent strings returned by the LLM must match the node names in the `StateGraph` exactly. The `intent_router` function returns `state["intent"]` directly as edge targets.
-- Every `classify` node first runs the shared `Graph._extract_structured_output()` (strips `<think>` blocks, normalizes curly quotes, extracts the first balanced `[...]`/`{...}` literal). It then parses that literal: `MainGraph` and `ShoppingListGraph` use `ast.literal_eval()` (their prompts emit single-quoted Python literals — never `eval()`, which would execute injected expressions); the smart-home graphs (lights/climate/sensors/cameras), `MusicGraph`, and `VehicleMaintenanceGraph` use `json.loads()`; `MemoryGraph` uses `json.loads()` directly. Do not change a graph's parser without updating its corresponding prompt to match.
+- Every `classify` node first runs the shared `Graph._extract_structured_output()` (strips `<think>` blocks, normalizes curly quotes, extracts the first balanced `[...]`/`{...}` literal). It then parses that literal: `MainGraph` and `ShoppingListGraph` use `ast.literal_eval()` (their prompts emit single-quoted Python literals — never `eval()`, which would execute injected expressions); the smart-home graphs (lights/climate/sensors/cameras), `MusicGraph`, `VehicleMaintenanceGraph`, and `PetHealthGraph` use `json.loads()`; `MemoryGraph` uses `json.loads()` directly. Do not change a graph's parser without updating its corresponding prompt to match.
 - `OnlyTalkGraph` does not use `StateGraph`. It is a plain `prompt | llm` chain that **reads** conversation history (read-only): it loads `get_session_history(user.id).messages` and injects them into the `MessagesPlaceholder("history")` (alongside the user's memories and the current datetime). It does **not** write history. The turn is persisted once, centrally, in `LlmAppService._persist_turn()` for **every** intent — so reads and writes share the same `session_id = user.id` key.
 - Each graph compiles its `StateGraph` on the first `invoke()` and caches it on `self._compiled_graph` (see `Graph.__init__`); subsequent calls reuse the compiled graph. Do not reintroduce per-request recompilation.
 
@@ -227,6 +229,16 @@ Lets the user register/query/edit/remove **maintenance records** for their vehic
 - **REST-only writes, enforced structurally (ISP)**: the vehicle interface is split into `VehicleReadRepository` (read) and `VehicleRepository` (read+write) in `domain/interfaces/vehicle_repository.py`. The chat path (graph, `MaintenanceService`, `LlmAppService`) is wired with `ReadOnlyVehicleRepository` (`infra/data/read_only_vehicle_repository.py`), which **physically lacks** `add`/`update`/`delete`. The full repo is reserved for `VehicleAppService` (the `/vehicle` REST routes). So even under prompt injection, no chat-reachable code can mutate a vehicle. Chat attempts to write a vehicle hit the `vehicle_write_forbidden` node → fixed reply "Não tenho permissão para realizar esta operação".
 - **Multi-turn slot-filling + focused record**: `MaintenanceFlowService` (backed by `ContextRepository`, keyed by `user_id` with embedded TTL) persists a `PendingMaintenanceFlow` for register slot collection (vehicle→date→km) and a "focused record" (the record a query last reported on) so a follow-up "altere a km desse registro" / "remova este registro" knows its target. `LlmAppService` short-circuits a pending flow **before** `MainGraph` (mirrors the shopping-list `DisambiguationService` pattern); deletes go through a `delete_confirm` yes/no turn.
 - **Prompt-injection hardening**: free-text reinjected into prompts (record descriptions, history) is passed through `sanitize_for_prompt` (`application/appservices/prompt_sanitizer.py`); `query_limit` from the LLM is hard-capped at `_QUERY_RECORD_LIMIT` (20).
+
+### Pet Health
+
+Lets the user register/query/edit/remove **health events** (vaccines, dewormers, antiparasitics, medications, vet visits) for their pets via chat, while **pet CRUD itself is REST-only**. It is a near 1:1 mirror of Vehicle Maintenance; the shared refactors from that work power it (`text_matching.find_by_term`, `flow_state_store.FlowStateStore`, `PendingFlow` with a `flow_domain` discriminator). Key differences:
+
+- **Domain**: `Pet` (name + `nicknames` list — 1st is primary; `birth_date`, `sex` closed set `male|female|unknown`, `species` free text, `description`) / `PetHealthEvent` (`event_type` closed set, `description`, `occurred_at`). `PetService` enforces per-user uniqueness over the **union** of every pet's name+nicknames (so the chat matcher never stays ambiguous) and cascades delete children-first. `PetHealthService` validates `pet.user_id == user_id` on **every** op and rejects an event dated **before** the pet's `birth_date` (only when set). `find_pets_by_term` matches on name AND nicknames.
+- **Nicknames persistence**: a JSON array in a TEXT column (`sqlite_pet_repository.py`) — a value object of the Pet aggregate, order-preserving (index 0 = primary), matched only in Python.
+- **REST-only writes, enforced structurally (ISP)**: `PetReadRepository` vs `PetRepository` in `domain/interfaces/pet_repository.py`; the chat path (graph, `PetHealthService`, `LlmAppService`) gets `ReadOnlyPetRepository` (`infra/data/read_only_pet_repository.py`), which physically lacks writes. Full repo reserved for `PetAppService` (`/pet` routes). Chat write attempts hit `pet_write_forbidden` → same fixed reply.
+- **Multi-turn slot-filling + focused record + the "tomou mais alguma?" loop**: `PetHealthFlowService` collects `pet → event_name → date`; after a **vaccine** registers via the flow it arms a `register_more` operation so the next reply ("sim, a raiva" registers another; "só esta"/"não" ends). All deterministic (no LLM), short-circuited in `LlmAppService` before `MainGraph`, dispatched by `flow_domain`. Reuses the `MAINTENANCE_FLOW_TTL_SECONDS` TTL.
+- **Dynamic persona (§2.9)**: the pets registered by the user are injected into the `OnlyTalkGraph` system prompt as Peruca's "siblings" via `context_hints["user_pets_persona"]` (the old hardcoded Caçolin/Caçolão block was removed from `only_talk_graph.md`). `MemoryGraph` was told not to re-extract dated pet-health events as durable memories.
 
 ### API Authentication
 

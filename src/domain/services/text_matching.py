@@ -14,6 +14,15 @@ lista") or a cancel word ("... para amanhã") never hijacks a pending choice.
 """
 
 import unicodedata
+from difflib import SequenceMatcher
+from typing import Callable, List, TypeVar
+
+T = TypeVar("T")
+
+# Fuzzy-match thresholds shared by every deterministic term matcher (vehicles,
+# pets, ...). A typo is only honored above this ratio and above a minimum length.
+_FUZZY_THRESHOLD = 0.8
+_FUZZY_MIN_LENGTH = 4
 
 
 # Generic Portuguese connective words dropped when tokenizing, so a partial
@@ -106,3 +115,57 @@ def resolve_ordinal(
             if 1 <= position <= count:
                 return position - 1
     return None
+
+
+def find_by_term(
+    term: str, items: List[T], searchables: Callable[[T], List[str]]
+) -> List[T]:
+    """
+    Resolve a user-typed term against already-loaded items, deterministically
+    (no LLM, no repository access). ``searchables`` yields every string an item
+    may legitimately match by. Three layers in priority order; the first
+    non-empty layer wins:
+
+      1. exact normalized match on any searchable field — short-circuits so a
+         literal name is never treated as ambiguous;
+      2. partial — the query tokens are a subset of a field's tokens;
+      3. typo — difflib ratio >= threshold, guarded by a minimum length.
+
+    Returns 0, 1 or many; the caller uses the count to act or disambiguate.
+    """
+    normalized_query = normalize(term)
+    if not normalized_query or not items:
+        return []
+
+    exact = [
+        item
+        for item in items
+        if any(normalize(s) == normalized_query for s in searchables(item))
+    ]
+    if exact:
+        return exact
+
+    query_tokens = name_tokens(term)
+    if query_tokens:
+        partial = [
+            item
+            for item in items
+            if any(query_tokens <= name_tokens(s) for s in searchables(item))
+        ]
+        if partial:
+            return partial
+
+    if len(normalized_query) >= _FUZZY_MIN_LENGTH:
+        fuzzy = [
+            item
+            for item in items
+            if any(
+                SequenceMatcher(None, normalized_query, normalize(s)).ratio()
+                >= _FUZZY_THRESHOLD
+                for s in searchables(item)
+            )
+        ]
+        if fuzzy:
+            return fuzzy
+
+    return []

@@ -4,6 +4,7 @@ from application.appservices.llm_app_service import LlmAppService
 from application.appservices.memory_app_service import MemoryAppService
 from application.appservices.shopping_list_app_service import ShoppingListAppService
 from application.appservices.smart_home_app_service import SmartHomeAppService
+from application.appservices.pet_app_service import PetAppService
 from application.appservices.user_app_service import UserAppService
 from application.appservices.user_memory_app_service import UserMemoryAppService
 from application.appservices.vehicle_app_service import VehicleAppService
@@ -11,6 +12,8 @@ from application.appservices.view_models import (
     ChatRequest,
     ChatResponse,
     MaintenanceRecordResponse,
+    PetHealthEventResponse,
+    PetResponse,
     ShoppingListCleanType,
     ShoppingListItemResponse,
     UserMemoryResponse,
@@ -18,6 +21,8 @@ from application.appservices.view_models import (
     VehicleResponse,
 )
 from domain.commands import (
+    PetAdd,
+    PetUpdate,
     ShoppingListItemAdd,
     ShoppingListItemUpdate,
     UserAdd,
@@ -29,6 +34,7 @@ from domain.entities import SmartHomeEntityAlias
 from infra.ioc import (
     get_llm_app_service,
     get_memory_app_service,
+    get_pet_app_service,
     get_shopping_list_app_service,
     get_smart_home_app_service,
     get_user_app_service,
@@ -305,3 +311,57 @@ def vehicle_delete(
     vehicle_app_service: VehicleAppService = Depends(get_vehicle_app_service),
 ) -> None:
     vehicle_app_service.delete(vehicle_id=id)
+
+
+# =====================================
+# Pet Routes (write is REST-only — never via chat)
+# =====================================
+
+
+@router.get("/user/{id}/pet", tags=["Pet"])
+def pet_get_all_by_user(
+    id: str,
+    pet_app_service: PetAppService = Depends(get_pet_app_service),
+) -> List[PetResponse]:
+    return pet_app_service.get_all_by_user(user_id=id)
+
+
+@router.get("/pet/{id}", tags=["Pet"])
+def pet_get(
+    id: str,
+    pet_app_service: PetAppService = Depends(get_pet_app_service),
+) -> PetResponse:
+    return pet_app_service.get_by_id(pet_id=id)
+
+
+@router.get("/pet/{id}/health-event", tags=["Pet"])
+def pet_get_health_events(
+    id: str,
+    pet_app_service: PetAppService = Depends(get_pet_app_service),
+) -> List[PetHealthEventResponse]:
+    return pet_app_service.get_health_events(pet_id=id)
+
+
+@router.post("/pet", tags=["Pet"])
+def pet_add(
+    request: PetAdd,
+    pet_app_service: PetAppService = Depends(get_pet_app_service),
+) -> dict:
+    pet_id = pet_app_service.add(pet_add=request)
+    return {"pet_id": pet_id}
+
+
+@router.put("/pet", tags=["Pet"])
+def pet_update(
+    request: PetUpdate,
+    pet_app_service: PetAppService = Depends(get_pet_app_service),
+) -> None:
+    pet_app_service.update(pet_update=request)
+
+
+@router.delete("/pet/{id}", tags=["Pet"])
+def pet_delete(
+    id: str,
+    pet_app_service: PetAppService = Depends(get_pet_app_service),
+) -> None:
+    pet_app_service.delete(pet_id=id)

@@ -90,15 +90,17 @@ class MaintenanceRecord(BaseEntity):
 
 
 @dataclass
-class PendingMaintenanceFlow:
+class PendingFlow:
     """
-    A multi-turn maintenance operation awaiting the user's next reply, persisted
-    between turns (JSON payload with an embedded TTL, mirroring
-    PendingDisambiguation). ``slots`` holds the data gathered so far
-    (description, vehicle_id, performed_at ISO string, odometer_km, record_id);
-    ``missing_slots`` is the ordered queue of what to ask next (veículo -> data
-    -> km); ``candidates`` reuses the disambiguation candidate shape for the
-    "choose_vehicle" operation.
+    A multi-turn flow awaiting the user's next reply, persisted between turns
+    (JSON payload with an embedded TTL, mirroring PendingDisambiguation).
+    ``flow_domain`` discriminates which consumer owns this pending state
+    ("maintenance" | "pet_health"), so a single pending slot can dispatch by
+    domain instead of relying on the order of sequential checks. ``slots`` holds
+    the data gathered so far (e.g. description, vehicle_id, performed_at ISO
+    string, odometer_km, record_id); ``missing_slots`` is the ordered queue of
+    what to ask next (e.g. veículo -> data -> km); ``candidates`` reuses the
+    disambiguation candidate shape for a "choose_*" operation.
     """
 
     operation: str = ""  # "register" | "edit" | "delete_confirm" | "choose_vehicle"
@@ -106,6 +108,35 @@ class PendingMaintenanceFlow:
     missing_slots: List[str] = field(default_factory=list)
     candidates: List["DisambiguationCandidate"] = field(default_factory=list)
     expires_at: float = 0.0  # epoch seconds
+    flow_domain: str = ""  # "maintenance" | "pet_health"
+
+
+# Backwards-compat alias: existing imports/tests reference the old name.
+PendingMaintenanceFlow = PendingFlow
+
+
+# ====================================
+# Pet Health Related Classes
+# ====================================
+@dataclass
+class Pet(BaseEntity):
+    user_id: str = ""
+    name: str = ""
+    # The first nickname is the primary one. An empty list is valid (the pet is
+    # only ever referred to by name).
+    nicknames: List[str] = field(default_factory=list)
+    birth_date: Optional[date] = None
+    sex: str = ""  # "male" | "female" | "unknown" (closed set)
+    species: str = ""  # free text: "dog", "cat", "fish", ...
+    description: str = ""  # physical/behavioral notes
+
+
+@dataclass
+class PetHealthEvent(BaseEntity):
+    pet_id: str = ""
+    event_type: str = ""  # closed set: vaccine|dewormer|antiparasitic|medication|vet_visit|other
+    description: str = ""  # e.g. "DHPPI", "Leptospirose", "vermifugo Bravecto"
+    occurred_at: Optional[date] = None
 
 
 # ====================================

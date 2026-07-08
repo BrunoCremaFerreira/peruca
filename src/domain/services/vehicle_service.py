@@ -1,6 +1,5 @@
 import uuid
 from datetime import datetime, timezone
-from difflib import SequenceMatcher
 from typing import List
 
 from domain.commands import VehicleAdd, VehicleUpdate
@@ -10,13 +9,9 @@ from domain.interfaces.vehicle_repository import (
     MaintenanceRecordRepository,
     VehicleRepository,
 )
-from domain.services.text_matching import name_tokens, normalize
+from domain.services.text_matching import find_by_term, normalize
 from domain.validations.vehicle_validation import VehicleValidator
 from infra.utils import auto_map
-
-
-_FUZZY_THRESHOLD = 0.8
-_FUZZY_MIN_LENGTH = 4
 
 
 def _searchables(vehicle: Vehicle) -> List[str]:
@@ -32,52 +27,10 @@ def _searchables(vehicle: Vehicle) -> List[str]:
 def find_vehicles_by_term(term: str, vehicles: List[Vehicle]) -> List[Vehicle]:
     """
     Resolve a user-typed term against already-loaded vehicles, deterministically
-    (no LLM, no repository access). Three layers in priority order; the first
-    non-empty layer wins:
-
-      1. exact normalized match on any searchable field — short-circuits so a
-         literal name is never treated as ambiguous;
-      2. partial — the query tokens are a subset of a field's tokens;
-      3. typo — difflib ratio >= threshold, guarded by a minimum length.
-
-    Returns 0, 1 or many; the caller uses the count to act or disambiguate.
+    (no LLM, no repository access). Delegates to the generic ``find_by_term``;
+    only ``_searchables`` is vehicle-specific.
     """
-    normalized_query = normalize(term)
-    if not normalized_query or not vehicles:
-        return []
-
-    exact = [
-        v
-        for v in vehicles
-        if any(normalize(s) == normalized_query for s in _searchables(v))
-    ]
-    if exact:
-        return exact
-
-    query_tokens = name_tokens(term)
-    if query_tokens:
-        partial = [
-            v
-            for v in vehicles
-            if any(query_tokens <= name_tokens(s) for s in _searchables(v))
-        ]
-        if partial:
-            return partial
-
-    if len(normalized_query) >= _FUZZY_MIN_LENGTH:
-        fuzzy = [
-            v
-            for v in vehicles
-            if any(
-                SequenceMatcher(None, normalized_query, normalize(s)).ratio()
-                >= _FUZZY_THRESHOLD
-                for s in _searchables(v)
-            )
-        ]
-        if fuzzy:
-            return fuzzy
-
-    return []
+    return find_by_term(term, vehicles, _searchables)
 
 
 class VehicleService:

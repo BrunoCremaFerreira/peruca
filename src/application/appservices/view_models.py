@@ -80,3 +80,27 @@ class MaintenanceRecordResponse:
     description: str = ""
     performed_at: str = ""
     odometer_km: int = None
+
+
+# =====================================
+# Pet Health
+# =====================================
+@dataclass
+class PetResponse:
+    id: str = ""
+    user_id: str = ""
+    name: str = ""
+    nicknames: list = field(default_factory=list)
+    birth_date: str = ""
+    sex: str = ""
+    species: str = ""
+    description: str = ""
+
+
+@dataclass
+class PetHealthEventResponse:
+    id: str = ""
+    pet_id: str = ""
+    event_type: str = ""
+    description: str = ""
+    occurred_at: str = ""

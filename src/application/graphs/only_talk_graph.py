@@ -145,10 +145,14 @@ class OnlyTalkGraph(Graph):
             user_memories = (
                 "(você ainda não tem memórias registradas sobre esta pessoa)"
             )
+        siblings = (invoke_request.context_hints or {}).get("user_pets_persona")
+        if not siblings or not str(siblings).strip():
+            siblings = "(nenhum pet cadastrado no momento)"
         return self.load_prompt("only_talk_graph.md").format(
             user_name=user.name,
             user_summary=user.summary,
             user_memories=user_memories,
+            siblings=siblings,
             current_datetime=datetime.now().astimezone().strftime("%d/%m/%Y %H:%M"),
         )
 

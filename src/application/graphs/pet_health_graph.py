@@ -10,12 +10,12 @@ from langgraph.graph import END, START, StateGraph
 
 from application.appservices.prompt_sanitizer import sanitize_for_prompt
 from application.graphs.graph import Graph
-from domain.commands import MaintenanceRecordAdd, MaintenanceRecordUpdate
+from domain.commands import PetHealthEventAdd, PetHealthEventUpdate
 from domain.entities import (
     DisambiguationCandidate,
     GraphInvokeRequest,
+    Pet,
     PendingFlow,
-    Vehicle,
 )
 from domain.exceptions import ValidationError
 from domain.services.date_resolver import (
@@ -23,7 +23,7 @@ from domain.services.date_resolver import (
     resolve_date_token,
     resolve_period,
 )
-from domain.services.vehicle_service import find_vehicles_by_term
+from domain.services.pet_service import find_pets_by_term
 from infra import async_runner
 
 
@@ -34,20 +34,20 @@ _QUERY_RECORD_LIMIT = 20
 _MAX_RECORD_DESCRIPTION_CHARS = 200
 
 
-class VehicleMaintenanceGraphState(TypedDict, total=False):
+class PetHealthGraphState(TypedDict, total=False):
     input: GraphInvokeRequest
     intent: Optional[List[str]]
-    vehicle_term: Optional[str]
-    description: Optional[str]
-    resolved_performed_at: Optional[date]
+    pet_term: Optional[str]
+    event_type: Optional[str]
+    event_name: Optional[str]
+    resolved_occurred_at: Optional[date]
     resolved_period: Optional[tuple]
-    odometer_km: Optional[int]
     query: Optional[str]
     query_kind: Optional[str]
     query_limit: Optional[int]
     edit_field: Optional[str]
     new_value: Optional[str]
-    matched_vehicles: Optional[List[Vehicle]]
+    matched_pets: Optional[List[Pet]]
     output_list: Optional[str]
     output_register: Optional[str]
     output_query: Optional[str]
@@ -58,38 +58,38 @@ class VehicleMaintenanceGraphState(TypedDict, total=False):
     output: Optional[str]
 
 
-class VehicleMaintenanceGraph(Graph):
+class PetHealthGraph(Graph):
     """
-    Vehicle maintenance graph: lists vehicles, registers/queries/edits/removes
-    maintenance records, and refuses vehicle writes over chat. Vehicle
+    Pet health graph: lists pets, registers/queries/edits/removes health events
+    (vaccines, dewormers, vet visits...), and refuses pet writes over chat. Pet
     resolution and date arithmetic are deterministic (Python); the LLM only
     classifies + extracts and, for open queries, phrases the answer.
 
-    It receives ONLY a VehicleReadRepository — no code path here can write a
-    vehicle (§2.4).
+    It receives ONLY a PetReadRepository — no code path here can write a pet
+    (§2.4).
     """
 
     def __init__(
         self,
         llm_chat: BaseChatModel,
-        vehicle_read_repository,
-        maintenance_service,
-        maintenance_flow_service,
+        pet_read_repository,
+        pet_health_service,
+        pet_health_flow_service,
         get_session_history=None,
         provider: str = "OLLAMA",
         strip_think_directive: bool = False,
     ):
         super().__init__(provider, strip_think_directive)
         self.llm_chat = llm_chat
-        self.vehicle_read_repository = vehicle_read_repository
-        self.maintenance_service = maintenance_service
-        self.maintenance_flow_service = maintenance_flow_service
+        self.pet_read_repository = pet_read_repository
+        self.pet_health_service = pet_health_service
+        self.pet_health_flow_service = pet_health_flow_service
         self.get_session_history = get_session_history
         self.classification_prompt = ChatPromptTemplate.from_template(
-            self.load_prompt("vehicle_maintenance_graph.md")
+            self.load_prompt("pet_health_graph.md")
         )
         self.query_response_prompt = ChatPromptTemplate.from_template(
-            self.load_prompt("vehicle_maintenance_graph_query_response.md")
+            self.load_prompt("pet_health_graph_query_response.md")
         )
 
     # ===============================================
@@ -98,13 +98,13 @@ class VehicleMaintenanceGraph(Graph):
     def _classify_intent(self, data):
         request: GraphInvokeRequest = data["input"]
         user = request.user
-        fleet = self._fleet(user.id)
-        available = ", ".join(v.name for v in fleet) or "nenhum"
+        pets = self._pets(user.id)
+        available = self._render_available_pets(pets)
 
         payload = {
             "input": request.message,
             "current_date": date.today().isoformat(),
-            "available_vehicles": available,
+            "available_pets": available,
             "history": self._recent_history(user.id),
         }
         chain = self.classification_prompt | self.llm_chat
@@ -127,127 +127,126 @@ class VehicleMaintenanceGraph(Graph):
         if isinstance(intents, str):
             intents = [intents]
 
-        vehicle_term = (parsed.get("vehicle_term") or "").strip()
-        performed_at = self._resolve_date(
+        pet_term = (parsed.get("pet_term") or "").strip()
+        occurred_at = self._resolve_date(
             parsed.get("date_token") or "", parsed.get("date_value") or ""
         )
         period = resolve_period(parsed.get("period") or "", date.today())
-        odometer_km = self._coerce_km(parsed.get("odometer_km"))
 
         return {
             "intent": intents,
             "input": request,
-            "vehicle_term": vehicle_term,
-            "description": (parsed.get("description") or "").strip(),
-            "resolved_performed_at": performed_at,
+            "pet_term": pet_term,
+            "event_type": (parsed.get("event_type") or "").strip(),
+            "event_name": (parsed.get("event_name") or "").strip(),
+            "resolved_occurred_at": occurred_at,
             "resolved_period": period,
-            "odometer_km": odometer_km,
             "query": (parsed.get("query") or "").strip(),
             "query_kind": (parsed.get("query_kind") or "").strip(),
             "query_limit": self._coerce_int(parsed.get("query_limit")),
             "edit_field": (parsed.get("edit_field") or "").strip(),
             "new_value": (parsed.get("new_value") or "").strip(),
-            "matched_vehicles": find_vehicles_by_term(vehicle_term, fleet)
-            if vehicle_term
-            else [],
+            "matched_pets": find_pets_by_term(pet_term, pets) if pet_term else [],
         }
 
-    def _handle_list_vehicles(self, data):
+    def _handle_list_pets(self, data):
         user = data["input"].user
-        fleet = self._fleet(user.id)
-        if not fleet:
-            return {"output_list": "Você ainda não tem nenhum veículo cadastrado."}
-        names = ", ".join(v.name for v in fleet)
+        pets = self._pets(user.id)
+        if not pets:
+            return {"output_list": "Você ainda não tem nenhum pet cadastrado."}
+        names = ", ".join(p.name for p in pets)
         return {
             "output_list": (
-                f"Os seus veículos são: {names}. Gostaria de registrar alguma "
-                "manutenção ou saber quando será a próxima?"
+                f"Os seus pets são: {names}. Quer registrar alguma vacina ou "
+                "consultar o histórico de algum deles?"
             )
         }
 
-    def _handle_vehicle_write_forbidden(self, data):
+    def _handle_pet_write_forbidden(self, data):
         return {"output_forbidden": _FORBIDDEN_MESSAGE}
 
-    def _handle_register_maintenance(self, data):
+    def _handle_register_health_event(self, data):
         user = data["input"].user
-        term = data.get("vehicle_term") or ""
-        matched, ask = self._resolve_or_ask(user, term)
-        if ask is not None:
-            return {"output_register": ask}
-        vehicle = matched[0]
+        term = data.get("pet_term") or ""
+        pets = self._pets(user.id)
+        matched = data.get("matched_pets")
+        if matched is None:
+            matched = find_pets_by_term(term, pets) if term else []
 
-        description = data.get("description") or ""
-        performed_at = data.get("resolved_performed_at")
-        odometer_km = data.get("odometer_km")
+        event_type = data.get("event_type") or "other"
+        event_name = data.get("event_name") or ""
+        occurred_at = data.get("resolved_occurred_at")
 
+        pet = None
+        if len(matched) == 1:
+            pet = matched[0]
+        elif len(matched) > 1:
+            names = " ou ".join(p.name for p in matched)
+            self._store_flow(
+                user,
+                PendingFlow(
+                    operation="choose_pet",
+                    slots=self._register_slots(None, event_type, event_name, occurred_at),
+                    candidates=[
+                        DisambiguationCandidate(id=p.id, name=p.name) for p in matched
+                    ],
+                ),
+            )
+            return {"output_register": f"De qual deles? {names}?"}
+        elif term:
+            # A non-empty term with no match: the pet is not registered. Never
+            # offer to create it (§2.4).
+            return {
+                "output_register": f"Você não tem nenhum pet chamado {term}."
+            }
+
+        slots = self._register_slots(pet, event_type, event_name, occurred_at)
         missing = []
-        if not performed_at:
+        if not pet:
+            missing.append("pet")
+        if not event_name:
+            missing.append("event_name")
+        if not occurred_at:
             missing.append("date")
-        if odometer_km is None:
-            missing.append("km")
 
         if missing:
             self._store_flow(
                 user,
                 PendingFlow(
-                    operation="register",
-                    slots={
-                        "description": description,
-                        "vehicle_id": vehicle.id,
-                        "vehicle_name": vehicle.name,
-                        "date": performed_at.isoformat() if performed_at else None,
-                        "odometer_km": odometer_km,
-                    },
-                    missing_slots=missing,
+                    operation="register", slots=slots, missing_slots=missing
                 ),
             )
-            return {"output_register": self._ask_for_slot(missing[0])}
+            return {"output_register": self._ask_for_slot(missing[0], event_type)}
 
-        try:
-            self.maintenance_service.register(
-                MaintenanceRecordAdd(
-                    vehicle_id=vehicle.id,
-                    description=description,
-                    performed_at=performed_at,
-                    odometer_km=odometer_km,
-                ),
-                user.id,
-            )
-        except ValidationError as error:
-            return {"output_register": f"Não consegui registrar: {error.errors}"}
-        except Exception as error:  # noqa: BLE001
-            logger.error("register_maintenance failed: %s", error, exc_info=True)
-            return {"output_register": "Tive um problema ao registrar, tente de novo."}
+        return {"output_register": self._do_register(user, pet, event_type, event_name, occurred_at)}
 
-        return {
-            "output_register": (
-                f"Registrei {description} para o {vehicle.name}, com data "
-                f"{performed_at.strftime('%d/%m/%Y')} e quilometragem {odometer_km}."
-            )
-        }
-
-    def _handle_query_maintenance(self, data):
+    def _handle_query_health_event(self, data):
         user = data["input"].user
-        term = data.get("vehicle_term") or ""
-        matched, ask = self._resolve_or_ask(user, term)
-        if ask is not None:
-            return {"output_query": ask}
-        vehicle = matched[0]
+        term = data.get("pet_term") or ""
+        pets = self._pets(user.id)
+        matched = find_pets_by_term(term, pets) if term else []
 
-        # Hard ceiling: never fetch or render more than _QUERY_RECORD_LIMIT records,
-        # regardless of the query_limit the LLM emits — an inflated value (e.g. from
-        # "as últimas 100000 manutenções", or a hallucination) must not blow up the
-        # prompt/response (§9.5).
+        if not matched:
+            if term:
+                return {"output_query": f"Você não tem nenhum pet chamado {term}."}
+            return {"output_query": "De qual pet você quer saber?"}
+        if len(matched) > 1:
+            names = " ou ".join(p.name for p in matched)
+            return {"output_query": f"De qual deles? {names}?"}
+        pet = matched[0]
+
+        # Hard ceiling: never fetch or render more than _QUERY_RECORD_LIMIT records
+        # regardless of the query_limit the LLM emits (§9.4).
         requested = data.get("query_limit") or 0
-        records = self.maintenance_service.get_by_vehicle(
-            vehicle.id, user.id, limit=_QUERY_RECORD_LIMIT
+        records = self.pet_health_service.get_by_pet(
+            pet.id, user.id, limit=_QUERY_RECORD_LIMIT
         )
 
         period = data.get("resolved_period")
         if period:
             start, end = period
             records = [
-                r for r in records if r.performed_at and start <= r.performed_at <= end
+                r for r in records if r.occurred_at and start <= r.occurred_at <= end
             ]
 
         if requested:
@@ -256,31 +255,27 @@ class VehicleMaintenanceGraph(Graph):
         if not records:
             return {
                 "output_query": (
-                    f"Não encontrei nenhuma manutenção registrada para o {vehicle.name}."
+                    f"Não encontrei nenhum registro de saúde para o {pet.name}."
                 )
             }
 
-        # Remember the most recent record reported, so a follow-up
-        # ("altere a km desse registro" / "remova este registro") knows which
-        # one it refers to (§2.7).
-        self._set_focus(user, vehicle, records[0])
+        # Remember the most recent record reported for a follow-up edit/delete (§2.7).
+        self._set_focus(user, pet, records[0])
 
         if (data.get("query_kind") or "") == "open":
-            return {"output_query": self._render_open(user, vehicle, data, records)}
+            return {"output_query": self._render_open(user, pet, data, records)}
+        return {"output_query": self._render_records(pet, records)}
 
-        return {"output_query": self._render_records(vehicle, records)}
-
-    def _handle_edit_maintenance(self, data):
+    def _handle_edit_health_event(self, data):
         user = data["input"].user
         focus = self._get_focus(user)
         if not focus:
             return {
                 "output_edit": (
-                    "Não sei a qual manutenção você se refere. Consulte o registro "
-                    "primeiro (por exemplo, a última troca) e depois peça a alteração."
+                    "Não sei a qual registro você se refere. Consulte o histórico "
+                    "primeiro e depois peça a alteração."
                 )
             }
-
         update, human = self._build_edit(
             focus, (data.get("edit_field") or ""), (data.get("new_value") or "")
         )
@@ -289,21 +284,21 @@ class VehicleMaintenanceGraph(Graph):
                 "output_edit": "Não entendi o que você quer alterar nesse registro."
             }
         try:
-            self.maintenance_service.update(update, user.id)
+            self.pet_health_service.update(update, user.id)
         except ValidationError as error:
             return {"output_edit": f"Não consegui alterar: {error.errors}"}
         except Exception as error:  # noqa: BLE001
-            logger.error("edit_maintenance failed: %s", error, exc_info=True)
+            logger.error("edit_health_event failed: %s", error, exc_info=True)
             return {"output_edit": "Tive um problema ao alterar, tente de novo."}
         return {"output_edit": human}
 
-    def _handle_delete_maintenance(self, data):
+    def _handle_delete_health_event(self, data):
         user = data["input"].user
         focus = self._get_focus(user)
         if not focus:
             return {
                 "output_delete": (
-                    "Não sei qual registro remover. Consulte a manutenção primeiro "
+                    "Não sei qual registro remover. Consulte o histórico primeiro "
                     "para eu confirmar a remoção."
                 )
             }
@@ -313,25 +308,23 @@ class VehicleMaintenanceGraph(Graph):
                 operation="delete_confirm",
                 slots={
                     "record_id": focus.get("record_id"),
-                    "vehicle_name": focus.get("vehicle_name"),
+                    "pet_name": focus.get("pet_name"),
                     "description": focus.get("description"),
                 },
             ),
         )
-        when = self._format_iso(focus.get("performed_at"))
-        km = focus.get("odometer_km")
-        km_part = f", km {km}" if km else ""
+        when = self._format_iso(focus.get("occurred_at"))
         return {
             "output_delete": (
                 f"Devo remover o registro de {focus.get('description')} do "
-                f"{focus.get('vehicle_name')}, realizado em {when}{km_part}?"
+                f"{focus.get('pet_name')}, de {when}?"
             )
         }
 
     def _handle_not_recognized(self, data):
         return {
             "output_not_recognized": (
-                "Não entendi o que você quer fazer com as manutenções do veículo."
+                "Não entendi o que você quer fazer com a saúde do pet."
             )
         }
 
@@ -349,18 +342,35 @@ class VehicleMaintenanceGraph(Graph):
             ]
             if isinstance(e, str) and e.strip()
         ]
-        response = "\n\n".join(outputs) if len(outputs) > 1 else (outputs[0] if outputs else "")
+        response = (
+            "\n\n".join(outputs) if len(outputs) > 1 else (outputs[0] if outputs else "")
+        )
         return {"output": response}
 
     # ===============================================
     # Private helpers
     # ===============================================
-    def _fleet(self, user_id) -> List[Vehicle]:
+    def _pets(self, user_id) -> List[Pet]:
         try:
-            return self.vehicle_read_repository.get_all_by_user_id(user_id) or []
+            return self.pet_read_repository.get_all_by_user_id(user_id) or []
         except Exception as error:  # noqa: BLE001
-            logger.warning("fleet load failed: %s", error)
+            logger.warning("pets load failed: %s", error)
             return []
+
+    def _render_available_pets(self, pets: List[Pet]) -> str:
+        if not pets:
+            return "nenhum"
+        lines = []
+        for p in pets[:_QUERY_RECORD_LIMIT]:
+            name = sanitize_for_prompt(p.name, 40)
+            aliases = ", ".join(
+                sanitize_for_prompt(n, 40) for n in (p.nicknames or [])
+            )
+            if aliases:
+                lines.append(f"- {name} (apelidos: {aliases})")
+            else:
+                lines.append(f"- {name}")
+        return "\n".join(lines)
 
     def _recent_history(self, user_id, max_messages: int = 6) -> str:
         if self.get_session_history is None:
@@ -376,47 +386,60 @@ class VehicleMaintenanceGraph(Graph):
             rendered.append(f"{role}: {sanitize_for_prompt(m.content, 200)}")
         return "\n".join(rendered)
 
-    def _resolve_or_ask(self, user, term):
-        """
-        Resolve a vehicle term against the user's fleet. Returns (matched, ask):
-        - ([vehicle], None) when unambiguous;
-        - ([], question) when unregistered;
-        - ([], question) when ambiguous (a choose_vehicle flow is stored).
-        """
-        fleet = self._fleet(user.id)
-        matched = find_vehicles_by_term(term, fleet) if term else []
-        if not matched:
-            return [], f"Você não tem nenhum veículo {term} cadastrado."
-        if len(matched) > 1:
-            names = " ou ".join(v.name for v in matched)
-            self._store_flow(
-                user,
-                PendingFlow(
-                    operation="choose_vehicle",
-                    candidates=[
-                        DisambiguationCandidate(id=v.id, name=v.name) for v in matched
-                    ],
-                ),
-            )
-            return [], f"Qual deles? {names}?"
-        return matched, None
+    @staticmethod
+    def _register_slots(pet, event_type, event_name, occurred_at) -> dict:
+        return {
+            "pet_id": pet.id if pet else None,
+            "pet_name": pet.name if pet else None,
+            "event_type": event_type,
+            "event_name": event_name,
+            "date": occurred_at.isoformat() if occurred_at else None,
+        }
 
-    def _render_records(self, vehicle, records) -> str:
-        lines = [f"As últimas manutenções do {vehicle.name} que me lembro:"]
+    def _do_register(self, user, pet, event_type, event_name, occurred_at) -> str:
+        try:
+            self.pet_health_service.register(
+                PetHealthEventAdd(
+                    pet_id=pet.id,
+                    event_type=event_type,
+                    description=event_name,
+                    occurred_at=occurred_at,
+                ),
+                user.id,
+            )
+        except ValidationError as error:
+            return f"Não consegui registrar: {error.errors}"
+        except Exception as error:  # noqa: BLE001
+            logger.error("register_health_event failed: %s", error, exc_info=True)
+            return "Tive um problema ao registrar, tente de novo."
+        when = occurred_at.strftime("%d/%m/%Y")
+        return f"Registrei {event_name} para o {pet.name}, no dia {when}."
+
+    def _ask_for_slot(self, slot: str, event_type: str = "") -> str:
+        if slot == "pet":
+            return "De qual pet estamos falando?"
+        if slot == "event_name":
+            if event_type == "vaccine":
+                return "Qual vacina ele tomou?"
+            return "O que foi aplicado exatamente?"
+        if slot == "date":
+            return "Quando foi?"
+        return "Pode me dar esse dado?"
+
+    def _render_records(self, pet, records) -> str:
+        lines = [f"O histórico de saúde do {pet.name} que eu tenho:"]
         for r in records:
-            when = r.performed_at.strftime("%d/%m/%Y") if r.performed_at else "?"
-            km = f"km {r.odometer_km}" if r.odometer_km else "km não informada"
+            when = r.occurred_at.strftime("%d/%m/%Y") if r.occurred_at else "?"
             desc = sanitize_for_prompt(r.description, _MAX_RECORD_DESCRIPTION_CHARS)
-            lines.append(f"{when} - {km} - {desc}")
+            lines.append(f"{when} - {desc}")
         return "\n".join(lines)
 
-    def _render_open(self, user, vehicle, data, records) -> str:
+    def _render_open(self, user, pet, data, records) -> str:
         block_lines = []
         for r in records:
-            when = r.performed_at.strftime("%d/%m/%Y") if r.performed_at else "?"
-            km = r.odometer_km if r.odometer_km else "?"
+            when = r.occurred_at.strftime("%d/%m/%Y") if r.occurred_at else "?"
             desc = sanitize_for_prompt(r.description, _MAX_RECORD_DESCRIPTION_CHARS)
-            block_lines.append(f"- {when} | km {km} | {desc}")
+            block_lines.append(f"- {when} | {r.event_type} | {desc}")
         records_block = "\n".join(block_lines)
         chain = self.query_response_prompt | self.llm_chat
         try:
@@ -425,7 +448,7 @@ class VehicleMaintenanceGraph(Graph):
                     "input": data.get("query") or "",
                     "user_name": user.name,
                     "current_date": date.today().isoformat(),
-                    "vehicle_name": vehicle.name,
+                    "pet_name": pet.name,
                     "records": records_block,
                 }
             )
@@ -434,92 +457,67 @@ class VehicleMaintenanceGraph(Graph):
                 return text
         except Exception as error:  # noqa: BLE001
             logger.error("open query render failed: %s", error, exc_info=True)
-        # Fallback to the deterministic listing.
-        return self._render_records(vehicle, records)
-
-    def _ask_for_slot(self, slot: str) -> str:
-        if slot == "vehicle":
-            return "De qual veículo?"
-        if slot == "date":
-            return "Quando foi?"
-        if slot == "km":
-            return "Qual a quilometragem no momento?"
-        return "Pode me dar esse dado?"
+        return self._render_records(pet, records)
 
     def _store_flow(self, user, pending: PendingFlow) -> None:
-        if self.maintenance_flow_service is None:
+        if self.pet_health_flow_service is None:
             return
         try:
             async_runner.run(
-                self.maintenance_flow_service.set_pending(user.id, pending)
+                self.pet_health_flow_service.set_pending(user.id, pending)
             )
         except Exception as error:  # noqa: BLE001
-            logger.error("failed to store maintenance flow: %s", error, exc_info=True)
+            logger.error("failed to store pet health flow: %s", error, exc_info=True)
 
-    def _set_focus(self, user, vehicle, record) -> None:
-        if self.maintenance_flow_service is None:
+    def _set_focus(self, user, pet, record) -> None:
+        if self.pet_health_flow_service is None:
             return
         focus = {
             "record_id": record.id,
-            "vehicle_id": vehicle.id,
-            "vehicle_name": vehicle.name,
+            "pet_id": pet.id,
+            "pet_name": pet.name,
+            "event_type": record.event_type,
             "description": record.description,
-            "performed_at": record.performed_at.isoformat()
-            if record.performed_at
+            "occurred_at": record.occurred_at.isoformat()
+            if record.occurred_at
             else None,
-            "odometer_km": record.odometer_km,
         }
         try:
-            async_runner.run(self.maintenance_flow_service.set_focus(user.id, focus))
+            async_runner.run(self.pet_health_flow_service.set_focus(user.id, focus))
         except Exception as error:  # noqa: BLE001
             logger.error("failed to store focus: %s", error, exc_info=True)
 
     def _get_focus(self, user) -> Optional[dict]:
-        if self.maintenance_flow_service is None:
+        if self.pet_health_flow_service is None:
             return None
         try:
-            return async_runner.run(self.maintenance_flow_service.get_focus(user.id))
+            return async_runner.run(self.pet_health_flow_service.get_focus(user.id))
         except Exception as error:  # noqa: BLE001
             logger.warning("failed to load focus: %s", error)
             return None
 
     def _build_edit(self, focus: dict, edit_field: str, new_value: str):
-        """
-        Build a MaintenanceRecordUpdate for the focused record plus a human
-        confirmation, or (None, None) when the field/value is not understood.
-        """
         field = (edit_field or "").lower()
         record_id = focus.get("record_id")
         if not record_id:
             return None, None
-
-        if "km" in field or "quilometr" in field or "hodometr" in field:
-            digits = "".join(ch for ch in (new_value or "") if ch.isdigit())
-            if not digits:
-                return None, None
-            km = int(digits)
-            old = focus.get("odometer_km")
-            human = (
-                f"Alterei a quilometragem da {focus.get('description')} do "
-                f"{focus.get('vehicle_name')}"
-                + (f", de {old} para {km}." if old else f" para {km}.")
-            )
-            return MaintenanceRecordUpdate(id=record_id, odometer_km=km), human
 
         if "data" in field or "dia" in field:
             parsed = parse_explicit_date(new_value, date.today())
             if parsed is None:
                 return None, None
             human = (
-                f"Alterei a data da {focus.get('description')} do "
-                f"{focus.get('vehicle_name')} para {parsed.strftime('%d/%m/%Y')}."
+                f"Alterei a data de {focus.get('description')} do "
+                f"{focus.get('pet_name')} para {parsed.strftime('%d/%m/%Y')}."
             )
-            return MaintenanceRecordUpdate(id=record_id, performed_at=parsed), human
+            return PetHealthEventUpdate(id=record_id, occurred_at=parsed), human
 
         if new_value.strip():
             human = f"Atualizei a descrição para: {new_value.strip()}."
-            return MaintenanceRecordUpdate(id=record_id, description=new_value.strip()), human
-
+            return (
+                PetHealthEventUpdate(id=record_id, description=new_value.strip()),
+                human,
+            )
         return None, None
 
     @staticmethod
@@ -542,14 +540,6 @@ class VehicleMaintenanceGraph(Graph):
         return None
 
     @staticmethod
-    def _coerce_km(value) -> Optional[int]:
-        try:
-            km = int(value)
-        except (TypeError, ValueError):
-            return None
-        return km if km > 0 else None
-
-    @staticmethod
     def _coerce_int(value) -> int:
         try:
             return int(value)
@@ -557,24 +547,24 @@ class VehicleMaintenanceGraph(Graph):
             return 0
 
     def _compile(self):
-        workflow = StateGraph(VehicleMaintenanceGraphState)
+        workflow = StateGraph(PetHealthGraphState)
         workflow.add_node("classify", RunnableLambda(self._classify_intent))
-        workflow.add_node("list_vehicles", RunnableLambda(self._handle_list_vehicles))
+        workflow.add_node("list_pets", RunnableLambda(self._handle_list_pets))
         workflow.add_node(
-            "register_maintenance", RunnableLambda(self._handle_register_maintenance)
+            "register_health_event",
+            RunnableLambda(self._handle_register_health_event),
         )
         workflow.add_node(
-            "query_maintenance", RunnableLambda(self._handle_query_maintenance)
+            "query_health_event", RunnableLambda(self._handle_query_health_event)
         )
         workflow.add_node(
-            "edit_maintenance", RunnableLambda(self._handle_edit_maintenance)
+            "edit_health_event", RunnableLambda(self._handle_edit_health_event)
         )
         workflow.add_node(
-            "delete_maintenance", RunnableLambda(self._handle_delete_maintenance)
+            "delete_health_event", RunnableLambda(self._handle_delete_health_event)
         )
         workflow.add_node(
-            "vehicle_write_forbidden",
-            RunnableLambda(self._handle_vehicle_write_forbidden),
+            "pet_write_forbidden", RunnableLambda(self._handle_pet_write_forbidden)
         )
         workflow.add_node("not_recognized", RunnableLambda(self._handle_not_recognized))
         workflow.add_node("final_response", RunnableLambda(self._handle_final_response))
@@ -586,12 +576,12 @@ class VehicleMaintenanceGraph(Graph):
         workflow.add_conditional_edges("classify", intent_router)
 
         for node in [
-            "list_vehicles",
-            "register_maintenance",
-            "query_maintenance",
-            "edit_maintenance",
-            "delete_maintenance",
-            "vehicle_write_forbidden",
+            "list_pets",
+            "register_health_event",
+            "query_health_event",
+            "edit_health_event",
+            "delete_health_event",
+            "pet_write_forbidden",
             "not_recognized",
         ]:
             workflow.add_edge(node, "final_response")

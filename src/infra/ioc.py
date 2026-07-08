@@ -2,6 +2,7 @@ from typing import Callable, Optional
 
 from application.appservices.llm_app_service import LlmAppService
 from application.appservices.memory_app_service import MemoryAppService
+from application.appservices.pet_app_service import PetAppService
 from application.appservices.shopping_list_app_service import ShoppingListAppService
 from application.appservices.smart_home_app_service import SmartHomeAppService
 from application.appservices.user_app_service import UserAppService
@@ -17,6 +18,7 @@ from application.graphs.smart_home_climate_graph import SmartHomeClimateGraph
 from application.graphs.smart_home_sensors_graph import SmartHomeSensorsGraph
 from application.graphs.smart_home_cameras_graph import SmartHomeCamerasGraph
 from application.graphs.vehicle_maintenance_graph import VehicleMaintenanceGraph
+from application.graphs.pet_health_graph import PetHealthGraph
 from domain.interfaces.data_repository import (
     ContextRepository,
     ImageStore,
@@ -33,6 +35,10 @@ from domain.interfaces.smart_home_repository import (
     SmartHomeSensorRepository,
     SmartHomeCameraRepository,
 )
+from domain.interfaces.pet_repository import (
+    PetHealthEventRepository,
+    PetRepository,
+)
 from domain.interfaces.vehicle_repository import (
     MaintenanceRecordRepository,
     VehicleRepository,
@@ -41,6 +47,9 @@ from domain.services.disambiguation_service import DisambiguationService
 from domain.services.maintenance_flow_service import MaintenanceFlowService
 from domain.services.maintenance_service import MaintenanceService
 from domain.services.music_service import MusicService
+from domain.services.pet_health_flow_service import PetHealthFlowService
+from domain.services.pet_health_service import PetHealthService
+from domain.services.pet_service import PetService
 from domain.services.shopping_list_service import ShoppingListService
 from domain.services.vehicle_service import VehicleService
 from domain.services.smart_home_service import SmartHomeService
@@ -86,9 +95,14 @@ from infra.data.sqlite.sqlite_user_memory_repository import (
 )
 from infra.data.sqlite.sqlite_user_repository import SqliteUserRepository
 from infra.data.read_only_vehicle_repository import ReadOnlyVehicleRepository
+from infra.data.read_only_pet_repository import ReadOnlyPetRepository
 from infra.data.sqlite.sqlite_vehicle_repository import SqliteVehicleRepository
 from infra.data.sqlite.sqlite_maintenance_record_repository import (
     SqliteMaintenanceRecordRepository,
+)
+from infra.data.sqlite.sqlite_pet_repository import SqlitePetRepository
+from infra.data.sqlite.sqlite_pet_health_event_repository import (
+    SqlitePetHealthEventRepository,
 )
 import hashlib
 import os
@@ -149,6 +163,7 @@ def get_main_graph() -> MainGraph:
         smart_home_cameras_graph = get_smart_home_cameras_graph()
         music_graph = get_music_graph()
         vehicle_maintenance_graph = get_vehicle_maintenance_graph()
+        pet_health_graph = get_pet_health_graph()
 
         _repo_cache[cache_key] = MainGraph(
             llm_chat=llm_chat,
@@ -160,6 +175,7 @@ def get_main_graph() -> MainGraph:
             smart_home_cameras_graph=smart_home_cameras_graph,
             music_graph=music_graph,
             vehicle_maintenance_graph=vehicle_maintenance_graph,
+            pet_health_graph=pet_health_graph,
             provider=settings.llm_provider_type,
             strip_think_directive=settings.llm_strip_think_directive,
         )
@@ -189,6 +205,36 @@ def get_vehicle_maintenance_graph() -> VehicleMaintenanceGraph:
             vehicle_read_repository=get_vehicle_read_repository(),
             maintenance_service=get_maintenance_service(),
             maintenance_flow_service=get_maintenance_flow_service(),
+            get_session_history=_get_session_history_factory(),
+            provider=settings.llm_provider_type,
+            strip_think_directive=settings.llm_strip_think_directive,
+        )
+    return _repo_cache[cache_key]
+
+
+def get_pet_health_graph() -> PetHealthGraph:
+    """
+    IOC for Pet Health Graph. Receives the pet repo as READ-only (write is
+    REST-only, §2.4).
+    """
+
+    settings = _get_settings()
+
+    cache_key = ("graph", "pet_health")
+    if cache_key not in _repo_cache:
+        llm_chat = get_llm_chat(
+            model=settings.llm_pet_health_graph_chat_model,
+            temperature=settings.llm_pet_health_graph_chat_temperature,
+            reasoning=_resolve_reasoning(
+                settings.llm_pet_health_graph_chat_reasoning
+            ),
+        )
+
+        _repo_cache[cache_key] = PetHealthGraph(
+            llm_chat=llm_chat,
+            pet_read_repository=get_pet_read_repository(),
+            pet_health_service=get_pet_health_service(),
+            pet_health_flow_service=get_pet_health_flow_service(),
             get_session_history=_get_session_history_factory(),
             provider=settings.llm_provider_type,
             strip_think_directive=settings.llm_strip_think_directive,
@@ -485,6 +531,9 @@ def get_llm_app_service() -> LlmAppService:
         maintenance_flow_service=get_maintenance_flow_service(),
         maintenance_service=get_maintenance_service(),
         vehicle_read_repository=get_vehicle_read_repository(),
+        pet_health_flow_service=get_pet_health_flow_service(),
+        pet_health_service=get_pet_health_service(),
+        pet_read_repository=get_pet_read_repository(),
         chat_image_max_bytes=settings.chat_image_max_bytes,
         chat_image_max_count=settings.chat_image_max_count,
         chat_image_allowed_mimes=settings.chat_image_allowed_mimes,
@@ -554,6 +603,19 @@ def get_vehicle_app_service() -> VehicleAppService:
         vehicle_service=get_vehicle_service(),
         vehicle_repository=get_vehicle_repository(),
         maintenance_record_repository=get_maintenance_record_repository(),
+        user_repository=get_user_repository(),
+    )
+
+
+def get_pet_app_service() -> PetAppService:
+    """
+    IOC for PetAppService (the only pet WRITE path — REST only).
+    """
+
+    return PetAppService(
+        pet_service=get_pet_service(),
+        pet_repository=get_pet_repository(),
+        pet_health_event_repository=get_pet_health_event_repository(),
         user_repository=get_user_repository(),
     )
 
@@ -630,6 +692,43 @@ def get_maintenance_flow_service() -> MaintenanceFlowService:
 
     settings = _get_settings()
     return MaintenanceFlowService(
+        context_repository=get_context_repository(),
+        ttl_seconds=settings.maintenance_flow_ttl_seconds,
+    )
+
+
+def get_pet_service() -> PetService:
+    """
+    IOC for Pet Service (full read/write repo — REST side).
+    """
+
+    return PetService(
+        pet_repository=get_pet_repository(),
+        pet_health_event_repository=get_pet_health_event_repository(),
+    )
+
+
+def get_pet_health_service() -> PetHealthService:
+    """
+    IOC for Pet Health Service. Receives the pet repo as the READ-only view so
+    the chat path can never write a pet.
+    """
+
+    return PetHealthService(
+        pet_health_event_repository=get_pet_health_event_repository(),
+        pet_read_repository=get_pet_read_repository(),
+    )
+
+
+def get_pet_health_flow_service() -> PetHealthFlowService:
+    """
+    IOC for Pet Health Flow Service (multi-turn pending state). Reuses the flow
+    TTL of the maintenance domain (it is a property of the flow mechanism, not the
+    domain).
+    """
+
+    settings = _get_settings()
+    return PetHealthFlowService(
         context_repository=get_context_repository(),
         ttl_seconds=settings.maintenance_flow_ttl_seconds,
     )
@@ -784,6 +883,49 @@ def get_maintenance_record_repository() -> MaintenanceRecordRepository:
     cache_key = ("sqlite_maintenance_record", settings.peruca_db_connection_string)
     if cache_key not in _repo_cache:
         _repo_cache[cache_key] = SqliteMaintenanceRecordRepository(
+            db_path=settings.peruca_db_connection_string
+        )
+    return _repo_cache[cache_key]
+
+
+def get_pet_repository() -> PetRepository:
+    """
+    Pet Repository (full read/write — REST side only).
+    """
+
+    settings = _get_settings()
+    cache_key = ("sqlite_pet", settings.peruca_db_connection_string)
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = SqlitePetRepository(
+            db_path=settings.peruca_db_connection_string
+        )
+    return _repo_cache[cache_key]
+
+
+def get_pet_read_repository() -> ReadOnlyPetRepository:
+    """
+    Read-only pet repository for the chat/graph path (§2.4, level 1). It
+    physically lacks add/update/delete, so no code reachable from chat — even a
+    future one — can mutate pets. The full repository is reserved for the REST app
+    service (get_pet_app_service).
+    """
+
+    settings = _get_settings()
+    cache_key = ("readonly_pet", settings.peruca_db_connection_string)
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = ReadOnlyPetRepository(get_pet_repository())
+    return _repo_cache[cache_key]
+
+
+def get_pet_health_event_repository() -> PetHealthEventRepository:
+    """
+    Pet Health Event Repository
+    """
+
+    settings = _get_settings()
+    cache_key = ("sqlite_pet_health_event", settings.peruca_db_connection_string)
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = SqlitePetHealthEventRepository(
             db_path=settings.peruca_db_connection_string
         )
     return _repo_cache[cache_key]

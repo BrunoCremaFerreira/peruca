@@ -3,6 +3,7 @@ Sua tarefa é identificar a(s) intenção(ões) do usuário a partir da mensagem
 
 Contexto de música: {music_is_playing}
 Contexto de veículos cadastrados do usuário: {user_vehicles}
+Contexto de pets cadastrados do usuário: {user_pets}
 
 Você deve classificar a entrada em **uma ou mais** das seguintes categorias:
 
@@ -23,6 +24,7 @@ Você deve classificar a entrada em **uma ou mais** das seguintes categorias:
 - "shopping_list" → quando o usuário deseja **adicionar, remover ou listar itens** da lista de compras, inclusive em pedidos indiretos ou com ruído conversacional ("não esquece de tirar maçã e banana da lista", "pode apagar o café", "deixa só o açúcar").
 - "music" → quando o usuário quer **controlar a reprodução de música ou saber o que está tocando**: tocar uma música, artista, álbum ou playlist; pausar, parar, retomar; pular faixa (próxima/anterior); ajustar o volume da música; ou perguntar o que está tocando.
 - "vehicle_maintenance" → quando o usuário quer **AGIR sobre a manutenção dos veículos cadastrados**: registrar uma manutenção realizada (troca de óleo, pneus, peças, fluidos, rodízio, revisão), consultar o histórico de manutenções, editar/apagar um registro, listar seus veículos, ou tentar cadastrar/editar/excluir um VEÍCULO.
+- "pet_health" → quando o usuário quer **AGIR sobre a saúde dos pets cadastrados**: registrar uma vacina, vermífugo, antipulgas, remédio ou consulta veterinária realizada, consultar o histórico de vacinas/saúde de um pet, apagar/editar um registro de saúde, listar seus pets, ou tentar cadastrar/editar/excluir um PET.
 - "only_talking" → quando o usuário está **apenas comentando, conversando, contando histórias ou fazendo observações**, sem pedir nenhuma ação prática.
 
 ⚠️ **Instruções importantes**:
@@ -52,6 +54,14 @@ Você deve classificar a entrada em **uma ou mais** das seguintes categorias:
     - Relato sobre um veículo que NÃO está no contexto, sem pedido explícito ("troquei o câmbio do Porsche") → `["only_talking"]`.
     - Opiniões, custos hipotéticos, notícias e memórias sobre carros ("gosto muito do meu Outlander", "o Outlander dá muita manutenção?", "quanto custa a revisão do Pajero?") → `["only_talking"]`. Pergunta hipotética não é consulta ao histórico registrado.
     - Follow-up curto citando um veículo do contexto logo após uma interação de manutenção ("E do Pajero?") → `["vehicle_maintenance"]`.
+11. **Desambiguação de saúde dos pets**: nem toda menção a um pet é um evento de saúde.
+    - Relato de vacina/vermífugo/antipulgas/remédio/consulta REALIZADA em um pet do contexto acima ("o Caçolin tomou vacina hoje", "dei o Bravecto pro Caçolão") → `["pet_health"]`.
+    - Pedido EXPLÍCITO de registrar/consultar/editar/apagar um evento de saúde → `["pet_health"]`, mesmo que o pet citado não esteja no contexto.
+    - Tentativa de cadastrar/editar/excluir um PET ("cadastre minha nova cachorra", "muda o apelido do Caçolin") → `["pet_health"]` (o subsistema é quem nega a operação).
+    - Histórias, comentários, carinho e travessuras dos pets ("o Caçolin está dormindo no sofá", "o Caçolão comeu meu chinelo", "o Lilo está lindo hoje") → `["only_talking"]`.
+    - Perguntas hipotéticas ou de conhecimento geral ("cachorro pode tomar dipirona?", "de quanto em quanto tempo se dá vermífugo?") → `["only_talking"]`. Pergunta hipotética não é consulta ao histórico registrado.
+    - Relato de saúde de um pet que NÃO está no contexto e sem pedido explícito ("o cachorro da vizinha tomou vacina") → `["only_talking"]`.
+    - Follow-up curto citando um pet do contexto logo após uma interação de saúde ("E o Caçolão?") → `["pet_health"]`.
 
 📌 **Formato de saída obrigatório**: uma lista Python com as categorias detectadas. Exemplo:  
 `["only_talking"]`  
@@ -62,6 +72,7 @@ Você deve classificar a entrada em **uma ou mais** das seguintes categorias:
 `["smart_home_sensors", "shopping_list"]`
 `["music"]`
 `["vehicle_maintenance"]`
+`["pet_health"]`
 
 ⚠️ **Importante**: Retorne APENAS a lista Python, sem texto antes ou depois, sem bloco de código markdown, sem explicação.
 

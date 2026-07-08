@@ -48,6 +48,9 @@ class LlmAppService:
         maintenance_flow_service=None,
         maintenance_service=None,
         vehicle_read_repository=None,
+        pet_health_flow_service=None,
+        pet_health_service=None,
+        pet_read_repository=None,
         chat_image_max_bytes: int = 5_242_880,
         chat_image_max_count: int = 4,
         chat_image_allowed_mimes: Optional[list[str]] = None,
@@ -64,6 +67,9 @@ class LlmAppService:
         self.maintenance_flow_service = maintenance_flow_service
         self.maintenance_service = maintenance_service
         self.vehicle_read_repository = vehicle_read_repository
+        self.pet_health_flow_service = pet_health_flow_service
+        self.pet_health_service = pet_health_service
+        self.pet_read_repository = pet_read_repository
         self.chat_image_max_bytes = chat_image_max_bytes
         self.chat_image_max_count = chat_image_max_count
         self.chat_image_allowed_mimes = chat_image_allowed_mimes or [
@@ -139,6 +145,20 @@ class LlmAppService:
                 if consumed is not None:
                     return consumed
 
+        # A pending pet-health flow (register slot-filling / choose_pet /
+        # delete_confirm / register_more) is consumed the same way, dispatched by
+        # its own key. A reply that does not parse clears it and falls through.
+        if self.pet_health_flow_service is not None:
+            p_pending = async_runner.run(
+                self.pet_health_flow_service.get_pending(user.id)
+            )
+            if p_pending is not None:
+                consumed = self._consume_pet_health_flow(
+                    user, p_pending, chat_request.message
+                )
+                if consumed is not None:
+                    return consumed
+
         memories = self.user_memory_service.get_all_by_user(user.id)
         memory_contents = [memory.content for memory in memories]
 
@@ -147,6 +167,9 @@ class LlmAppService:
         # (resolves EX3/EX4: an unregistered vehicle mentioned in passing is
         # only_talking, §2.5).
         context_hints["user_vehicles"] = self._user_vehicles_hint(user.id)
+        pets_hint, pets_persona = self._user_pets_hints(user.id)
+        context_hints["user_pets"] = pets_hint
+        context_hints["user_pets_persona"] = pets_persona
         if self.music_service is not None:
             try:
                 players = async_runner.run(
@@ -254,6 +277,40 @@ class LlmAppService:
         names = ", ".join(v.name for v in vehicles if v.name)
         return names or "nenhum"
 
+    def _user_pets_hints(self, user_id: str):
+        """
+        Return (classifier_hint, persona_block) from a single repository read.
+        The classifier hint is a compact "Name (alias, alias)" list so the
+        MainGraph can route pet mentions; the persona block is the multi-line
+        "sibling" description injected into the OnlyTalkGraph (§2.9).
+        """
+        if self.pet_read_repository is None:
+            return "nenhum", ""
+        try:
+            pets = self.pet_read_repository.get_all_by_user_id(user_id) or []
+        except Exception as error:  # noqa: BLE001
+            logger.warning("user_pets hint failed: %s", error)
+            return "nenhum", ""
+
+        hint_parts = []
+        persona_lines = []
+        for pet in pets:
+            if not pet.name:
+                continue
+            name = sanitize_for_prompt(pet.name, 40)
+            aliases = ", ".join(
+                sanitize_for_prompt(n, 40) for n in (pet.nicknames or []) if n
+            )
+            hint_parts.append(f"{name} ({aliases})" if aliases else name)
+            alias_part = f" (apelidos: {aliases})" if aliases else ""
+            desc = sanitize_for_prompt(pet.description or "", 200)
+            desc_part = f": {desc}" if desc else ""
+            persona_lines.append(f"- **{name}**{alias_part}{desc_part}")
+
+        hint = ", ".join(hint_parts) or "nenhum"
+        persona = "\n".join(persona_lines)
+        return hint, persona
+
     def _consume_maintenance_flow(self, user: User, pending, message: str):
         """
         Resolve a reply against a pending maintenance flow. Returns a final chat
@@ -320,14 +377,14 @@ class LlmAppService:
                 # Still ambiguous: keep asking, store a choose_vehicle flow.
                 from domain.entities import (
                     DisambiguationCandidate,
-                    PendingMaintenanceFlow,
+                    PendingFlow,
                 )
 
                 names = " ou ".join(v.name for v in result.value)
                 async_runner.run(
                     self.maintenance_flow_service.set_pending(
                         user.id,
-                        PendingMaintenanceFlow(
+                        PendingFlow(
                             operation="choose_vehicle",
                             slots=slots,
                             candidates=[
@@ -351,7 +408,7 @@ class LlmAppService:
         from datetime import date as _date
 
         from domain.commands import MaintenanceRecordAdd
-        from domain.entities import PendingMaintenanceFlow
+        from domain.entities import PendingFlow
 
         # Recompute what is still missing so a slot filled by a correction is not
         # asked again.
@@ -367,7 +424,7 @@ class LlmAppService:
             async_runner.run(
                 self.maintenance_flow_service.set_pending(
                     user.id,
-                    PendingMaintenanceFlow(
+                    PendingFlow(
                         operation="register", slots=slots, missing_slots=pending_missing
                     ),
                 )
@@ -426,6 +483,229 @@ class LlmAppService:
     def _flow_reply(self, user: User, message: str, output: str) -> dict:
         self._persist_turn(user=user, message=message, output=output)
         return {"intents": ["vehicle_maintenance"], "output": output}
+
+    # ===============================================
+    # Pet health flow (§2.5 / §2.6)
+    # ===============================================
+    def _consume_pet_health_flow(self, user: User, pending, message: str):
+        """
+        Resolve a reply against a pending pet-health flow. Returns a final chat
+        response dict, or None to fall through to the MainGraph (§9.3).
+        """
+        pets = (
+            self.pet_read_repository.get_all_by_user_id(user.id)
+            if self.pet_read_repository is not None
+            else []
+        )
+        result = self.pet_health_flow_service.parse_slot_reply(
+            pending, message, pets=pets
+        )
+        op = pending.operation
+
+        if result.kind == "none":
+            async_runner.run(self.pet_health_flow_service.clear_pending(user.id))
+            return None
+
+        if result.kind == "cancel":
+            async_runner.run(self.pet_health_flow_service.clear_pending(user.id))
+            closing = "Perfeito então." if op == "register_more" else "Ok, cancelei."
+            return self._pet_reply(user, message, closing)
+
+        if result.kind == "invalid":
+            return self._pet_reply(
+                user, message, result.error_message or "Não entendi, pode repetir?"
+            )
+
+        if op == "delete_confirm":
+            async_runner.run(self.pet_health_flow_service.clear_pending(user.id))
+            if result.kind == "value" and result.value is True:
+                output = self._delete_focused_pet_record(user, pending)
+            else:
+                output = "Ok."
+            return self._pet_reply(user, message, output)
+
+        if op == "choose_pet":
+            if result.kind == "value":
+                slots = dict(pending.slots)
+                slots["pet_id"] = result.value.id
+                slots["pet_name"] = result.value.name
+                return self._advance_pet_register(user, slots, message)
+            async_runner.run(self.pet_health_flow_service.clear_pending(user.id))
+            return None
+
+        if op == "register_more":
+            from domain.entities import PendingFlow
+
+            if result.kind == "affirm":
+                slots = {
+                    "pet_id": pending.slots.get("pet_id"),
+                    "pet_name": pending.slots.get("pet_name"),
+                    "event_type": pending.slots.get("event_type") or "vaccine",
+                    "event_name": None,
+                    "date": pending.slots.get("date"),
+                }
+                async_runner.run(
+                    self.pet_health_flow_service.set_pending(
+                        user.id,
+                        PendingFlow(
+                            operation="register",
+                            slots=slots,
+                            missing_slots=["event_name"],
+                            flow_domain="pet_health",
+                        ),
+                    )
+                )
+                return self._pet_reply(user, message, "Qual outra vacina?")
+            if result.kind == "value":
+                slots = dict(pending.slots)
+                slots["event_name"] = result.value
+                return self._advance_pet_register(user, slots, message)
+            async_runner.run(self.pet_health_flow_service.clear_pending(user.id))
+            return None
+
+        # register slot filling.
+        from domain.entities import DisambiguationCandidate, PendingFlow
+
+        slots = dict(pending.slots)
+        missing = list(pending.missing_slots)
+        current = missing[0] if missing else None
+
+        if current == "pet":
+            if result.kind == "choose":
+                names = " ou ".join(p.name for p in result.value)
+                async_runner.run(
+                    self.pet_health_flow_service.set_pending(
+                        user.id,
+                        PendingFlow(
+                            operation="choose_pet",
+                            slots=slots,
+                            candidates=[
+                                DisambiguationCandidate(id=p.id, name=p.name)
+                                for p in result.value
+                            ],
+                            flow_domain="pet_health",
+                        ),
+                    )
+                )
+                return self._pet_reply(user, message, f"De qual deles? {names}?")
+            slots["pet_id"] = result.value.id
+            slots["pet_name"] = result.value.name
+        elif current == "event_name":
+            slots["event_name"] = result.value if result.kind == "value" else None
+        elif current == "date":
+            slots["date"] = (
+                result.value.isoformat() if result.kind == "value" else None
+            )
+
+        return self._advance_pet_register(user, slots, message)
+
+    def _advance_pet_register(self, user: User, slots: dict, message: str):
+        """
+        Ask for the next missing slot, or register the event when the slot queue
+        is empty. After a vaccine registers, arm the "tomou mais alguma?" loop
+        (§2.6).
+        """
+        from datetime import date as _date
+
+        from domain.commands import PetHealthEventAdd
+        from domain.entities import PendingFlow
+
+        missing = []
+        if not slots.get("pet_id"):
+            missing.append("pet")
+        if not slots.get("event_name"):
+            missing.append("event_name")
+        if not slots.get("date"):
+            missing.append("date")
+
+        if missing:
+            async_runner.run(
+                self.pet_health_flow_service.set_pending(
+                    user.id,
+                    PendingFlow(
+                        operation="register",
+                        slots=slots,
+                        missing_slots=missing,
+                        flow_domain="pet_health",
+                    ),
+                )
+            )
+            event_type = slots.get("event_type") or ""
+            questions = {
+                "pet": "De qual pet estamos falando?",
+                "event_name": "Qual vacina ele tomou?"
+                if event_type == "vaccine"
+                else "O que foi aplicado exatamente?",
+                "date": "Quando foi?",
+            }
+            return self._pet_reply(
+                user, message, questions.get(missing[0], "Pode me dar esse dado?")
+            )
+
+        async_runner.run(self.pet_health_flow_service.clear_pending(user.id))
+        occurred_at = (
+            _date.fromisoformat(slots["date"]) if slots.get("date") else None
+        )
+        event_type = slots.get("event_type") or "other"
+        try:
+            self.pet_health_service.register(
+                PetHealthEventAdd(
+                    pet_id=slots.get("pet_id"),
+                    event_type=event_type,
+                    description=slots.get("event_name") or "",
+                    occurred_at=occurred_at,
+                ),
+                user.id,
+            )
+        except Exception as error:  # noqa: BLE001
+            logger.error("pet flow register failed: %s", error, exc_info=True)
+            return self._pet_reply(
+                user, message, "Não consegui registrar esse evento de saúde."
+            )
+
+        name = slots.get("pet_name") or "pet"
+        when = occurred_at.strftime("%d/%m/%Y") if occurred_at else "?"
+        confirm = f"Registrei {slots.get('event_name')} para o {name}, no dia {when}."
+
+        # Vaccines come in batches — offer to register another (§2.6). Other
+        # event types confirm and end.
+        if event_type == "vaccine":
+            async_runner.run(
+                self.pet_health_flow_service.set_pending(
+                    user.id,
+                    PendingFlow(
+                        operation="register_more",
+                        slots={
+                            "pet_id": slots.get("pet_id"),
+                            "pet_name": name,
+                            "event_type": "vaccine",
+                            "date": slots.get("date"),
+                        },
+                        flow_domain="pet_health",
+                    ),
+                )
+            )
+            return self._pet_reply(user, message, f"{confirm} Tomou mais alguma?")
+        return self._pet_reply(user, message, confirm)
+
+    def _delete_focused_pet_record(self, user: User, pending) -> str:
+        record_id = pending.slots.get("record_id")
+        if not record_id or self.pet_health_service is None:
+            return "Não encontrei o registro para remover."
+        try:
+            self.pet_health_service.delete(record_id, user.id)
+        except Exception as error:  # noqa: BLE001
+            logger.error("pet flow delete failed: %s", error, exc_info=True)
+            return "Não consegui remover o registro."
+        try:
+            async_runner.run(self.pet_health_flow_service.clear_focus(user.id))
+        except Exception:  # noqa: BLE001
+            pass
+        return "Removido."
+
+    def _pet_reply(self, user: User, message: str, output: str) -> dict:
+        self._persist_turn(user=user, message=message, output=output)
+        return {"intents": ["pet_health"], "output": output}
 
     def _apply_operation(self, operation: str, item_id: str) -> None:
         operations = {

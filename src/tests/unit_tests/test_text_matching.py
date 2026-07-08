@@ -15,12 +15,28 @@ API under test:
     resolve_ordinal(message, count, max_content_tokens=3) -> Optional[int]
 """
 
+from dataclasses import dataclass, field
+from typing import List
+
 from domain.services.text_matching import (
+    find_by_term,
     is_cancel,
     name_tokens,
     normalize,
     resolve_ordinal,
 )
+
+
+@dataclass
+class _Dummy:
+    """A minimal item to exercise the generic find_by_term contract."""
+
+    name: str = ""
+    aliases: List[str] = field(default_factory=list)
+
+
+def _searchables(item: "_Dummy") -> List[str]:
+    return [item.name, *item.aliases]
 
 
 class TestNormalize:
@@ -76,3 +92,71 @@ class TestResolveOrdinal:
 
     def test_unrelated_message__none(self):
         assert resolve_ordinal("do outlander", 2) is None
+
+
+class TestFindByTerm:
+    def test_exact_normalized_match_wins(self):
+        caco = _Dummy(name="Caçolin", aliases=["Lilo"])
+        cacao = _Dummy(name="Caçolão", aliases=["Lyon"])
+        result = find_by_term("cacolin", [caco, cacao], _searchables)
+        assert result == [caco]
+
+    def test_exact_match_on_alias(self):
+        caco = _Dummy(name="Caçolin", aliases=["Lilo", "Suzu"])
+        result = find_by_term("Suzu", [caco], _searchables)
+        assert result == [caco]
+
+    def test_partial_token_subset_match(self):
+        item = _Dummy(name="Carne de panela")
+        result = find_by_term("carne", [item], _searchables)
+        assert result == [item]
+
+    def test_fuzzy_typo_with_accent(self):
+        # "Caninça" is a phonetic typo of "Caniça" — resolved by the fuzzy layer.
+        cani = _Dummy(name="Caniça")
+        result = find_by_term("Caninça", [cani], _searchables)
+        assert result == [cani]
+
+    def test_no_matches_returns_empty(self):
+        item = _Dummy(name="Fusca")
+        assert find_by_term("Ferrari", [item], _searchables) == []
+
+    def test_multiple_matches_returned(self):
+        a = _Dummy(name="Gato Preto")
+        b = _Dummy(name="Gato Branco")
+        result = find_by_term("gato", [a, b], _searchables)
+        assert result == [a, b]
+
+    def test_empty_term_returns_empty(self):
+        item = _Dummy(name="Fusca")
+        assert find_by_term("", [item], _searchables) == []
+
+    def test_empty_items_returns_empty(self):
+        assert find_by_term("fusca", [], _searchables) == []
+
+
+class TestFindByTermPetNicknames:
+    """
+    Pet matching reuses find_by_term with searchables=[p.name, *p.nicknames]
+    (§2.1a / requirement 4): a pet is resolvable by any of its nicknames, not
+    only the primary one, and matching is accent-insensitive.
+    """
+
+    def test_match_on_secondary_nickname(self):
+        # The SECOND nickname (not the primary) must still resolve the pet.
+        caco = _Dummy(name="Caçolin", aliases=["Lilo", "Caçolinho", "Suzu"])
+        cacao = _Dummy(name="Caçolão", aliases=["Lyon"])
+        result = find_by_term("Suzu", [caco, cacao], _searchables)
+        assert result == [caco]
+
+    def test_match_on_nickname_is_accent_insensitive(self):
+        # "cacolinho" (no cedilla) must match the accented nickname "Caçolinho".
+        caco = _Dummy(name="Caçolin", aliases=["Lilo", "Caçolinho", "Suzu"])
+        result = find_by_term("cacolinho", [caco], _searchables)
+        assert result == [caco]
+
+    def test_phonetic_typo_on_name_resolves_via_fuzzy(self):
+        # "Câniça" is a phonetic variant of "Caniça" (requirement 4).
+        cani = _Dummy(name="Caniça", aliases=["Nick"])
+        result = find_by_term("Câniça", [cani], _searchables)
+        assert result == [cani]

@@ -79,6 +79,14 @@ class TestPersistence:
         service = _service()
         assert _run(service.get_pending(str(uuid.uuid4()))) is None
 
+    def test_reconstructed_pending_has_maintenance_flow_domain(self):
+        service = _service()
+        user_id = str(uuid.uuid4())
+        _run(service.set_pending(user_id, _pending_register(["km"])))
+
+        loaded = _run(service.get_pending(user_id))
+        assert loaded.flow_domain == "maintenance"
+
     def test_expired__returns_none_and_clears(self):
         repo = FakeContextRepository()
         service = _service(ttl_seconds=-10, repo=repo)

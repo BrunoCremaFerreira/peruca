@@ -12,6 +12,7 @@ Sua tarefa: ler a última mensagem do usuário e identificar APENAS **fatos dur�
 ❌ **O que NÃO extrair** (ignore por completo — produza `[]` se a mensagem só contém isto):
 - Comandos de casa inteligente (ligar/desligar luzes, status de equipamentos).
 - Itens ou operações de lista de compras (adicionar, remover, marcar).
+- Eventos pontuais de saúde dos pets com data (vacinas, vermífugos, antipulgas, consultas tomadas em uma data) — estes já têm registro estruturado próprio. Fatos duráveis sobre o pet ("o Caçolin é alérgico a frango", "tem um cachorro chamado Caçolin") continuam válidos.
 - Perguntas factuais ou pedidos de informação (ex.: "que horas são?", "quanto é 2+2?").
 - Estados momentâneos e passageiros (ex.: "estou com fome agora", "estou cansado hoje").
 - Saudações, agradecimentos e small talk (ex.: "oi", "obrigado", "tudo bem?").

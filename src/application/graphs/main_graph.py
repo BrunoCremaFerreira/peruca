@@ -32,6 +32,7 @@ class MainGraphState(TypedDict):
     output_sensors: Optional[str]
     output_music: Optional[str]
     output_vehicle: Optional[str]
+    output_pet: Optional[str]
     output: Optional[str]
     # Side channel: the factual image description produced by the only_talk
     # graph. Consumed by LlmAppService for history persistence; deliberately
@@ -54,6 +55,7 @@ class MainGraph(Graph):
         smart_home_cameras_graph: SmartHomeCamerasGraph = None,
         music_graph=None,
         vehicle_maintenance_graph=None,
+        pet_health_graph=None,
         provider: str = "OLLAMA",
         strip_think_directive: bool = False,
     ):
@@ -67,6 +69,7 @@ class MainGraph(Graph):
         self.smart_home_cameras_graph = smart_home_cameras_graph
         self.music_graph = music_graph
         self.vehicle_maintenance_graph = vehicle_maintenance_graph
+        self.pet_health_graph = pet_health_graph
         self.classification_prompt = ChatPromptTemplate.from_template(
             self.load_prompt("main_graph.md")
         )
@@ -92,10 +95,12 @@ class MainGraph(Graph):
             else "Não."
         )
         user_vehicles = data["input"].context_hints.get("user_vehicles") or "nenhum"
+        user_pets = data["input"].context_hints.get("user_pets") or "nenhum"
         invoke_payload = {
             "input": data["input"].message,
             "music_is_playing": hint_str,
             "user_vehicles": user_vehicles,
+            "user_pets": user_pets,
         }
         chain = self.classification_prompt | self.llm_chat
         try:
@@ -138,6 +143,19 @@ class MainGraph(Graph):
             return {"output_vehicle": self._remove_thinking_tag(output or "")}
         return {"output_vehicle": result.get("output")}
 
+    def _handle_pet_health(self, data):
+        logger.info("pet_health graph triggered")
+        result = self.pet_health_graph.invoke(invoke_request=data["input"])
+        # Main-classifier false positive: the sub-classifier found no actionable
+        # pet-health intent. Degrade to free conversation instead of replying
+        # "I did not understand" (§9.1).
+        if result.get("intent") == ["not_recognized"]:
+            logger.info("pet_health not_recognized — falling back to only_talk")
+            fallback = self.only_talk_graph.invoke(invoke_request=data["input"])
+            output = fallback.get("output") if isinstance(fallback, dict) else fallback
+            return {"output_pet": self._remove_thinking_tag(output or "")}
+        return {"output_pet": result.get("output")}
+
     def _handle_final_response(self, data):
         output_shopping = data.get("output_shopping")
         listing = (
@@ -161,6 +179,7 @@ class MainGraph(Graph):
                 data.get("output_sensors"),
                 data.get("output_music"),
                 data.get("output_vehicle"),
+                data.get("output_pet"),
             ]
             if e is not None and e.strip()
         ]
@@ -278,6 +297,13 @@ class MainGraph(Graph):
                 RunnableLambda(self._handle_vehicle_maintenance),
             )
             action_nodes.append("vehicle_maintenance")
+
+        if self.pet_health_graph is not None:
+            workflow.add_node(
+                "pet_health",
+                RunnableLambda(self._handle_pet_health),
+            )
+            action_nodes.append("pet_health")
 
         workflow.add_node("final_response", RunnableLambda(self._handle_final_response))
         workflow.add_edge(START, "classify")

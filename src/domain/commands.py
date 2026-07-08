@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 
 # =====================================
@@ -79,6 +79,48 @@ class MaintenanceRecordUpdate:
     description: Optional[str] = None
     performed_at: Optional[date] = None
     odometer_km: Optional[int] = None
+
+
+# =====================================
+# Pet Health Commands
+# =====================================
+@dataclass
+class PetAdd:
+    user_id: str = ""
+    name: str = ""
+    nicknames: List[str] = field(default_factory=list)
+    birth_date: Optional[date] = None
+    sex: str = ""
+    species: str = ""
+    description: str = ""
+
+
+@dataclass
+class PetUpdate:
+    id: str = ""
+    user_id: str = ""
+    name: str = ""
+    nicknames: List[str] = field(default_factory=list)
+    birth_date: Optional[date] = None
+    sex: str = ""
+    species: str = ""
+    description: str = ""
+
+
+@dataclass
+class PetHealthEventAdd:
+    pet_id: str = ""
+    event_type: str = ""
+    description: str = ""
+    occurred_at: Optional[date] = None
+
+
+@dataclass
+class PetHealthEventUpdate:
+    id: str = ""
+    event_type: Optional[str] = None
+    description: Optional[str] = None
+    occurred_at: Optional[date] = None
 
 
 # =====================================
