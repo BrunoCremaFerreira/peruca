@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     llm_only_talk_graph_chat_model: str = "gemma4:12b"
     llm_only_talk_graph_chat_temperature: float = 0.5
     llm_only_talk_graph_chat_reasoning: bool | None = None
+    # Max history messages injected into the only-talk prompt. Bounds the prompt
+    # so a long conversation cannot fill num_ctx and truncate the answer. <=0
+    # keeps the full history.
+    llm_only_talk_history_max_messages: int = 30
 
     llm_shopping_list_graph_chat_model: str = "gemma4:12b"
     llm_shopping_list_graph_chat_temperature: float = 0.5

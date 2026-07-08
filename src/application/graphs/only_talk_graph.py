@@ -65,11 +65,17 @@ class OnlyTalkGraph(Graph):
         get_session_history: Callable[[str], BaseChatMessageHistory],
         provider: str = "OLLAMA",
         image_store: Optional[ImageStore] = None,
+        history_max_messages: Optional[int] = None,
     ):
         super().__init__(provider)
         self.llm_chat = llm_chat
         self._get_session_history = get_session_history
         self._image_store = image_store
+        # Cap the number of history messages injected into the prompt. Injecting
+        # an unbounded history lets a long conversation fill num_ctx, leaving no
+        # room for generation — the model then stops mid-sentence
+        # (done_reason=length). None keeps the full history (legacy behavior).
+        self._history_max_messages = history_max_messages
 
     def invoke(self, invoke_request: GraphInvokeRequest) -> dict:
         user = invoke_request.user
@@ -77,6 +83,11 @@ class OnlyTalkGraph(Graph):
         has_images = bool(images)
 
         history_messages = self._get_session_history(user.id).messages
+        if (
+            self._history_max_messages
+            and len(history_messages) > self._history_max_messages
+        ):
+            history_messages = history_messages[-self._history_max_messages:]
         has_prior_image = self._image_store is not None and any(
             "[Imagem #" in str(getattr(m, "content", "")) for m in history_messages
         )

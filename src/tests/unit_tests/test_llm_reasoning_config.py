@@ -86,6 +86,7 @@ def _make_ollama_settings(
         llm_keep_alive=keep_alive,
         llm_num_ctx=num_ctx,
         llm_num_predict=num_predict,
+        llm_only_talk_history_max_messages=30,
     )
 
 
@@ -454,6 +455,7 @@ class TestGraphFactoryForwardsResolvedReasoning:
             llm_only_talk_graph_chat_model="gemma4:12b",
             llm_only_talk_graph_chat_temperature=0.5,
             llm_only_talk_graph_chat_reasoning=graph_value,
+            llm_only_talk_history_max_messages=30,
         )
 
     @pytest.mark.parametrize(

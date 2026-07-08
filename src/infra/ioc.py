@@ -326,6 +326,11 @@ def get_only_talk_graph() -> OnlyTalkGraph:
             get_session_history=_get_session_history_factory(),
             provider=settings.llm_provider_type,
             image_store=get_image_store(),
+            history_max_messages=(
+                settings.llm_only_talk_history_max_messages
+                if settings.llm_only_talk_history_max_messages > 0
+                else None
+            ),
         )
     return _repo_cache[cache_key]
 
