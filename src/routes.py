@@ -155,6 +155,14 @@ def user_memory_clear(
     svc.clear_by_user(user_id=id)
 
 
+@router.delete("/user/{id}/chat-history", tags=["User Chat History"])
+def user_chat_history_reset(
+    id: str,
+    llm_app_service: LlmAppService = Depends(get_llm_app_service),
+) -> None:
+    llm_app_service.reset_context(user_id=id)
+
+
 # =====================================
 # Shopping List Routes
 # =====================================

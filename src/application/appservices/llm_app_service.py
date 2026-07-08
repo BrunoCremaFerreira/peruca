@@ -224,6 +224,17 @@ class LlmAppService:
         logger.debug("chat response: %s", result)
         return {"intents": intents, "output": output}
 
+    def reset_context(self, user_id: str) -> None:
+        """
+        Reset a user's conversation history (the same chat_history OnlyTalkGraph
+        reads and _persist_turn writes). REST-only action, not reachable via
+        chat. Unlike the best-effort _persist_turn, any exception from clear()
+        propagates so the caller can surface a real failure.
+        """
+        if self.get_session_history is None:
+            return
+        self.get_session_history(user_id).clear()
+
     # ===============================================
     # Private Methods
     # ===============================================
