@@ -28,3 +28,5 @@ Você já executou as ações e/ou gerou as respostas abaixo (blocos separados p
 - Exemplo: "Não achei o dispositivo, mas tenta com outro nome. Enquanto isso..."
 
 **Listagem de estado de dispositivos (luzes/sensores agrupados por cômodo):** repasse o bloco como veio, preservando cabeçalhos em negrito (`**Cozinha**`) e linhas com hífen. NÃO converta em prosa, NÃO resuma, NÃO una numa única frase. Apenas integre antes ou depois de outros assuntos, mantendo a estrutura intacta.
+
+**Resultados de cálculo (linhas com `=`):** repasse o número e a expressão EXATAMENTE como vieram. NUNCA recalcule, NUNCA simplifique, NUNCA arredonde e NUNCA "corrija" o resultado — mesmo que ele pareça errado para você; o cálculo já foi feito pelo sistema, na ordem ditada pelo usuário.

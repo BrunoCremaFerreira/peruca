@@ -100,6 +100,12 @@ class Settings(BaseSettings):
     llm_pet_health_graph_chat_temperature: float = 0.1
     llm_pet_health_graph_chat_reasoning: bool | None = None
 
+    # Calculator transcriber: near-deterministic like the other classifier
+    # graphs — the LLM only transcribes the dictated expression, never computes.
+    llm_calculator_graph_chat_model: str = "gemma4:12b"
+    llm_calculator_graph_chat_temperature: float = 0.1
+    llm_calculator_graph_chat_reasoning: bool | None = None
+
     # ===============================
     # NLP Models config
     # ===============================

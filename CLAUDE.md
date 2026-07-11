@@ -134,6 +134,7 @@ MUSIC_ASSISTANT_TOKEN=
 LLM_MUSIC_GRAPH_CHAT_MODEL=gemma4:12b
 LLM_VEHICLE_MAINTENANCE_GRAPH_CHAT_MODEL=gemma4:12b
 LLM_PET_HEALTH_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_CALCULATOR_GRAPH_CHAT_MODEL=gemma4:12b
 MAINTENANCE_FLOW_TTL_SECONDS=600                # TTL for the pending multi-turn maintenance flow AND the pet-health flow (shared; it is the flow mechanism's TTL, not a per-domain one) / focused record
 PERUCA_API_KEY=                                 # X-API-Key required on every route except /health; empty = migration mode (open, logs a warning)
 PERUCA_DB_CONNECTION_STRING=<path>/peruca.db
@@ -178,6 +179,7 @@ LlmAppService.chat()                           ← loads user memories; probes M
               ├─► MusicGraph.invoke()          ← Music Assistant control (optional; only wired when MA is configured)
               ├─► VehicleMaintenanceGraph.invoke() ← vehicle maintenance records (LLM call); vehicle CRUD is REST-only
               ├─► PetHealthGraph.invoke()      ← pet vaccines/health events (LLM call); pet CRUD is REST-only
+              ├─► CalculatorGraph.invoke()     ← sequential/scientific/symbolic math (LLM only transcribes; Decimal + SymPy compute)
               ├─► OnlyTalkGraph.invoke()        ← free conversation (chain, not StateGraph); pets are injected as "siblings" via context_hints
               └─► [final_response]              ← merges multiple outputs (LLM call #2, if needed)
 

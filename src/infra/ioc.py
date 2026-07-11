@@ -19,6 +19,7 @@ from application.graphs.smart_home_sensors_graph import SmartHomeSensorsGraph
 from application.graphs.smart_home_cameras_graph import SmartHomeCamerasGraph
 from application.graphs.vehicle_maintenance_graph import VehicleMaintenanceGraph
 from application.graphs.pet_health_graph import PetHealthGraph
+from application.graphs.calculator_graph import CalculatorGraph
 from domain.interfaces.data_repository import (
     ContextRepository,
     ImageStore,
@@ -29,6 +30,7 @@ from domain.interfaces.data_repository import (
     UserRepository,
 )
 from domain.interfaces.music_repository import MusicRepository
+from domain.interfaces.symbolic_math_engine import SymbolicMathEngine
 from domain.interfaces.smart_home_repository import (
     SmartHomeLightRepository,
     SmartHomeClimateRepository,
@@ -51,6 +53,7 @@ from domain.services.pet_health_flow_service import PetHealthFlowService
 from domain.services.pet_health_service import PetHealthService
 from domain.services.pet_service import PetService
 from domain.services.shopping_list_service import ShoppingListService
+from domain.services.symbolic_math_service import SymbolicMathService
 from domain.services.vehicle_service import VehicleService
 from domain.services.smart_home_service import SmartHomeService
 from domain.services.user_memory_service import UserMemoryService
@@ -96,6 +99,7 @@ from infra.data.sqlite.sqlite_user_memory_repository import (
 from infra.data.sqlite.sqlite_user_repository import SqliteUserRepository
 from infra.data.read_only_vehicle_repository import ReadOnlyVehicleRepository
 from infra.data.read_only_pet_repository import ReadOnlyPetRepository
+from infra.math.sympy_symbolic_math_engine import SympySymbolicMathEngine
 from infra.data.sqlite.sqlite_vehicle_repository import SqliteVehicleRepository
 from infra.data.sqlite.sqlite_maintenance_record_repository import (
     SqliteMaintenanceRecordRepository,
@@ -164,6 +168,7 @@ def get_main_graph() -> MainGraph:
         music_graph = get_music_graph()
         vehicle_maintenance_graph = get_vehicle_maintenance_graph()
         pet_health_graph = get_pet_health_graph()
+        calculator_graph = get_calculator_graph()
 
         _repo_cache[cache_key] = MainGraph(
             llm_chat=llm_chat,
@@ -176,6 +181,7 @@ def get_main_graph() -> MainGraph:
             music_graph=music_graph,
             vehicle_maintenance_graph=vehicle_maintenance_graph,
             pet_health_graph=pet_health_graph,
+            calculator_graph=calculator_graph,
             provider=settings.llm_provider_type,
             strip_think_directive=settings.llm_strip_think_directive,
         )
@@ -236,6 +242,45 @@ def get_pet_health_graph() -> PetHealthGraph:
             pet_health_service=get_pet_health_service(),
             pet_health_flow_service=get_pet_health_flow_service(),
             get_session_history=_get_session_history_factory(),
+            provider=settings.llm_provider_type,
+            strip_think_directive=settings.llm_strip_think_directive,
+        )
+    return _repo_cache[cache_key]
+
+
+def get_symbolic_math_engine() -> SymbolicMathEngine:
+    """
+    IOC for the CAS engine behind the SymbolicMathEngine port (SymPy adapter,
+    process-isolated execution with timeout).
+    """
+
+    cache_key = ("engine", "symbolic_math")
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = SympySymbolicMathEngine()
+    return _repo_cache[cache_key]
+
+
+def get_calculator_graph() -> CalculatorGraph:
+    """
+    IOC for Calculator Graph. The LLM only transcribes expressions; numeric
+    math runs in calculator_service and symbolic math behind the CAS port.
+    """
+
+    settings = _get_settings()
+
+    cache_key = ("graph", "calculator")
+    if cache_key not in _repo_cache:
+        llm_chat = get_llm_chat(
+            model=settings.llm_calculator_graph_chat_model,
+            temperature=settings.llm_calculator_graph_chat_temperature,
+            reasoning=_resolve_reasoning(
+                settings.llm_calculator_graph_chat_reasoning
+            ),
+        )
+
+        _repo_cache[cache_key] = CalculatorGraph(
+            llm_chat=llm_chat,
+            symbolic_math_service=SymbolicMathService(get_symbolic_math_engine()),
             provider=settings.llm_provider_type,
             strip_think_directive=settings.llm_strip_think_directive,
         )

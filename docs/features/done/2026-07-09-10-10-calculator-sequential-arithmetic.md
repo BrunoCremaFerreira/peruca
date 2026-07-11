@@ -1,12 +1,14 @@
 # Plano: Calculadora Sequencial e Científica via Chat (Calculator Graph)
 
-- **Status:** todo
+- **Status:** done
 - **Criado em:** 2026-07-09 10:10
 - **Atualizado em:** 2026-07-10 (extensão: raiz quadrada, logaritmos, percentual,
   potência e cálculo simbólico — integrais, derivadas, gradientes, limites)
-- **Implementado em:** —
-- **PR/commit:** —
-- **Branch (a criar quando o plano for aprovado):** `feature/calculator-graph`
+- **Implementado em:** 2026-07-11 (TDD: 115 testes unitários novos, suíte com
+  1587 verdes; 21 testes de integração passando contra Ollama vivo, zero frases
+  em `AMBIGUOUS_EXCLUDED`)
+- **PR/commit:** — (sem commit ainda; aguardando solicitação do usuário)
+- **Branch:** `feature/calculator-graph`
 - **Consultorias realizadas (obrigatórias):** `arquiteto`, `especialista-de-prompt`,
   `programador-tester` — rodada 1 (2026-07-09, calculadora sequencial) e rodada 2
   (2026-07-10, extensão científica/simbólica)

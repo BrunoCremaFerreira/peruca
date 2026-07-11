@@ -24,6 +24,9 @@ langchain-community==0.4.2
 aiohttp==3.13.5
 websockets==16.0
 
+# Math (symbolic engine behind the SymbolicMathEngine port)
+sympy>=1.13,<2
+
 # NLP
 spacy==3.8.14
 unidecode==1.4.0

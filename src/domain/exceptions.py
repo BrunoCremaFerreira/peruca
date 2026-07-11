@@ -30,3 +30,28 @@ class EmptyParamValidationError(ValidationError):
         super().__init__(
             errors=[f"Param '{param_name}' is null or empty"], status_code=400
         )
+
+
+class DivisionByZeroError(ValidationError):
+    """
+    Division by zero in a user-dictated calculation.
+    """
+
+
+class MathDomainError(ValidationError):
+    """
+    Operation outside the mathematical domain (sqrt of a negative, log of
+    zero/negative, log base 1, 0 ** 0, divergent limit, zoo/nan results).
+    """
+
+
+class NoClosedFormError(ValidationError):
+    """
+    Symbolic integral (or similar) with no closed-form solution.
+    """
+
+
+class CalculationTimeoutError(ValidationError):
+    """
+    Symbolic calculation exceeded the engine timeout and was aborted.
+    """

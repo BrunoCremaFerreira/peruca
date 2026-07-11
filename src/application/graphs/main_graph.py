@@ -7,7 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from typing import Optional, TypedDict
 from langchain_core.language_models.chat_models import BaseChatModel
 from application.graphs.graph import Graph
-from application.graphs.markers import SHOPPING_LIST_HEADER
+from application.graphs.markers import CALCULATOR_RESULT_HEADER, SHOPPING_LIST_HEADER
 from application.graphs.only_talk_graph import OnlyTalkGraph
 from application.graphs.shopping_list_graph import ShoppingListGraph
 from application.graphs.smart_home_lights_graph import SmartHomeLightsGraph
@@ -33,6 +33,7 @@ class MainGraphState(TypedDict):
     output_music: Optional[str]
     output_vehicle: Optional[str]
     output_pet: Optional[str]
+    output_calculator: Optional[str]
     output: Optional[str]
     # Side channel: the factual image description produced by the only_talk
     # graph. Consumed by LlmAppService for history persistence; deliberately
@@ -56,6 +57,7 @@ class MainGraph(Graph):
         music_graph=None,
         vehicle_maintenance_graph=None,
         pet_health_graph=None,
+        calculator_graph=None,
         provider: str = "OLLAMA",
         strip_think_directive: bool = False,
     ):
@@ -70,6 +72,7 @@ class MainGraph(Graph):
         self.music_graph = music_graph
         self.vehicle_maintenance_graph = vehicle_maintenance_graph
         self.pet_health_graph = pet_health_graph
+        self.calculator_graph = calculator_graph
         self.classification_prompt = ChatPromptTemplate.from_template(
             self.load_prompt("main_graph.md")
         )
@@ -156,6 +159,19 @@ class MainGraph(Graph):
             return {"output_pet": self._remove_thinking_tag(output or "")}
         return {"output_pet": result.get("output")}
 
+    def _handle_calculator(self, data):
+        logger.info("calculator graph triggered")
+        result = self.calculator_graph.invoke(invoke_request=data["input"])
+        # Main-classifier false positive: the sub-classifier found no actionable
+        # calculation. Degrade to free conversation instead of replying
+        # "I did not understand" (mirrors _handle_pet_health).
+        if result.get("intent") == ["not_recognized"]:
+            logger.info("calculator not_recognized — falling back to only_talk")
+            fallback = self.only_talk_graph.invoke(invoke_request=data["input"])
+            output = fallback.get("output") if isinstance(fallback, dict) else fallback
+            return {"output_calculator": self._remove_thinking_tag(output or "")}
+        return {"output_calculator": result.get("output")}
+
     def _handle_final_response(self, data):
         output_shopping = data.get("output_shopping")
         listing = (
@@ -167,6 +183,20 @@ class MainGraph(Graph):
         )
 
         mergeable_shopping = None if listing else output_shopping
+
+        # Same bypass for calculator results: the LLM merge could "recalculate"
+        # the number (applying precedence) or "simplify" a symbolic result,
+        # undoing the feature's guarantee through the back door (plan §7).
+        output_calculator = data.get("output_calculator")
+        calculator_result = (
+            output_calculator
+            if output_calculator
+            and output_calculator.strip()
+            and CALCULATOR_RESULT_HEADER in output_calculator
+            else None
+        )
+
+        mergeable_calculator = None if calculator_result else output_calculator
 
         outputs = [
             e
@@ -180,6 +210,7 @@ class MainGraph(Graph):
                 data.get("output_music"),
                 data.get("output_vehicle"),
                 data.get("output_pet"),
+                mergeable_calculator,
             ]
             if e is not None and e.strip()
         ]
@@ -196,13 +227,16 @@ class MainGraph(Graph):
             if not merged or not merged.strip():
                 merged = "\n\n".join(outputs)
 
-        # A verbatim listing is bypassed from the LLM (the model can never
-        # rewrite its bytes), but any legitimate merged conversational content
-        # is still appended after it so nothing the user asked for is dropped.
-        if listing and merged and merged.strip():
-            response = f"{listing}\n\n{merged}"
-        elif listing:
-            response = listing
+        # Verbatim fragments (listing, calculator result) are bypassed from the
+        # LLM (the model can never rewrite their bytes), but any legitimate
+        # merged conversational content is still appended after them so nothing
+        # the user asked for is dropped.
+        verbatim_parts = [part for part in (listing, calculator_result) if part]
+        verbatim = "\n\n".join(verbatim_parts)
+        if verbatim and merged and merged.strip():
+            response = f"{verbatim}\n\n{merged}"
+        elif verbatim:
+            response = verbatim
         else:
             response = merged
 
@@ -304,6 +338,10 @@ class MainGraph(Graph):
                 RunnableLambda(self._handle_pet_health),
             )
             action_nodes.append("pet_health")
+
+        # Calculator has no external dependency: wired unconditionally.
+        workflow.add_node("calculator", RunnableLambda(self._handle_calculator))
+        action_nodes.append("calculator")
 
         workflow.add_node("final_response", RunnableLambda(self._handle_final_response))
         workflow.add_edge(START, "classify")

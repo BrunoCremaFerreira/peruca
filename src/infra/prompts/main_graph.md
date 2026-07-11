@@ -25,6 +25,7 @@ Você deve classificar a entrada em **uma ou mais** das seguintes categorias:
 - "music" → quando o usuário quer **controlar a reprodução de música ou saber o que está tocando**: tocar uma música, artista, álbum ou playlist; pausar, parar, retomar; pular faixa (próxima/anterior); ajustar o volume da música; ou perguntar o que está tocando.
 - "vehicle_maintenance" → quando o usuário quer **AGIR sobre a manutenção dos veículos cadastrados**: registrar uma manutenção realizada (troca de óleo, pneus, peças, fluidos, rodízio, revisão), consultar o histórico de manutenções, editar/apagar um registro, listar seus veículos, ou tentar cadastrar/editar/excluir um VEÍCULO.
 - "pet_health" → quando o usuário quer **AGIR sobre a saúde dos pets cadastrados**: registrar uma vacina, vermífugo, antipulgas, remédio ou consulta veterinária realizada, consultar o histórico de vacinas/saúde de um pet, apagar/editar um registro de saúde, listar seus pets, ou tentar cadastrar/editar/excluir um PET.
+- "calculator" → quando a mensagem contém uma **expressão matemática concreta a ser resolvida** — operandos numéricos ("10 mais 5", "10% de 200", "raiz de 144") **ou simbólicos com variáveis matemáticas** como x, y, ômega ("derivada de x ao cubo", "integral de cosseno de x", "simplifica x mais x") — acompanhada de um **pedido de resolução** ("quanto é/dá", "calcule", "derive", "integre", "simplifique"). Perguntas **conceituais** sobre matemática e usos **figurados** de termos matemáticos NÃO são `calculator`.
 - "only_talking" → quando o usuário está **apenas comentando, conversando, contando histórias ou fazendo observações**, sem pedir nenhuma ação prática.
 
 ⚠️ **Instruções importantes**:
@@ -62,6 +63,13 @@ Você deve classificar a entrada em **uma ou mais** das seguintes categorias:
     - Perguntas hipotéticas ou de conhecimento geral ("cachorro pode tomar dipirona?", "de quanto em quanto tempo se dá vermífugo?") → `["only_talking"]`. Pergunta hipotética não é consulta ao histórico registrado.
     - Relato de saúde de um pet que NÃO está no contexto e sem pedido explícito ("o cachorro da vizinha tomou vacina") → `["only_talking"]`.
     - Follow-up curto citando um pet do contexto logo após uma interação de saúde ("E o Caçolão?") → `["pet_health"]`.
+12. **Desambiguação de cálculo**: nem toda frase com números (ou termos matemáticos) é `calculator`. Só é `calculator` quando há uma expressão matemática concreta E um pedido para resolvê-la.
+    - Números que **qualificam itens ou ações de outro domínio** NÃO são cálculo: "soma 3 maçãs na lista" → `["shopping_list"]`; "coloca o volume em 50" → `["music"]`; "coloca o ar em 22 graus" / "aumenta a temperatura em 2 graus" → `["smart_home_climate"]`; "troquei o óleo com 100232 km" → `["vehicle_maintenance"]`.
+    - Perguntas de **conhecimento/preço**, sem expressão a resolver ("quanto custa a revisão?") → `["only_talking"]`.
+    - Perguntas **conceituais** sobre matemática ("o que é uma integral? me explica") → `["only_talking"]` — não há expressão a resolver.
+    - Sentido **figurado** de termos matemáticos ("qual a raiz do problema?", "meu limite de cartão é 5000") → `["only_talking"]`.
+    - **Comentários** sem pedido de resolução ("derivada segunda é muito difícil, né?", "o preço da gasolina subiu 10 por cento") → `["only_talking"]`.
+    - **Problemas em linguagem natural** que exigem interpretação ("tinha 150, gastei 30, quanto sobrou?") → `["only_talking"]` — só é `calculator` quando a expressão já vem ditada ("150 menos 30").
 
 📌 **Formato de saída obrigatório**: uma lista Python com as categorias detectadas. Exemplo:  
 `["only_talking"]`  
@@ -73,6 +81,7 @@ Você deve classificar a entrada em **uma ou mais** das seguintes categorias:
 `["music"]`
 `["vehicle_maintenance"]`
 `["pet_health"]`
+`["calculator"]`
 
 ⚠️ **Importante**: Retorne APENAS a lista Python, sem texto antes ou depois, sem bloco de código markdown, sem explicação.
 
