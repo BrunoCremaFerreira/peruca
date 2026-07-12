@@ -16,6 +16,18 @@ The **only** exception is `infra/prompts/` — prompt files may be written in an
 
 **Claude Code must never create a git commit automatically.** Commits are only allowed when the user explicitly requests one. This rule applies to all agents, skills, and workflows — no automatic commit at the end of a feature implementation, test run, or any other automated step.
 
+## Feature Branches — One per Plan
+
+**Every plan implementation must, by default, happen on its own feature branch created from `development`.** Never implement a plan directly on `development` or `main`.
+
+Before writing any code for a plan:
+
+1. Make sure `development` is checked out and up to date.
+2. Create the branch off `development` using the pattern `feature/{plan_name}` — the same kebab-case `plan_name` used in the plan filename (e.g. plan `2026-07-04-01-51-shopping-list-fuzzy-remove-disambiguation.md` → branch `feature/shopping-list-fuzzy-remove-disambiguation`).
+3. Do all the implementation work for that plan on this branch.
+
+The only exception is when the user explicitly asks for the work to be done on the current branch. This rule does not change the "Git Commits — Never Automatic" rule: creating the branch is automatic, committing to it is not.
+
 ## Test-Driven Development (TDD) — Mandatory
 
 **TDD must always be followed for every code change, without exception.** The cycle is strictly:
