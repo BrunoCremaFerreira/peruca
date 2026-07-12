@@ -1,14 +1,19 @@
+import logging
 import re
 from typing import Callable, Optional
 
+from application.appservices.prompt_sanitizer import sanitize_summary_for_prompt
 from application.graphs.graph import Graph
 from domain.entities import GraphInvokeRequest
-from domain.interfaces.data_repository import ImageStore
+from domain.interfaces.data_repository import ConversationContextStore, ImageStore
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.messages import HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from datetime import datetime
+
+
+logger = logging.getLogger(__name__)
 
 
 # Sentinel that separates the user-facing answer from the factual image
@@ -53,6 +58,16 @@ _IMAGE_REVISION_DIRECTIVE = (
     "pedido. Se a descrição já basta, responda direto e NÃO emita essa linha."
 )
 
+# The compaction summary is injected as a history message under the same bracket
+# convention as "[Imagem #N enviada pelo usuário: ...]" — never in the system
+# prompt, which would promote user-derived text to a trusted role.
+_SUMMARY_MESSAGE_TEMPLATE = "[Resumo da conversa anterior: {summary}]"
+
+# Image references as they appear in the raw history and in the summary
+# (infra/prompts/context_summary_graph.md emits the bare "Imagem #N" form).
+_HISTORY_IMAGE_MARKER = "[Imagem #"
+_SUMMARY_IMAGE_MARKER = "Imagem #"
+
 
 class OnlyTalkGraph(Graph):
     """
@@ -66,6 +81,7 @@ class OnlyTalkGraph(Graph):
         provider: str = "OLLAMA",
         image_store: Optional[ImageStore] = None,
         history_max_messages: Optional[int] = None,
+        conversation_context_store: Optional[ConversationContextStore] = None,
     ):
         super().__init__(provider)
         self.llm_chat = llm_chat
@@ -76,6 +92,9 @@ class OnlyTalkGraph(Graph):
         # room for generation — the model then stops mid-sentence
         # (done_reason=length). None keeps the full history (legacy behavior).
         self._history_max_messages = history_max_messages
+        # Optional: holds the summary of the turns the window would have dropped.
+        # None keeps the legacy behavior (window only, older turns forgotten).
+        self._conversation_context_store = conversation_context_store
 
     def invoke(self, invoke_request: GraphInvokeRequest) -> dict:
         user = invoke_request.user
@@ -88,9 +107,26 @@ class OnlyTalkGraph(Graph):
             and len(history_messages) > self._history_max_messages
         ):
             history_messages = history_messages[-self._history_max_messages:]
-        has_prior_image = self._image_store is not None and any(
-            "[Imagem #" in str(getattr(m, "content", "")) for m in history_messages
+
+        # Read AFTER the windowing: the summary stands for the turns the window
+        # dropped, so it must not consume one of its slots.
+        summary = self._read_summary(user.id)
+
+        has_prior_image = self._image_store is not None and (
+            any(
+                _HISTORY_IMAGE_MARKER in str(getattr(m, "content", ""))
+                for m in history_messages
+            )
+            # The summarizer emits the marker WITHOUT the bracket
+            # ("- Imagem #1: ..."), so scanning the summary for the bare form
+            # also catches a model that echoed the raw bracketed line.
+            or (summary is not None and _SUMMARY_IMAGE_MARKER in summary)
         )
+
+        if summary is not None:
+            history_messages = [
+                HumanMessage(content=_SUMMARY_MESSAGE_TEMPLATE.format(summary=summary))
+            ] + list(history_messages)
 
         base_system = self._format_system(invoke_request)
 
@@ -145,6 +181,31 @@ class OnlyTalkGraph(Graph):
     # ===============================================
     # Private Methods
     # ===============================================
+
+    def _read_summary(self, user_id: str) -> Optional[str]:
+        """
+        The compaction summary of this user's older turns, or None when there is
+        no store, no summary yet, or the store is unreachable. Fail-safe by
+        design: a broken store degrades the turn to today's behavior (window
+        only), never to a failed answer.
+
+        The text is sanitized HERE, before it is returned, so the prepended
+        message and the re-vision gate both see the same sanitized string. The
+        cache is not a trust boundary: only the write path validated this text,
+        and anything able to write the summary key could otherwise forge history
+        lines or sentinels straight into the prompt.
+        """
+        if self._conversation_context_store is None:
+            return None
+        try:
+            record = self._conversation_context_store.get_summary(user_id)
+        except Exception as e:
+            logger.warning("Could not read the conversation summary: %s", e)
+            return None
+        if not record:
+            return None
+        summary = sanitize_summary_for_prompt(record.get("summary"))
+        return summary or None
 
     def _format_system(self, invoke_request: GraphInvokeRequest) -> str:
         user = invoke_request.user

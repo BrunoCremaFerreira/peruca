@@ -111,6 +111,10 @@ def _clear_history_keys(connection_string: str) -> None:
     try:
         for pattern in (
             "chat_history:*",
+            # The compaction summary lives in its own key next to the history;
+            # leaving it behind would leak a summary into the next test, which
+            # OnlyTalkGraph would happily prepend to a "fresh" conversation.
+            "chat_summary:*",
             "image:*",
             "image_ids:*",
             "image_seq:*",

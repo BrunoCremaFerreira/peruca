@@ -1,5 +1,8 @@
 from typing import List
 from fastapi import APIRouter, BackgroundTasks, Depends
+from application.appservices.context_compaction_app_service import (
+    ContextCompactionAppService,
+)
 from application.appservices.llm_app_service import LlmAppService
 from application.appservices.memory_app_service import MemoryAppService
 from application.appservices.shopping_list_app_service import ShoppingListAppService
@@ -32,6 +35,7 @@ from domain.commands import (
 )
 from domain.entities import SmartHomeEntityAlias
 from infra.ioc import (
+    get_context_compaction_app_service,
     get_llm_app_service,
     get_memory_app_service,
     get_pet_app_service,
@@ -66,14 +70,23 @@ def chat(
     background_tasks: BackgroundTasks,
     llm_app_service: LlmAppService = Depends(get_llm_app_service),
     memory_app_service: MemoryAppService = Depends(get_memory_app_service),
+    context_compaction_app_service: ContextCompactionAppService = Depends(
+        get_context_compaction_app_service
+    ),
 ) -> ChatResponse:
     result = llm_app_service.chat(request)
     output = result["output"] if isinstance(result, dict) else result
+    # Durable-memory extraction runs FIRST: it reads the turn that was just
+    # persisted, while compaction may rewrite the head of the history.
     background_tasks.add_task(
         memory_app_service.learn_from_message,
         request.external_user_id,
         request.message,
         output,
+    )
+    background_tasks.add_task(
+        context_compaction_app_service.compact_if_needed,
+        request.external_user_id,
     )
     response = ChatResponse(
         response=output,

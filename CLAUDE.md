@@ -147,12 +147,25 @@ LLM_MUSIC_GRAPH_CHAT_MODEL=gemma4:12b
 LLM_VEHICLE_MAINTENANCE_GRAPH_CHAT_MODEL=gemma4:12b
 LLM_PET_HEALTH_GRAPH_CHAT_MODEL=gemma4:12b
 LLM_CALCULATOR_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_CONTEXT_SUMMARY_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_CONTEXT_SUMMARY_GRAPH_CHAT_TEMPERATURE=0.2  # fidelity over creativity (0.1 makes the 12b telegraphic on long text)
 MAINTENANCE_FLOW_TTL_SECONDS=600                # TTL for the pending multi-turn maintenance flow AND the pet-health flow (shared; it is the flow mechanism's TTL, not a per-domain one) / focused record
 PERUCA_API_KEY=                                 # X-API-Key required on every route except /health; empty = migration mode (open, logs a warning)
 PERUCA_DB_CONNECTION_STRING=<path>/peruca.db
 CACHE_DB_CONNECTION_STRING=<redis-url>          # Redis for conversation history; if empty, falls back to in-memory store
-CHAT_HISTORY_TTL_SECONDS=                        # empty or <=0 means no expiry
+CHAT_HISTORY_TTL_SECONDS=                        # empty or <=0 means no expiry; the compaction summary shares this TTL and is renewed every turn
+CHAT_COMPACTION_ENABLED=true                     # background summarization of the old part of a long conversation
+CHAT_COMPACTION_TRIGGER_MESSAGES=30              # fires when the history reaches this many messages
+CHAT_COMPACTION_TRIGGER_CHARS=24000              # secondary trigger (~6k tokens), whichever comes first
+CHAT_COMPACTION_KEEP_TAIL_MESSAGES=16            # recent messages kept verbatim (8 turns; even = turn boundary)
+CHAT_COMPACTION_MAX_SUMMARY_CHARS=2500           # summary cap, truncated at a whole-bullet boundary
 ```
+
+**Single worker required.** The compaction swap is guarded by in-process
+`threading` locks (`infra/user_lock_registry.py`), so the API must run with one
+worker. With multiple workers a compaction in one worker can overwrite turns
+appended by another (silent history loss). Moving the swap to a Redis Lua script
+is the prerequisite for multi-worker.
 
 ## Architecture
 
@@ -195,8 +208,9 @@ LlmAppService.chat()                           ← loads user memories; probes M
               ├─► OnlyTalkGraph.invoke()        ← free conversation (chain, not StateGraph); pets are injected as "siblings" via context_hints
               └─► [final_response]              ← merges multiple outputs (LLM call #2, if needed)
 
-# After the response, as a FastAPI BackgroundTask:
+# After the response, as FastAPI BackgroundTasks (in this order):
 MemoryAppService.learn_from_message() ─► MemoryGraph.invoke()   ← extracts durable facts → SQLite
+ContextCompactionAppService.compact_if_needed() ─► ContextSummaryGraph.invoke()  ← summarizes the OLD turns → Redis
 ```
 
 All graphs inherit from `Graph` (ABC at `application/graphs/graph.py`) and implement `invoke(GraphInvokeRequest) -> dict`. `GraphInvokeRequest` carries `message: str`, `user: User`, `memories: list[str]`, and `context_hints: dict` (e.g. `music_is_playing`) through the whole chain. `LlmAppService.chat()` returns `{"intents": [...], "output": "..."}`, not a bare string.
@@ -253,6 +267,53 @@ Lets the user register/query/edit/remove **health events** (vaccines, dewormers,
 - **REST-only writes, enforced structurally (ISP)**: `PetReadRepository` vs `PetRepository` in `domain/interfaces/pet_repository.py`; the chat path (graph, `PetHealthService`, `LlmAppService`) gets `ReadOnlyPetRepository` (`infra/data/read_only_pet_repository.py`), which physically lacks writes. Full repo reserved for `PetAppService` (`/pet` routes). Chat write attempts hit `pet_write_forbidden` → same fixed reply.
 - **Multi-turn slot-filling + focused record + the "tomou mais alguma?" loop**: `PetHealthFlowService` collects `pet → event_name → date`; after a **vaccine** registers via the flow it arms a `register_more` operation so the next reply ("sim, a raiva" registers another; "só esta"/"não" ends). All deterministic (no LLM), short-circuited in `LlmAppService` before `MainGraph`, dispatched by `flow_domain`. Reuses the `MAINTENANCE_FLOW_TTL_SECONDS` TTL.
 - **Dynamic persona (§2.9)**: the pets registered by the user are injected into the `OnlyTalkGraph` system prompt as Peruca's "siblings" via `context_hints["user_pets_persona"]` (the old hardcoded Caçolin/Caçolão block was removed from `only_talk_graph.md`). `MemoryGraph` was told not to re-extract dated pet-health events as durable memories.
+
+### Chat Context Compaction
+
+Keeps a long conversation from forgetting how it started. `OnlyTalkGraph` windows
+the history to the last `llm_only_talk_history_max_messages` (30) messages;
+anything past that used to be dropped. Now a background task summarizes the
+**old** part and the graph reads `[summary + recent tail]` instead.
+
+- **Off the request path**: `ContextCompactionAppService.compact_if_needed()` is a
+  second `BackgroundTask` on `/llm/chat` (after `learn_from_message`). It mirrors
+  `MemoryAppService`: synchronous, whole body in try/except, never propagates. Its
+  gate is a cheap early-exit (one read + a `len()`), so the common turn pays ~nothing.
+- **`ContextSummaryGraph`** (`context_summary_graph.md`) is a plain `prompt | llm`
+  chain (no `StateGraph`), like `OnlyTalkGraph`/`MemoryGraph`. Output is **markdown
+  with fixed `###` headers, not JSON** — the consumer is another prompt, not a
+  parser. The graph is the **sole owner of output validation**: empty → `None`;
+  does not start with `###` → `None` (catches "Claro! Aqui está o resumo:" and
+  in-persona answers); over the cap → truncated at a **whole-bullet** boundary.
+  Invalid output is discarded silently and retried on the next trigger.
+- **Storage**: a separate key `chat_summary:{user_id}` (JSON: `summary`, `covers`,
+  `updated_at`), sharing `chat_history`'s TTL, renewed on every turn. The summary is
+  **not** put inside the `chat_history` array — the window takes the *last* N, so it
+  would be sliced off, and the serializer round-trips an unknown type as
+  `HumanMessage`.
+- **Presentation**: injected as a `HumanMessage` `[Resumo da conversa anterior: ...]`
+  at position 0 **after** the windowing (so it costs no window slot), never in the
+  system prompt — putting user-derived text into the `system` role would be a
+  prompt-injection privilege escalation. On the read path it goes through
+  `sanitize_summary_for_prompt` (`prompt_sanitizer.py`), which — unlike
+  `sanitize_for_prompt` — **preserves newlines** (the bullets are the format) while
+  neutralizing `[`/`]` and `<<<...>>>` sentinels, so a summary can never forge an
+  `[Imagem #N ...]` line or a `<<<DESC_IMAGEM>>>` marker. `Imagem #N` *bare*
+  survives on purpose: that is what keeps `has_prior_image` (the re-vision gate) working.
+- **Concurrency — verify-before-swap (logical CAS)**: `_persist_turn` is
+  append-only, so the prefix being summarized is immutable except by
+  `reset_context` or another compaction. The app service snapshots
+  `(count, conversation_digest(prefix))` **before** the LLM call; `apply_compaction`
+  re-reads under a per-user lock and swaps only if they still match. The LLM call
+  (seconds) runs **outside** the lock; the lock is held for microseconds. A mismatch
+  aborts and discards — the failure mode is always "did not compact yet", never
+  "lost history". `UserLockRegistry` (`infra/user_lock_registry.py`) is shared by
+  the store, `RedisChatMessageHistory` and `LockedInMemoryChatMessageHistory`, so
+  the in-memory fallback is guarded too (a raw `InMemoryChatMessageHistory` takes no
+  lock and would lose a turn appended mid-swap).
+- `conversation_digest` lives in `domain/services/` — it defines the semantics of
+  the `expected_digest` parameter that the `ConversationContextStore` ABC (a domain
+  port) publishes, and both application and infra must compute it identically.
 
 ### API Authentication
 

@@ -11,7 +11,11 @@ from application.appservices.view_models import ChatRequest
 from application.graphs.main_graph import MainGraph
 from domain.entities import GraphInvokeRequest, User
 from domain.exceptions import EmptyParamValidationError, NofFoundValidationError
-from domain.interfaces.data_repository import ContextRepository, UserRepository
+from domain.interfaces.data_repository import (
+    ContextRepository,
+    ConversationContextStore,
+    UserRepository,
+)
 from domain.services.user_memory_service import UserMemoryService
 from domain.validations.image_validation import ImageValidator
 from infra.utils import is_null_or_whitespace
@@ -54,8 +58,10 @@ class LlmAppService:
         chat_image_max_bytes: int = 5_242_880,
         chat_image_max_count: int = 4,
         chat_image_allowed_mimes: Optional[list[str]] = None,
+        conversation_context_store: Optional[ConversationContextStore] = None,
     ) -> None:
         self.main_graph = main_graph
+        self.conversation_context_store = conversation_context_store
         self.context_repository = context_repository
         self.user_repository = user_repository
         self.user_memory_service = user_memory_service
@@ -230,7 +236,15 @@ class LlmAppService:
         reads and _persist_turn writes). REST-only action, not reachable via
         chat. Unlike the best-effort _persist_turn, any exception from clear()
         propagates so the caller can surface a real failure.
+
+        Store-first: the conversation context store owns the history AND the
+        compaction summary, so a single clear() wipes both — clearing only the
+        history would leave Peruca "remembering" a conversation the user asked to
+        erase. A failing store never falls back to a partial reset.
         """
+        if self.conversation_context_store is not None:
+            self.conversation_context_store.clear(user_id)
+            return
         if self.get_session_history is None:
             return
         self.get_session_history(user_id).clear()

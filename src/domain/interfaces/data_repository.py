@@ -211,6 +211,64 @@ class ContextRepository(ABC):
 
 
 # =====================================
+# Conversation Context Store (history + compaction summary)
+# =====================================
+class ConversationContextStore(ABC):
+    """
+    Read/compaction contract over a user's conversation context: the raw chat
+    history and the summary that stands for the turns already compacted away.
+
+    It operates on the SERIALIZED form of the history — [{"type": "human"|"ai",
+    "content": str}] — so the domain stays free of any chat framework type.
+
+    Separate from ContextRepository (a key/value cache) because compaction needs
+    a primitive no key/value store has: swapping a prefix of the history for its
+    summary atomically, and only if that prefix has not changed meanwhile.
+    """
+
+    @abstractmethod
+    def get_summary(self, user_id: str) -> Optional[dict]:
+        """
+        Return {"summary": str, "covers": int, "updated_at": iso} for the turns
+        already compacted away, or None when the user has never been compacted.
+        """
+        pass
+
+    @abstractmethod
+    def read_history(self, user_id: str) -> List[dict]:
+        """
+        Return the raw history as [{"type": "human"|"ai", "content": str}], in
+        order; an empty list when there is none.
+        """
+        pass
+
+    @abstractmethod
+    def apply_compaction(
+        self,
+        user_id: str,
+        expected_count: int,
+        expected_digest: str,
+        summary: str,
+    ) -> bool:
+        """
+        Verify-before-swap: replace the first `expected_count` messages with
+        `summary` and keep the current tail, but only while that prefix still
+        matches `expected_digest` (the caller snapshotted it before a slow LLM
+        call). Return False and change nothing when it no longer matches — a
+        reset or a concurrent compaction got there first.
+        """
+        pass
+
+    @abstractmethod
+    def clear(self, user_id: str) -> None:
+        """
+        Wipe the history AND the summary — a surviving summary would resurrect
+        the context the user just reset.
+        """
+        pass
+
+
+# =====================================
 # Image Store (inbound chat images)
 # =====================================
 class ImageStore(ABC):

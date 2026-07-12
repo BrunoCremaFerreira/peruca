@@ -1,5 +1,8 @@
 from typing import Callable, Optional
 
+from application.appservices.context_compaction_app_service import (
+    ContextCompactionAppService,
+)
 from application.appservices.llm_app_service import LlmAppService
 from application.appservices.memory_app_service import MemoryAppService
 from application.appservices.pet_app_service import PetAppService
@@ -9,6 +12,7 @@ from application.appservices.user_app_service import UserAppService
 from application.appservices.user_memory_app_service import UserMemoryAppService
 from application.appservices.vehicle_app_service import VehicleAppService
 from application.graphs.main_graph import MainGraph
+from application.graphs.context_summary_graph import ContextSummaryGraph
 from application.graphs.memory_graph import MemoryGraph
 from application.graphs.music_graph import MusicGraph
 from application.graphs.only_talk_graph import OnlyTalkGraph
@@ -22,6 +26,7 @@ from application.graphs.pet_health_graph import PetHealthGraph
 from application.graphs.calculator_graph import CalculatorGraph
 from domain.interfaces.data_repository import (
     ContextRepository,
+    ConversationContextStore,
     ImageStore,
     ShoppingListRepository,
     SmartHomeAreaRepository,
@@ -77,11 +82,21 @@ from infra.data.external.smart_home.home_assistant.home_assistant_smart_home_cam
     HomeAssistantSmartHomeCameraRepository,
 )
 from infra.data.cache.in_memory_context_repository import InMemoryContextRepository
+from infra.data.cache.in_memory_conversation_context_store import (
+    InMemoryConversationContextStore,
+)
+from infra.data.cache.locked_in_memory_chat_message_history import (
+    LockedInMemoryChatMessageHistory,
+)
+from infra.user_lock_registry import get_user_lock_registry
+from infra.data.external.redis.redis_conversation_context_store import (
+    RedisConversationContextStore,
+)
 from infra.data.sqlite.context_repository_redis import RedisContextRepository
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.chat_history import BaseChatMessageHistory, InMemoryChatMessageHistory
+from langchain_core.chat_history import BaseChatMessageHistory
 from infra.data.external.redis.redis_chat_message_history import RedisChatMessageHistory
 from infra.data.external.redis.redis_image_store import RedisImageStore
 from infra.data.sqlite.sqlite_shopping_list_repository import (
@@ -308,27 +323,115 @@ def get_memory_graph() -> MemoryGraph:
     return _repo_cache[cache_key]
 
 
-def _get_session_history_factory() -> Callable[[str], BaseChatMessageHistory]:
+def get_context_summary_graph() -> ContextSummaryGraph:
+    """
+    IOC for Context Summary Graph
+    """
+
+    settings = _get_settings()
+
+    cache_key = ("graph", "context_summary")
+    if cache_key not in _repo_cache:
+        llm_chat = get_llm_chat(
+            model=settings.llm_context_summary_graph_chat_model,
+            temperature=settings.llm_context_summary_graph_chat_temperature,
+            reasoning=_resolve_reasoning(
+                settings.llm_context_summary_graph_chat_reasoning
+            ),
+        )
+
+        _repo_cache[cache_key] = ContextSummaryGraph(
+            llm_chat=llm_chat,
+            provider=settings.llm_provider_type,
+            max_summary_chars=settings.chat_compaction_max_summary_chars,
+        )
+    return _repo_cache[cache_key]
+
+
+def _get_session_history_bundle() -> (
+    tuple[
+        Callable[[str], BaseChatMessageHistory],
+        Optional[dict[str, LockedInMemoryChatMessageHistory]],
+    ]
+):
+    """
+    The session-history factory plus, on the in-memory backend, the dict it
+    closes over (None on Redis, where the state lives in Redis itself).
+
+    MEMOIZED: a fresh closure per call would hand every consumer
+    (OnlyTalkGraph, LlmAppService, the compaction store) its OWN in-memory
+    history — the graph would read a history nobody writes, and the compaction
+    would truncate a history nobody reads.
+    """
+
     settings = _get_settings()
     conn_str = settings.cache_db_connection_string
     ttl = settings.chat_history_ttl_seconds
 
-    if not conn_str:
-        _store: dict[str, InMemoryChatMessageHistory] = {}
+    cache_key = ("session_history_factory", conn_str, ttl)
+    if cache_key not in _repo_cache:
+        if not conn_str:
+            history_store: dict[str, LockedInMemoryChatMessageHistory] = {}
+            lock_registry = get_user_lock_registry()
 
-        def _get_in_memory(session_id: str) -> InMemoryChatMessageHistory:
-            if session_id not in _store:
-                _store[session_id] = InMemoryChatMessageHistory()
-            return _store[session_id]
+            def _get_in_memory(session_id: str) -> LockedInMemoryChatMessageHistory:
+                # Double-checked under the user's lock: a plain check-then-set
+                # lets two threads racing on a cold session each build their own
+                # history, and the loser's turn is dropped from the dict — the
+                # very turn nobody would ever read again.
+                history = history_store.get(session_id)
+                if history is not None:
+                    return history
+                with lock_registry.get(session_id):
+                    history = history_store.get(session_id)
+                    if history is None:
+                        history = LockedInMemoryChatMessageHistory(
+                            session_id=session_id, lock_registry=lock_registry
+                        )
+                        history_store[session_id] = history
+                    return history
 
-        return _get_in_memory
+            _repo_cache[cache_key] = (_get_in_memory, history_store)
+        else:
+            context_repo = get_context_repository()
 
-    context_repo = get_context_repository()
+            def _get_redis(session_id: str) -> RedisChatMessageHistory:
+                return RedisChatMessageHistory(session_id, context_repo, ttl)
 
-    def _get_redis(session_id: str) -> RedisChatMessageHistory:
-        return RedisChatMessageHistory(session_id, context_repo, ttl)
+            _repo_cache[cache_key] = (_get_redis, None)
+    return _repo_cache[cache_key]
 
-    return _get_redis
+
+def _get_session_history_factory() -> Callable[[str], BaseChatMessageHistory]:
+    return _get_session_history_bundle()[0]
+
+
+def get_conversation_context_store() -> ConversationContextStore:
+    """
+    IOC for the conversation context store (history + compaction summary).
+
+    Cached as a singleton: the in-memory backend keeps the summaries in its own
+    dict, so a per-request instance would forget every summary it wrote. It also
+    shares the VERY dict the session-history factory closes over, so a compaction
+    truncates the same array OnlyTalkGraph reads back.
+    """
+
+    settings = _get_settings()
+    conn_str = settings.cache_db_connection_string
+
+    cache_key = ("conversation_context_store", conn_str)
+    if cache_key not in _repo_cache:
+        if conn_str:
+            _repo_cache[cache_key] = RedisConversationContextStore(
+                get_context_repository(),
+                ttl_seconds=settings.chat_history_ttl_seconds,
+            )
+        else:
+            _, history_store = _get_session_history_bundle()
+            _repo_cache[cache_key] = InMemoryConversationContextStore(
+                history_store=history_store
+            )
+    return _repo_cache[cache_key]
 
 
 def get_image_store() -> Optional[ImageStore]:
@@ -376,6 +479,7 @@ def get_only_talk_graph() -> OnlyTalkGraph:
                 if settings.llm_only_talk_history_max_messages > 0
                 else None
             ),
+            conversation_context_store=get_conversation_context_store(),
         )
     return _repo_cache[cache_key]
 
@@ -587,6 +691,7 @@ def get_llm_app_service() -> LlmAppService:
         chat_image_max_bytes=settings.chat_image_max_bytes,
         chat_image_max_count=settings.chat_image_max_count,
         chat_image_allowed_mimes=settings.chat_image_allowed_mimes,
+        conversation_context_store=get_conversation_context_store(),
     )
 
 
@@ -600,6 +705,30 @@ def get_memory_app_service() -> MemoryAppService:
         user_repository=get_user_repository(),
         user_memory_repository_factory=get_user_memory_repository,
     )
+
+
+def get_context_compaction_app_service() -> ContextCompactionAppService:
+    """
+    IOC for ContextCompactionAppService class (the /llm/chat background task).
+
+    Cached like the graphs: a stateless orchestrator over already-cached
+    collaborators.
+    """
+
+    settings = _get_settings()
+
+    cache_key = ("app_service", "context_compaction")
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = ContextCompactionAppService(
+            context_summary_graph=get_context_summary_graph(),
+            user_repository=get_user_repository(),
+            store=get_conversation_context_store(),
+            enabled=settings.chat_compaction_enabled,
+            trigger_messages=settings.chat_compaction_trigger_messages,
+            trigger_chars=settings.chat_compaction_trigger_chars,
+            keep_tail_messages=settings.chat_compaction_keep_tail_messages,
+        )
+    return _repo_cache[cache_key]
 
 
 def get_user_memory_app_service() -> UserMemoryAppService:

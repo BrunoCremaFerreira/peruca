@@ -106,6 +106,14 @@ class Settings(BaseSettings):
     llm_calculator_graph_chat_temperature: float = 0.1
     llm_calculator_graph_chat_reasoning: bool | None = None
 
+    # Context summarizer (chat context compaction). Same model as the other
+    # graphs so it stays VRAM-resident (no swap) even though it runs in the
+    # background. Temperature 0.2 favours fidelity to the transcript; 0.1 makes
+    # the 12b telegraphic on long-form text, which loses context.
+    llm_context_summary_graph_chat_model: str = "gemma4:12b"
+    llm_context_summary_graph_chat_temperature: float = 0.2
+    llm_context_summary_graph_chat_reasoning: bool | None = None
+
     # ===============================
     # NLP Models config
     # ===============================
@@ -134,6 +142,29 @@ class Settings(BaseSettings):
 
     cache_db_connection_string: str = ""
     chat_history_ttl_seconds: int | None = None
+
+    # ===============================
+    # Chat Context Compaction Config
+    # ===============================
+    # Background summary of the old turns of a conversation, so a long chat
+    # keeps its context instead of silently losing whatever falls out of the
+    # only-talk history window.
+    #
+    # Calibration ("no gap"): trigger_messages (30) <= the only-talk window
+    # (llm_only_talk_history_max_messages, 30), so the window never drops a
+    # message the summary has not covered yet — it degrades to a safety net for
+    # when compaction is disabled or failing. keep_tail_messages (16) is below
+    # the trigger (there must be something left to summarize) and even, so the
+    # verbatim tail always starts on a turn boundary (a human/ai pair is never
+    # split). With 30/16 compaction runs roughly every 7 turns.
+    chat_compaction_enabled: bool = True
+    chat_compaction_trigger_messages: int = 30  # fires when history >= this
+    chat_compaction_trigger_chars: int = 24_000  # secondary trigger (~6k tokens)
+    chat_compaction_keep_tail_messages: int = 16  # kept verbatim (8 turns)
+    # Hard cap on the stored summary; enforced once, in the graph, by truncating
+    # on a whole-bullet boundary (never mid-sentence).
+    chat_compaction_max_summary_chars: int = 2_500
+
     # ===============================
     # Chat Image Input Config
     # ===============================

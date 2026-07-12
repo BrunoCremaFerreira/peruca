@@ -1,12 +1,14 @@
 # Plano: Compactação de Contexto de Conversa (Chat Context Compaction)
 
-- **Status:** todo
+- **Status:** done
 - **Criado em:** 2026-07-08 19:24
-- **Implementado em:** —
-- **PR/commit:** —
-- **Branch (a criar quando o plano for aprovado):** `feature/chat-context-compaction`
-- **Consultorias realizadas (obrigatórias):** `arquiteto`, `especialista-de-prompt`, `programador-tester`
+- **Implementado em:** 2026-07-12
+- **PR/commit:** — (branch `feature/chat-context-compaction`, ainda sem commit)
+- **Branch:** `feature/chat-context-compaction`
+- **Consultorias realizadas (obrigatórias):** `arquiteto`, `especialista-de-prompt`, `programador-tester`, `especialista-de-seguranca` (Fase G, 2026-07-12)
 - **Origem:** `docs/features/todo/sketch.txt`
+- **Resultado:** 1978 testes unitários + 19 de integração verdes (integração rodada
+  contra Ollama `gemma4:12b` e Redis reais). Ver §11 para o que divergiu do plano.
 
 ---
 
@@ -335,9 +337,15 @@ Integração (skip gracioso, padrão do conftest):
   estruturalmente válida. Asserts tolerantes (estrutura + 1–2 substrings de fatos);
   **não** assertar idioma do corpo nem fraseado.
 - `test_redis_conversation_context_store_integration.py` (`redis_backed_env`):
-  round-trip real com `RedisChatMessageHistory`; CAS real com append no meio →
-  False; `clear` remove as duas chaves. Estender
-  `test_llm_app_service_reset_context_redis.py` (summary key também some).
+  round-trip real com `RedisChatMessageHistory`; CAS real; `clear` remove as duas
+  chaves. Estender `test_llm_app_service_reset_context_redis.py` (summary key
+  também some).
+  **Correção (2026-07-12):** a redação original desta linha dizia "CAS real com
+  append no meio → False", o que **contradiz o §3.5** e estava errado. Um append
+  só toca a *cauda*; o prefixo permanece imutável, então o CAS deve retornar
+  **True** e preservar o turno appendado. Abortar aí faria um usuário tagarela
+  nunca compactar. A implementação segue o §3.5 (correto); era a linha do §7 que
+  estava desatualizada.
 - `test_llm_app_service_chat__context_compaction.py` (Ollama+Redis, skip duplo):
   1 ciclo completo com triggers baixos (trigger=6, tail=4) → histórico encolheu,
   summary existe, chat seguinte referenciando fato compactado responde coerente.
@@ -407,3 +415,100 @@ antes do `programador` implementar).
   descartado; degrada num 12b com entrada longa).
 - Lock distribuído / lock atravessando a chamada LLM (§3.5).
 - ISP read/write no store (não há fronteira de privilégio).
+
+## 11. O que divergiu do plano na implementação (2026-07-12)
+
+Registro honesto das decisões tomadas durante a execução que o plano não previa ou
+previa diferente. **O código é a fonte da verdade** — este plano agora é histórico.
+
+### 11.1 `conversation_digest` foi para `domain/services/`, não `application/`
+
+O §7-F1 não fixava o caminho; a Fase A o colocou em `application/appservices/`. Isso
+não fecha: quem recalcula o digest **sob o lock** é a implementação de infra do store,
+e `infra/ → application/` seria um acoplamento novo fora do composition root (hoje só
+o `ioc.py` faz isso). Parecer do `arquiteto`: o digest é a **semântica do parâmetro
+`expected_digest` do ABC que o próprio domain publica** — a definição de "quando dois
+prefixos de conversa são o mesmo" é regra de integridade, não mecânica de
+concorrência (troque Redis por Postgres: o lock muda, o digest não). Movido para
+`domain/services/conversation_digest.py`, importável por application e infra sem
+violar camada.
+
+### 11.2 Bug latente pré-existente, corrigido de quebra: `_get_session_history_factory` não era memoizada
+
+Cada chamada devolvia uma closure com um **dict novo**. No modo in-memory (o default,
+sem Redis), `OnlyTalkGraph` e `LlmAppService` operavam sobre dicts **diferentes** — o
+graph lia um histórico que o app service nunca escrevera. A memoização exigida pelo
+§3.1 (o store in-memory tem de compartilhar o *mesmo* dict) fechou isso.
+
+### 11.3 Fase G (segurança) achou um P0 de perda de dados que o plano não previa
+
+O §3.5 dizia que o lock por user_id seria compartilhado com o `add_messages`/`clear`
+"(e equivalente in-memory)". O equivalente in-memory **não existia**: a IoC entregava
+o `InMemoryChatMessageHistory` cru do LangChain, que não toma lock nenhum. Como
+`InMemoryConversationContextStore.apply_compaction` faz `clear()` + `add_messages(tail)`
+sob o lock, um `_persist_turn` concorrente (sem lock) podia ter o turno **apagado pelo
+`clear()`** — perda permanente, no backend *default*, violando o §6.6 ("nunca perdeu
+histórico"). O digest do CAS não protege: o append não tomava o lock, então podia
+pousar *depois* da verificação.
+
+Corrigido com `LockedInMemoryChatMessageHistory` (`infra/data/cache/`), cujos
+`add_messages`/`clear` tomam o lock do registro compartilhado, mais primitivas
+`*_unlocked` para o store (que já segura o lock — `threading.Lock` não é reentrante e
+chamá-lo de novo deadlockaria).
+
+### 11.4 A pendência §8.3 (sanitização da reinjeção) foi fechada — e o motivo real é outro
+
+O plano justificava a sanitização pela *prompt injection*. O `especialista-de-seguranca`
+apontou que, isoladamente, isso seria quase teatro: o usuário **já** consegue plantar
+`[Imagem #N ...]` no histórico digitando isso na mensagem (o `_persist_turn` grava a
+`message` verbatim), então a reinjeção não lhe dá privilégio novo de *forjar*.
+
+O que muda o veredito são dois fatos que o plano não considerou:
+1. **A validação mora só no caminho de escrita** (o graph). `OnlyTalkGraph._read_summary`
+   aceitava qualquer dict com `summary` truthy e injetava **cru, sem cap**. E o Redis do
+   projeto roda **sem autenticação** — qualquer host da LAN escreve `chat_summary:{user_id}`
+   com texto arbitrário. A sanitização é o **único controle no caminho de leitura**.
+2. **A compactação apaga a evidência**: o prefixo bruto some do Redis, então um resumo
+   envenenado não é diagnosticável a partir do histórico, e é reinjetado *para sempre*
+   (a regra anti-erosão do prompt, que manda preservar itens na dúvida, vira uma regra
+   anti-despejo para conteúdo malicioso).
+
+Implementado: `sanitize_summary_for_prompt` (`prompt_sanitizer.py`) — **preserva `\n`**
+(ao contrário do `sanitize_for_prompt`, que colapsaria os bullets e destruiria o
+formato), neutraliza `[`/`]` e sentinelas `<<<...>>>`, e capa por linha inteira.
+Preservar `Imagem #N` *bare* é **requisito**, não efeito colateral: é a forma que o gate
+de re-vision procura.
+
+O que foi explicitamente **descartado como teatro de segurança**: blocklist de frases de
+injection; guardrail com LLM sobre o resumo; criptografia do resumo; re-validar `###` na
+leitura. E foi **verificado como não-problema**: o escopo por `user_id` das chaves (UUID
+interno, resolvido server-side — sem key-injection nem leitura cross-user); deadlock nos
+locks (toda leitura sob lock é lock-free); injeção de template `{...}` (o resumo entra
+como `HumanMessage` num `MessagesPlaceholder`, que o LangChain não re-parseia).
+
+### 11.5 Outras correções da Fase G
+
+- **TTL do resumo não era renovado**: o `add_messages` renovava o TTL de
+  `chat_history:` a cada turno, mas o de `chat_summary:` só era setado dentro do
+  `apply_compaction` (~1 a cada 7 turnos). Com `CHAT_HISTORY_TTL_SECONDS` setado, o
+  **resumo expirava antes do histórico** — e como o prefixo bruto já fora apagado, isso
+  é perda permanente de contexto. Agora as duas chaves são renovadas juntas.
+- **Entrada do sumarizador sem cap**: `_format_old_messages` concatenava os contents
+  inteiros. Como `ChatRequest.message` não tem `max_length`, o prompt podia ir a
+  megabytes (e o Ollama serializa requests: a sumarização em background seguraria a GPU
+  e viraria latência no turno seguinte). Cap de 2.000 chars por mensagem, via construtor.
+
+### 11.6 Recomendação NÃO implementada (fora do escopo aprovado)
+
+O `especialista-de-seguranca` recomendou `max_length` em `ChatRequest.message` (fecharia
+o SEC-010 e daria sentido ao `trigger_chars`). **Não foi feito**: passar a devolver 422
+em mensagens longas é mudança de contrato de um endpoint público, fora deste plano.
+Merece um plano próprio.
+
+### 11.7 Premissa de processo único virou requisito de integridade
+
+O §8.4 registrava o multi-worker como limitação. Depois desta feature isso deixou de ser
+uma nota de performance: com 2+ workers, a compactação de um worker **sobrescreve turnos
+appendados por outro** (perda silenciosa de histórico), porque os locks são `threading`.
+Documentado em `CLAUDE.md` e `.env.example` como **requisito de worker único** até o CAS
+migrar para script Lua no Redis.
