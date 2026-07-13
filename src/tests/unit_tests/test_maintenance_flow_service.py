@@ -314,3 +314,54 @@ class TestFocus:
         _run(service.set_focus(user_id, self._focus()))
         _run(service.clear_focus(user_id))
         assert _run(service.get_focus(user_id)) is None
+
+
+# --------------------------------------------------------------------------- #
+# Date reference injected by the caller (plan §8.4 / §10.6)
+#
+# `_parse_date` had `reference = date.today()` baked in — the SERVER's date. The
+# multi-turn flow would resolve "ontem" in the server's timezone even after the
+# graphs were fixed. The reference becomes a parameter, and LlmAppService passes
+# the user's LOCAL date:
+#
+#     parse_slot_reply(pending, message, vehicles=None, reference: date = None)
+#
+# `reference=None` keeps today's behaviour (date.today()) so nothing else breaks.
+# --------------------------------------------------------------------------- #
+class TestDateReference:
+    def _p(self):
+        return _pending_register(["date"], {"vehicle_id": "v1", "description": "óleo"})
+
+    def test_today_token__resolves_against_the_given_reference(self):
+        reference = date(2026, 7, 9)
+        r = _service().parse_slot_reply(self._p(), "hoje", reference=reference)
+        assert r.kind == "value"
+        assert r.value == reference
+
+    def test_yesterday_token__resolves_against_the_given_reference(self):
+        reference = date(2026, 7, 9)
+        r = _service().parse_slot_reply(self._p(), "ontem", reference=reference)
+        assert r.kind == "value"
+        assert r.value == reference - timedelta(days=1)
+
+    def test_future_guard__is_relative_to_the_given_reference(self):
+        # A date the SERVER already considers past can still be in the user's
+        # future (and vice-versa): the guard must use the injected reference.
+        reference = date(2026, 7, 9)
+        r = _service().parse_slot_reply(
+            self._p(), "10/07/2026", reference=reference
+        )
+        assert r.kind == "invalid"
+
+    def test_reference_day_itself__is_not_in_the_future(self):
+        reference = date(2026, 7, 9)
+        r = _service().parse_slot_reply(
+            self._p(), "09/07/2026", reference=reference
+        )
+        assert r.kind == "value"
+        assert r.value == reference
+
+    def test_no_reference__falls_back_to_the_server_date(self):
+        r = _service().parse_slot_reply(self._p(), "hoje")
+        assert r.kind == "value"
+        assert r.value == date.today()

@@ -106,6 +106,13 @@ class Settings(BaseSettings):
     llm_calculator_graph_chat_temperature: float = 0.1
     llm_calculator_graph_chat_reasoning: bool | None = None
 
+    # User settings classifier: near-deterministic like the other classifier
+    # graphs — the LLM only transcribes the spoken location and, when it is sure,
+    # suggests an IANA identifier; timezone_resolver decides.
+    llm_user_settings_graph_chat_model: str = "gemma4:12b"
+    llm_user_settings_graph_chat_temperature: float = 0.1
+    llm_user_settings_graph_chat_reasoning: bool | None = None
+
     # Context summarizer (chat context compaction). Same model as the other
     # graphs so it stays VRAM-resident (no swap) even though it runs in the
     # background. Temperature 0.2 favours fidelity to the transcript; 0.1 makes
@@ -119,6 +126,15 @@ class Settings(BaseSettings):
     # ===============================
 
     nlp_spacy_model: str = "pt_core_news_sm"
+
+    # ===============================
+    # User Preferences Defaults
+    # ===============================
+    # IANA timezone used for a user who never set one (no row in user_settings).
+    # This is the ONLY place a timezone literal lives: it is injected into
+    # UserSettingsService by the IoC and reaches the graphs through
+    # LlmAppService.chat() — the domain never hardcodes a zone.
+    default_timezone: str = "America/Sao_Paulo"
 
     # ===============================
     # Home Assistant Config

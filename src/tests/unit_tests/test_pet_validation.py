@@ -12,13 +12,17 @@ term, or a term normalizing to the pet's own name is an error (§2.8).
 """
 
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from domain.validations.pet_validation import PetValidator
 
 
 def _valid_uuid() -> str:
     return str(uuid.uuid4())
+
+
+def _utc_today() -> date:
+    return datetime.now(timezone.utc).date()
 
 
 class TestPetValidatorId:
@@ -84,10 +88,33 @@ class TestPetValidatorBirthDate:
         assert PetValidator().validate_birth_date(date(2020, 1, 1)).errors == []
 
     def test_future__error(self):
-        assert PetValidator().validate_birth_date(date.today() + timedelta(days=1)).errors
+        # "Future" is measured against the greatest civil date existing anywhere
+        # on Earth (UTC+14) — see TestPetValidatorBirthDateEarthBoundary.
+        beyond_earth = _utc_today() + timedelta(days=2)
+        assert PetValidator().validate_birth_date(beyond_earth).errors
 
     def test_not_a_date__error(self):
         assert PetValidator().validate_birth_date("2020-01-01").errors
+
+
+class TestPetValidatorBirthDateEarthBoundary:
+    """
+    birth_date is a CIVIL date (no timezone): the future guard must compare it to
+    ``clock.max_civil_date_on_earth()`` (UTC today + 1 day = the local date at
+    UTC+14), never to the server's ``date.today()`` — a puppy born "today" for a
+    user in a timezone ahead of the server is not a future birth.
+    """
+
+    def test_utc_today__accepted(self):
+        assert PetValidator().validate_birth_date(_utc_today()).errors == []
+
+    def test_utc_today_plus_one_day__accepted(self):
+        earth_max = _utc_today() + timedelta(days=1)
+        assert PetValidator().validate_birth_date(earth_max).errors == []
+
+    def test_utc_today_plus_two_days__rejected(self):
+        beyond_earth = _utc_today() + timedelta(days=2)
+        assert PetValidator().validate_birth_date(beyond_earth).errors
 
 
 class TestPetValidatorSex:

@@ -10,7 +10,12 @@ from typing import List, Optional, Tuple
 @dataclass
 class BaseEntity:
     id: str = ""
-    when_created: datetime = datetime.now(timezone.utc)
+    # default_factory, never a bare default: a plain ``datetime.now(...)`` default
+    # is evaluated ONCE at import time, so every entity built without an explicit
+    # value would share the process-start timestamp.
+    when_created: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
     when_updated: Optional[datetime] = None
     when_deleted: Optional[datetime] = None
 
@@ -31,6 +36,19 @@ class User(BaseEntity):
 class UserMemory(BaseEntity):
     user_id: str = ""
     content: str = ""
+
+
+@dataclass
+class UserSettings(BaseEntity):
+    """
+    Per-user preferences (1:1 with a user). ``timezone`` is an IANA identifier
+    ("America/Sao_Paulo") — the single source of truth for what "now" and "today"
+    mean for this user. Absence of a row means "use the configured default": no
+    ghost record is ever written on a read.
+    """
+
+    user_id: str = ""
+    timezone: str = ""
 
 
 # ====================================
@@ -182,6 +200,12 @@ class GraphInvokeRequest:
     user: User
     memories: list[str] = field(default_factory=list)
     context_hints: dict = field(default_factory=dict)
+    # The user's IANA timezone, resolved ONCE per request by LlmAppService.chat()
+    # (whose own fallback is the default injected by the composition root). The
+    # default is deliberately EMPTY: a timezone literal is policy, and policy does
+    # not live in the domain — an unresolved timezone must fail loudly in the
+    # clock, never silently pretend a zone.
+    user_timezone: str = ""
     # Inbound images as full data URIs ("data:image/jpeg;base64,..."). Only the
     # OnlyTalkGraph consumes them; action graphs ignore them. Default empty keeps
     # every existing construction valid.

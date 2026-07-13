@@ -26,6 +26,7 @@ Você deve classificar a entrada em **uma ou mais** das seguintes categorias:
 - "vehicle_maintenance" → quando o usuário quer **AGIR sobre a manutenção dos veículos cadastrados**: registrar uma manutenção realizada (troca de óleo, pneus, peças, fluidos, rodízio, revisão), consultar o histórico de manutenções, editar/apagar um registro, listar seus veículos, ou tentar cadastrar/editar/excluir um VEÍCULO.
 - "pet_health" → quando o usuário quer **AGIR sobre a saúde dos pets cadastrados**: registrar uma vacina, vermífugo, antipulgas, remédio ou consulta veterinária realizada, consultar o histórico de vacinas/saúde de um pet, apagar/editar um registro de saúde, listar seus pets, ou tentar cadastrar/editar/excluir um PET.
 - "calculator" → quando a mensagem contém uma **expressão matemática concreta a ser resolvida** — operandos numéricos ("10 mais 5", "10% de 200", "raiz de 144") **ou simbólicos com variáveis matemáticas** como x, y, ômega ("derivada de x ao cubo", "integral de cosseno de x", "simplifica x mais x") — acompanhada de um **pedido de resolução** ("quanto é/dá", "calcule", "derive", "integre", "simplifique"). Perguntas **conceituais** sobre matemática e usos **figurados** de termos matemáticos NÃO são `calculator`.
+- "user_settings" → quando o usuário quer **ALTERAR ou CONSULTAR uma configuração do assistente**, como o fuso horário/timezone usado nas respostas.
 - "only_talking" → quando o usuário está **apenas comentando, conversando, contando histórias ou fazendo observações**, sem pedir nenhuma ação prática.
 
 ⚠️ **Instruções importantes**:
@@ -70,6 +71,12 @@ Você deve classificar a entrada em **uma ou mais** das seguintes categorias:
     - Sentido **figurado** de termos matemáticos ("qual a raiz do problema?", "meu limite de cartão é 5000") → `["only_talking"]`.
     - **Comentários** sem pedido de resolução ("derivada segunda é muito difícil, né?", "o preço da gasolina subiu 10 por cento") → `["only_talking"]`.
     - **Problemas em linguagem natural** que exigem interpretação ("tinha 150, gastei 30, quanto sobrou?") → `["only_talking"]` — só é `calculator` quando a expressão já vem ditada ("150 menos 30").
+13. **Desambiguação de configurações**: só é `user_settings` quando há pedido de ALTERAR/CONSULTAR a configuração.
+    - "Altere o timezone para São Paulo", "muda o fuso para Lisboa", "qual fuso horário está configurado?" → `["user_settings"]`.
+    - Perguntar data/hora ("que horas são?", "que dia é hoje?") NÃO é configuração — é conversa → `["only_talking"]`.
+    - Alarmes, timers e lembretes ("põe um alarme pra 7h") NÃO são configuração nem casa inteligente → `["only_talking"]`.
+    - Comentários sobre fusos ("o fuso do Japão é maluco", "odeio horário de verão") → `["only_talking"]`.
+    - Menção a cidade sem comando ("vou viajar para Lisboa semana que vem") → `["only_talking"]`.
 
 📌 **Formato de saída obrigatório**: uma lista Python com as categorias detectadas. Exemplo:  
 `["only_talking"]`  
@@ -82,6 +89,7 @@ Você deve classificar a entrada em **uma ou mais** das seguintes categorias:
 `["vehicle_maintenance"]`
 `["pet_health"]`
 `["calculator"]`
+`["user_settings"]`
 
 ⚠️ **Importante**: Retorne APENAS a lista Python, sem texto antes ou depois, sem bloco de código markdown, sem explicação.
 

@@ -12,6 +12,9 @@ from application.graphs.only_talk_graph import OnlyTalkGraph
 from domain.entities import GraphInvokeRequest, User
 
 
+_TZ = "America/Sao_Paulo"
+
+
 _TEMPLATE = "PERSONA|{user_name}|{user_memories}|{siblings}|{current_datetime}"
 
 
@@ -33,7 +36,7 @@ def _req(persona=None):
     hints = {}
     if persona is not None:
         hints["user_pets_persona"] = persona
-    return GraphInvokeRequest(message="oi", user=_user(), context_hints=hints)
+    return GraphInvokeRequest(message="oi", user=_user(), context_hints=hints, user_timezone=_TZ)
 
 
 class TestSiblingsInjection:

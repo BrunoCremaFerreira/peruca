@@ -12,6 +12,7 @@ from langgraph.graph import StateGraph, START, END
 
 from domain.entities import GraphInvokeRequest, SensorReading
 from domain.interfaces.data_repository import SmartHomeEntityAliasRepository
+from domain.services.clock import format_local
 from domain.services.smart_home_service import SmartHomeService
 
 
@@ -151,6 +152,10 @@ class SmartHomeSensorsGraph(Graph):
             f"{sensor_type}|{location}", available_entities
         )
 
+        # `last_changed` is a real instant (Home Assistant hands it back in UTC),
+        # not a civil date: it must be shown on the user's wall clock.
+        user_timezone = data["input"].user_timezone
+
         async def _fetch_histories(ids, back):
             results = await asyncio.gather(
                 *[self.smart_home_service.sensor_get_history(eid, back) for eid in ids],
@@ -170,7 +175,7 @@ class SmartHomeSensorsGraph(Graph):
                     entries = []
                     for reading in history:
                         time_str = (
-                            reading.last_changed.strftime("%H:%M")
+                            format_local(reading.last_changed, user_timezone, "%H:%M")
                             if reading.last_changed
                             else "?"
                         )

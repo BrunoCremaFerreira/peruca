@@ -28,6 +28,9 @@ from application.graphs.only_talk_graph import OnlyTalkGraph
 from domain.entities import GraphInvokeRequest, User
 
 
+_TZ = "America/Sao_Paulo"
+
+
 _PROMPT_TEMPLATE = "{user_name}|{user_summary}|{user_memories}|{current_datetime}"
 SECOND_URI = "data:image/png;base64,U0VDT05E"
 
@@ -91,8 +94,7 @@ class TestOnlyTalkGraphRevision:
         store.get.return_value = SECOND_URI
         graph = _make_graph(image_store=store, history=_history_with_image("3"))
         request = GraphInvokeRequest(
-            message="qual o número de série na foto?", user=user, images=[]
-        )
+            message="qual o número de série na foto?", user=user, images=[], user_timezone=_TZ)
 
         captured = _invoke_with_passes(
             graph,
@@ -123,7 +125,7 @@ class TestOnlyTalkGraphRevision:
         store.latest_id.return_value = "5"
         store.get.return_value = SECOND_URI
         graph = _make_graph(image_store=store, history=_history_with_image("5"))
-        request = GraphInvokeRequest(message="e a cor exata?", user=user, images=[])
+        request = GraphInvokeRequest(message="e a cor exata?", user=user, images=[], user_timezone=_TZ)
 
         captured = _invoke_with_passes(
             graph,
@@ -144,7 +146,7 @@ class TestOnlyTalkGraphRevision:
         store.get.return_value = None
         store.latest_id.return_value = None
         graph = _make_graph(image_store=store, history=_history_with_image("3"))
-        request = GraphInvokeRequest(message="qual o número?", user=user, images=[])
+        request = GraphInvokeRequest(message="qual o número?", user=user, images=[], user_timezone=_TZ)
 
         captured = _invoke_with_passes(
             graph,
@@ -161,7 +163,7 @@ class TestOnlyTalkGraphRevision:
     def test_no_store__sentinel_stripped_no_crash(self):
         user = _sample_user()
         graph = _make_graph(image_store=None, history=_history_with_image("1"))
-        request = GraphInvokeRequest(message="qual o número?", user=user, images=[])
+        request = GraphInvokeRequest(message="qual o número?", user=user, images=[], user_timezone=_TZ)
 
         captured = _invoke_with_passes(
             graph, request, responses=["Bla bla.\n<<<REVER_IMAGEM: #1>>>"]
@@ -176,7 +178,7 @@ class TestOnlyTalkGraphRevision:
         store = MagicMock()
         store.get.return_value = SECOND_URI
         graph = _make_graph(image_store=store, history=_history_with_image("2"))
-        request = GraphInvokeRequest(message="qual o texto?", user=user, images=[])
+        request = GraphInvokeRequest(message="qual o texto?", user=user, images=[], user_timezone=_TZ)
 
         with patch.object(asyncio, "run") as async_run:
             _invoke_with_passes(
@@ -194,7 +196,7 @@ class TestOnlyTalkGraphRevision:
         user = _sample_user()
         store = MagicMock()
         graph = _make_graph(image_store=store, history=_history_with_image("1"))
-        request = GraphInvokeRequest(message="tudo bem?", user=user, images=[])
+        request = GraphInvokeRequest(message="tudo bem?", user=user, images=[], user_timezone=_TZ)
 
         captured = _invoke_with_passes(graph, request, responses=["Tudo ótimo!"])
 

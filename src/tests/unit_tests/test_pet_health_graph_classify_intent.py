@@ -12,11 +12,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from domain.services.clock import local_date_for_user
 from domain.entities import GraphInvokeRequest, Pet, User
 
 pytest.importorskip("langgraph")
 
 from application.graphs.pet_health_graph import PetHealthGraph
+
+
+_TZ = "America/Sao_Paulo"
 
 
 def _uuid():
@@ -49,7 +53,7 @@ def _make_graph(pets):
 
 
 def _classify(graph, user, raw_json):
-    req = GraphInvokeRequest(message="msg", user=user)
+    req = GraphInvokeRequest(message="msg", user=user, user_timezone=_TZ)
     with patch.object(graph, "_extract_structured_output", return_value=raw_json):
         return graph._classify_intent({"input": req})
 
@@ -66,7 +70,9 @@ class TestClassify:
         )
         state = _classify(graph, user, raw)
         assert state["intent"] == ["register_health_event"]
-        assert state["resolved_occurred_at"] == date.today()
+        # The reference is the USER's civil date (request.user_timezone), not the
+        # server's — see test_pet_health_graph_timezone.py.
+        assert state["resolved_occurred_at"] == local_date_for_user(_TZ)
         assert state["event_type"] == "vaccine"
         assert len(state["matched_pets"]) == 1
         assert state["matched_pets"][0].id == "id-caco"
@@ -79,7 +85,9 @@ class TestClassify:
             '"event_type": "vaccine", "event_name": "raiva", "date_token": "yesterday"}'
         )
         state = _classify(graph, user, raw)
-        assert state["resolved_occurred_at"] == date.today() - timedelta(days=1)
+        assert state["resolved_occurred_at"] == local_date_for_user(_TZ) - timedelta(
+            days=1
+        )
         assert len(state["matched_pets"]) == 1
         assert state["matched_pets"][0].id == "id-cacao"
 

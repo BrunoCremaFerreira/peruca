@@ -12,11 +12,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from domain.services.clock import local_date_for_user
 from domain.entities import GraphInvokeRequest, User, Vehicle
 
 pytest.importorskip("langgraph")
 
 from application.graphs.vehicle_maintenance_graph import VehicleMaintenanceGraph
+
+
+_TZ = "America/Sao_Paulo"
 
 
 def _uuid():
@@ -51,7 +55,7 @@ def _make_graph(fleet):
 
 
 def _classify(graph, user, raw_json):
-    req = GraphInvokeRequest(message="msg", user=user)
+    req = GraphInvokeRequest(message="msg", user=user, user_timezone=_TZ)
     with patch.object(graph, "_extract_structured_output", return_value=raw_json):
         return graph._classify_intent({"input": req})
 
@@ -68,7 +72,11 @@ class TestClassify:
         )
         state = _classify(graph, user, raw)
         assert state["intent"] == ["register_maintenance"]
-        assert state["resolved_performed_at"] == date.today() - timedelta(days=1)
+        # The reference is the USER's civil date (request.user_timezone), not the
+        # server's — see test_vehicle_maintenance_graph_timezone.py.
+        assert state["resolved_performed_at"] == local_date_for_user(_TZ) - timedelta(
+            days=1
+        )
         assert state["odometer_km"] == 100232
         assert len(state["matched_vehicles"]) == 1
         assert state["matched_vehicles"][0].id == "id-out"

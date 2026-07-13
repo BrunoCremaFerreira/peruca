@@ -40,6 +40,9 @@ from application.graphs.only_talk_graph import (
 from domain.entities import GraphInvokeRequest, User
 
 
+_TZ = "America/Sao_Paulo"
+
+
 _PROMPT_TEMPLATE = (
     "{user_name}|{user_summary}|{user_memories}|{siblings}|{current_datetime}"
 )
@@ -137,8 +140,7 @@ def _capture_pass(graph, request, model_output="resposta"):
 
 def _request(user=None):
     return GraphInvokeRequest(
-        message="e aí?", user=user or _sample_user(), context_hints={}
-    )
+        message="e aí?", user=user or _sample_user(), context_hints={}, user_timezone=_TZ)
 
 
 # ===========================================================================

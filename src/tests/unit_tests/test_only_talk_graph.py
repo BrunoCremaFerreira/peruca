@@ -33,6 +33,9 @@ from application.graphs.only_talk_graph import OnlyTalkGraph
 from domain.entities import GraphInvokeRequest, User
 
 
+_TZ = "America/Sao_Paulo"
+
+
 # ===========================================================================
 # Helpers
 # ===========================================================================
@@ -110,7 +113,7 @@ class TestOnlyTalkGraphReadOnlyHistory:
         history = _make_history([HumanMessage(content="oi"), AIMessage(content="olá")])
         get_session_history = MagicMock(return_value=history)
         graph = _make_graph(get_session_history)
-        request = GraphInvokeRequest(message="tudo bem?", user=user, memories=[])
+        request = GraphInvokeRequest(message="tudo bem?", user=user, memories=[], user_timezone=_TZ)
         # Act
         _invoke_capturing_chain_input(graph, request)
         # Assert
@@ -123,7 +126,7 @@ class TestOnlyTalkGraphReadOnlyHistory:
         history = _make_history(prior)
         get_session_history = MagicMock(return_value=history)
         graph = _make_graph(get_session_history)
-        request = GraphInvokeRequest(message="tudo bem?", user=user, memories=[])
+        request = GraphInvokeRequest(message="tudo bem?", user=user, memories=[], user_timezone=_TZ)
         # Act
         captured = _invoke_capturing_chain_input(graph, request)
         # Assert — the messages read from history are passed under `history`.
@@ -138,7 +141,7 @@ class TestOnlyTalkGraphReadOnlyHistory:
         history = _make_history([])
         get_session_history = MagicMock(return_value=history)
         graph = _make_graph(get_session_history)
-        request = GraphInvokeRequest(message="tudo bem?", user=user, memories=[])
+        request = GraphInvokeRequest(message="tudo bem?", user=user, memories=[], user_timezone=_TZ)
         # Act
         captured = _invoke_capturing_chain_input(graph, request)
         # Assert — `input` is now a one-element list of HumanMessage whose
@@ -153,7 +156,7 @@ class TestOnlyTalkGraphReadOnlyHistory:
         history = _make_history([HumanMessage(content="oi")])
         get_session_history = MagicMock(return_value=history)
         graph = _make_graph(get_session_history)
-        request = GraphInvokeRequest(message="e aí?", user=user, memories=[])
+        request = GraphInvokeRequest(message="e aí?", user=user, memories=[], user_timezone=_TZ)
         # Act
         _invoke_capturing_chain_input(graph, request)
         # Assert — read-only: never writes.
@@ -172,7 +175,7 @@ class TestOnlyTalkGraphReadOnlyHistory:
         history = _make_history([HumanMessage(content="oi")])
         get_session_history = MagicMock(return_value=history)
         graph = _make_graph(get_session_history)
-        request = GraphInvokeRequest(message="e aí?", user=user, memories=[])
+        request = GraphInvokeRequest(message="e aí?", user=user, memories=[], user_timezone=_TZ)
         # Act
         captured = _invoke_capturing_chain_input(graph, request)
         # Assert — chain invoked directly with our explicit input + history.
@@ -188,7 +191,7 @@ class TestOnlyTalkGraphReadOnlyHistory:
         history = _make_history([])
         get_session_history = MagicMock(return_value=history)
         graph = _make_graph(get_session_history)
-        request = GraphInvokeRequest(message="oi", user=user, memories=[])
+        request = GraphInvokeRequest(message="oi", user=user, memories=[], user_timezone=_TZ)
         # Act
         captured = _invoke_capturing_chain_input(graph, request)
         # Assert — return is now a dict {"output", "image_description"}.

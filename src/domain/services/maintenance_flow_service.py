@@ -138,8 +138,18 @@ class MaintenanceFlowService:
     # Deterministic reply parsing (§9.3)
     # ------------------------------------------------------------------ #
     def parse_slot_reply(
-        self, pending: PendingFlow, message: str, vehicles=None
+        self,
+        pending: PendingFlow,
+        message: str,
+        vehicles=None,
+        *,
+        reference: Optional[date] = None,
     ) -> SlotReplyResult:
+        """
+        ``reference`` is the civil date "hoje"/"ontem" are resolved against — the
+        caller (LlmAppService) passes the USER's local date. None keeps the
+        server's date, for callers that have no timezone to offer.
+        """
         op = pending.operation
 
         if op == "delete_confirm":
@@ -158,7 +168,7 @@ class MaintenanceFlowService:
         if expected == "km":
             result = self._parse_km(message)
         elif expected == "date":
-            result = self._parse_date(message)
+            result = self._parse_date(message, reference)
         elif expected == "vehicle":
             result = self._parse_vehicle(message, vehicles or [])
         else:
@@ -167,16 +177,20 @@ class MaintenanceFlowService:
         if result.kind != "none":
             return result
 
-        correction = self._try_correction(message, pending, expected)
+        correction = self._try_correction(message, pending, expected, reference)
         if correction is not None:
             return correction
         return SlotReplyResult(kind="none")
 
     def _try_correction(
-        self, message: str, pending: PendingFlow, expected: Optional[str]
+        self,
+        message: str,
+        pending: PendingFlow,
+        expected: Optional[str],
+        reference: Optional[date],
     ) -> Optional[SlotReplyResult]:
         if expected != "date" and "date" in pending.slots:
-            parsed = self._parse_date(message)
+            parsed = self._parse_date(message, reference)
             if parsed.kind == "value":
                 return SlotReplyResult(
                     kind="correction", corrected_slot="date", value=parsed.value
@@ -208,8 +222,10 @@ class MaintenanceFlowService:
             return SlotReplyResult(kind="none")
         return SlotReplyResult(kind="value", value=km)
 
-    def _parse_date(self, message: str) -> SlotReplyResult:
-        reference = date.today()
+    def _parse_date(
+        self, message: str, reference: Optional[date] = None
+    ) -> SlotReplyResult:
+        reference = reference or date.today()
         content = [t for t in normalize(message).split() if t not in _DATE_FILLER]
         joined = " ".join(content)
 

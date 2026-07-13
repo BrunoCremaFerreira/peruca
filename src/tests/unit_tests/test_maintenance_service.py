@@ -8,7 +8,7 @@ must never touch another user's data).
 """
 
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 import pytest
@@ -92,10 +92,15 @@ class TestRegister:
         vehicle = _vehicle(user_id)
         vehicle_read_repo.get_by_id.return_value = vehicle
         service = MaintenanceService(record_repo, vehicle_read_repo)
+        # Unambiguously future = UTC today + 2 days. "+1 day" is no longer a
+        # future date: performed_at is a civil date (no timezone), so the guard
+        # is clock.max_civil_date_on_earth() (UTC+14's local date = UTC today+1),
+        # which is already "today" for a user in the earliest timezone.
+        beyond_earth = datetime.now(timezone.utc).date() + timedelta(days=2)
         with pytest.raises(ValidationError):
             service.register(
                 MaintenanceRecordAdd(vehicle_id=vehicle.id, description="x",
-                                     performed_at=date.today() + timedelta(days=1),
+                                     performed_at=beyond_earth,
                                      odometer_km=1000),
                 user_id,
             )

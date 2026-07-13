@@ -27,6 +27,9 @@ from application.graphs.only_talk_graph import OnlyTalkGraph
 from domain.entities import GraphInvokeRequest, User
 
 
+_TZ = "America/Sao_Paulo"
+
+
 # ===========================================================================
 # Helpers
 # ===========================================================================
@@ -73,7 +76,7 @@ def _make_request(memories) -> GraphInvokeRequest:
         name="Alice",
         summary="resumo",
     )
-    return GraphInvokeRequest(message="oi", user=user, memories=memories)
+    return GraphInvokeRequest(message="oi", user=user, memories=memories, user_timezone=_TZ)
 
 
 def _capture_system_message(graph: OnlyTalkGraph, request: GraphInvokeRequest) -> str:

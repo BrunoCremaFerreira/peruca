@@ -1,12 +1,109 @@
 # Plano: Data-hora correta com timezone por usuário
 
-- **Status:** todo
+- **Status:** done
 - **Criado em:** 2026-07-10 15:42
-- **Implementado em:** —
-- **PR/commit:** —
-- **Branch (a criar quando o plano for aprovado):** `feature/user-timezone`
+- **Implementado em:** 2026-07-13
+- **PR/commit:** branch `feature/user-timezone` (sem commit — regra "Git Commits — Never Automatic")
+- **Branch:** `feature/user-timezone`
 - **Consultorias realizadas (obrigatórias):** `arquiteto`, `especialista-de-prompt`,
-  `programador-tester` (2026-07-10)
+  `programador-tester` (2026-07-10, planejamento); `arquiteto`,
+  `especialista-de-prompt`, `programador-tester`, `programador`,
+  `especialista-de-seguranca` (2026-07-12/13, implementação)
+- **Resultado:** 2165 testes unitários verdes; bateria de integração §10.7 11/11
+  (100%, `AMBIGUOUS_EXCLUDED` vazio) com Ollama, Home Assistant e Music
+  Assistant vivos.
+
+---
+
+## 0. Divergências aprovadas durante a implementação
+
+Registradas aqui porque contradizem o texto original das seções indicadas. **O
+código é a fonte da verdade**; leia esta seção antes de acreditar em qualquer
+outra.
+
+### 0.1 Limite de data futura dos validadores (revisa §8 item 8) — parecer do `arquiteto`
+
+O plano mandava "tolerar o tz do servidor" nos validadores de data futura. Isso
+está **errado**, e não só na borda: `maintenance_record_validation.py`,
+`pet_health_event_validation.py` e `pet_validation.py` comparavam com
+`date.today()` (data local **do servidor**). Um usuário num fuso adiantado
+(servidor em UTC, usuário em `Asia/Tokyo`) teria um registro legítimo de "hoje"
+**rejeitado durante 9 horas por dia** — caminho feliz, não borda de réveillon.
+
+A causa é semântica: `performed_at`/`occurred_at`/`birth_date` são **datas
+civis** (sem hora, sem fuso — §3.6 fixa que não convertem). "Está no futuro?" é
+uma pergunta mal formada para uma data civil sem um fuso de referência; o único
+limite superior correto e independente de fuso é **a maior data local existente
+na Terra** (UTC+14) — ou seja, `UTC hoje + 1 dia`.
+
+Implementado como `clock.max_civil_date_on_earth()`, consumido pelos três
+validadores. `vehicle_validation.py` teve o `datetime.now().year` (naive, tz do
+servidor) trocado por `datetime.now(timezone.utc).year` — mesmo defeito, e a
+folga `+1` que já existia lá absorve a borda.
+
+**A folga de 1 dia é deliberada e semanticamente correta. Não "conserte" isso de
+volta para `date.today()`.** Dois testes de service pré-existentes que fixavam o
+limite antigo (`hoje+1` rejeitado) foram rebaseados para `hoje+2`.
+
+### 0.2 `GraphInvokeRequest.user_timezone` nasce **vazio** (revisa §3.3) — parecer do `arquiteto`
+
+O plano propunha `user_timezone: str = "America/Sao_Paulo"`. Isso criaria **duas
+fontes de verdade** para a mesma política (o literal no domain e o
+`DEFAULT_TIMEZONE` da `infra/settings.py`) — e a falha seria silenciosa: um
+operador muda o `.env` e qualquer caminho que esqueça de preencher o campo
+continua respondendo em São Paulo, sem erro.
+
+Implementado como `user_timezone: str = ""` (coerente com o resto da dataclass,
+onde todo default é *vazio*, nunca *política*). A fonte única é
+`LlmAppService.chat()`, que resolve via `UserSettingsService.get_timezone()`,
+cujo fallback é o `DEFAULT_TIMEZONE` **injetado pela IoC**. Um tz vazio chegando
+a um graph é bug de wiring e **falha alto** no `clock` (`ValidationError`).
+
+### 0.3 A localização pt-BR não mora no `clock` (revisa §4 e §7) — parecer do `arquiteto`
+
+`domain/services/clock.py` é **locale-free**: devolve `datetime` aware e formata
+pelo `fmt` recebido. Os nomes de dia da semana em português vivem em
+`application/appservices/datetime_presenter.py`
+(`format_current_datetime(tz) -> "sexta-feira, 10/07/2026 11:32 (America/Sao_Paulo)"`),
+que é apresentação, não domínio de tempo.
+
+### 0.4 `llm_app_service` NÃO converte `occurred_at` (revisa §8 item 5)
+
+O §8 pedia "formatação do fluxo curto-circuitado com o tz do usuário", mas
+`occurred_at` é **data civil** e o §3.6 proíbe convertê-la (converter um `date`
+puro mudaria o dia). O que mudou foi a **referência**: o fluxo resolve
+"hoje"/"ontem" na data local do usuário, então a confirmação já imprime o dia
+dele. Nenhuma conversão da data civil.
+
+### 0.5 Achados de segurança fechados antes do merge (`especialista-de-seguranca`)
+
+A auditoria **validou o argumento central do §3.1** (a escrita via chat é
+contida: um único campo, de um conjunto fechado de ~600 IANA, na própria linha
+do usuário autenticado, reversível com uma frase; nenhum caminho — direto ou
+transitivo — do chat para escrita em outra entidade). Zero achados Críticos ou
+Altos. Corrigidos nesta branch:
+
+- **TZ-001/TZ-002 (Médio):** a `location` transcrita pelo LLM era ecoada na
+  resposta — que é persistida no histórico **no papel `assistant`** e reinjetada
+  crua pelo `OnlyTalkGraph` nos turnos seguintes — sem `sanitize_for_prompt` e
+  sem cap, permitindo **forjar uma linha de turno**. Agora sanitizada no
+  `classify` (cap 60), a mesma defesa que vehicle/pet já aplicam. O cap também
+  mata o custo do fuzzy sobre uma `location` gigante.
+- **TZ-003 (Baixo):** um `DEFAULT_TIMEZONE` com typo derrubava **todo turno de
+  chat** de todo usuário sem linha em `user_settings`. Agora falha na composição
+  (guard no construtor do `UserSettingsService`).
+- **TZ-009 (latente):** `MainGraph._handle_smart_home_security_cams` reconstruía
+  o `GraphInvokeRequest` e descartava silenciosamente `user_timezone`, `memories`
+  e `context_hints`. Passa o request intacto.
+
+**Follow-ups registrados, fora do escopo desta branch:** TZ-004 (`set_timezone` é
+check-then-act; um upsert atômico `ON CONFLICT` eliminaria a corrida, hoje
+contida pelo `UNIQUE`); TZ-005 (a garantia "o chat só escreve settings" é
+convencional, não estrutural — o `LlmAppService` recebe o service com poder de
+escrita embora só leia; um `ReadOnlyUserSettingsRepository` daria a mesma
+garantia por ISP que vehicle/pet têm); e `context_summary_graph.py:59`, que ainda
+usa `datetime.now()` do servidor no seu `current_datetime` (roda no background da
+compaction, sem `GraphInvokeRequest`, logo sem tz para ler — não estava no §8).
 
 ---
 

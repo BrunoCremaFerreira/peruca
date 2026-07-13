@@ -34,6 +34,9 @@ pt_core_news_sm @ https://github.com/explosion/spacy-models/releases/download/pt
 
 # Utils
 typing-extensions==4.15.0
+# IANA tz database fallback for zoneinfo: the slim images ship the system tzdata
+# today, but pinning the package guarantees the pure-Python source if that changes.
+tzdata==2025.2
 
 # Tests
 pytest==9.0.3

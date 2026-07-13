@@ -16,6 +16,9 @@ from application.graphs.only_talk_graph import OnlyTalkGraph
 from domain.entities import GraphInvokeRequest, User
 
 
+_TZ = "America/Sao_Paulo"
+
+
 _PROMPT_TEMPLATE = "{user_name}|{user_summary}|{user_memories}|{siblings}|{current_datetime}"
 
 
@@ -73,7 +76,7 @@ class TestHistoryWindow:
         graph = _make_graph(get_hist, history_max_messages=20)
 
         injected = _capture_history(
-            graph, GraphInvokeRequest(message="oi", user=_user(), context_hints={})
+            graph, GraphInvokeRequest(message="oi", user=_user(), context_hints={}, user_timezone=_TZ)
         )
 
         assert len(injected) == 20
@@ -86,7 +89,7 @@ class TestHistoryWindow:
         graph = _make_graph(get_hist, history_max_messages=20)
 
         injected = _capture_history(
-            graph, GraphInvokeRequest(message="oi", user=_user(), context_hints={})
+            graph, GraphInvokeRequest(message="oi", user=_user(), context_hints={}, user_timezone=_TZ)
         )
         assert injected == messages
 
@@ -96,6 +99,6 @@ class TestHistoryWindow:
         graph = _make_graph(get_hist, history_max_messages=None)
 
         injected = _capture_history(
-            graph, GraphInvokeRequest(message="oi", user=_user(), context_hints={})
+            graph, GraphInvokeRequest(message="oi", user=_user(), context_hints={}, user_timezone=_TZ)
         )
         assert len(injected) == 100

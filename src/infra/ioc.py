@@ -24,6 +24,7 @@ from application.graphs.smart_home_cameras_graph import SmartHomeCamerasGraph
 from application.graphs.vehicle_maintenance_graph import VehicleMaintenanceGraph
 from application.graphs.pet_health_graph import PetHealthGraph
 from application.graphs.calculator_graph import CalculatorGraph
+from application.graphs.user_settings_graph import UserSettingsGraph
 from domain.interfaces.data_repository import (
     ContextRepository,
     ConversationContextStore,
@@ -46,6 +47,7 @@ from domain.interfaces.pet_repository import (
     PetHealthEventRepository,
     PetRepository,
 )
+from domain.interfaces.user_settings_repository import UserSettingsRepository
 from domain.interfaces.vehicle_repository import (
     MaintenanceRecordRepository,
     VehicleRepository,
@@ -63,6 +65,7 @@ from domain.services.vehicle_service import VehicleService
 from domain.services.smart_home_service import SmartHomeService
 from domain.services.user_memory_service import UserMemoryService
 from domain.services.user_service import UserService
+from domain.services.user_settings_service import UserSettingsService
 from infra.data.external.music.music_assistant.music_assistant_music_repository import (
     MusicAssistantMusicRepository,
 )
@@ -112,6 +115,9 @@ from infra.data.sqlite.sqlite_user_memory_repository import (
     SqliteUserMemoryRepository,
 )
 from infra.data.sqlite.sqlite_user_repository import SqliteUserRepository
+from infra.data.sqlite.sqlite_user_settings_repository import (
+    SqliteUserSettingsRepository,
+)
 from infra.data.read_only_vehicle_repository import ReadOnlyVehicleRepository
 from infra.data.read_only_pet_repository import ReadOnlyPetRepository
 from infra.math.sympy_symbolic_math_engine import SympySymbolicMathEngine
@@ -184,6 +190,7 @@ def get_main_graph() -> MainGraph:
         vehicle_maintenance_graph = get_vehicle_maintenance_graph()
         pet_health_graph = get_pet_health_graph()
         calculator_graph = get_calculator_graph()
+        user_settings_graph = get_user_settings_graph()
 
         _repo_cache[cache_key] = MainGraph(
             llm_chat=llm_chat,
@@ -197,6 +204,34 @@ def get_main_graph() -> MainGraph:
             vehicle_maintenance_graph=vehicle_maintenance_graph,
             pet_health_graph=pet_health_graph,
             calculator_graph=calculator_graph,
+            user_settings_graph=user_settings_graph,
+            provider=settings.llm_provider_type,
+            strip_think_directive=settings.llm_strip_think_directive,
+        )
+    return _repo_cache[cache_key]
+
+
+def get_user_settings_graph() -> UserSettingsGraph:
+    """
+    IOC for User Settings Graph. The LLM only transcribes the spoken location;
+    timezone_resolver (Python) is the authority on the IANA identifier.
+    """
+
+    settings = _get_settings()
+
+    cache_key = ("graph", "user_settings")
+    if cache_key not in _repo_cache:
+        llm_chat = get_llm_chat(
+            model=settings.llm_user_settings_graph_chat_model,
+            temperature=settings.llm_user_settings_graph_chat_temperature,
+            reasoning=_resolve_reasoning(
+                settings.llm_user_settings_graph_chat_reasoning
+            ),
+        )
+
+        _repo_cache[cache_key] = UserSettingsGraph(
+            llm_chat=llm_chat,
+            user_settings_service=get_user_settings_service(),
             provider=settings.llm_provider_type,
             strip_think_directive=settings.llm_strip_think_directive,
         )
@@ -688,6 +723,7 @@ def get_llm_app_service() -> LlmAppService:
         pet_health_flow_service=get_pet_health_flow_service(),
         pet_health_service=get_pet_health_service(),
         pet_read_repository=get_pet_read_repository(),
+        user_settings_service=get_user_settings_service(),
         chat_image_max_bytes=settings.chat_image_max_bytes,
         chat_image_max_count=settings.chat_image_max_count,
         chat_image_allowed_mimes=settings.chat_image_allowed_mimes,
@@ -913,6 +949,19 @@ def get_pet_health_flow_service() -> PetHealthFlowService:
     )
 
 
+def get_user_settings_service() -> UserSettingsService:
+    """
+    IOC for User Settings Service. The default timezone is policy: it lives in
+    the settings and is injected here — the domain never hardcodes a zone.
+    """
+
+    settings = _get_settings()
+    return UserSettingsService(
+        user_settings_repository=get_user_settings_repository(),
+        default_timezone=settings.default_timezone,
+    )
+
+
 def get_user_memory_service() -> UserMemoryService:
     """
     IOC for User Memory Service
@@ -1009,6 +1058,21 @@ def get_user_memory_repository() -> UserMemoryRepository:
     cache_key = ("sqlite_user_memory", settings.peruca_db_connection_string)
     if cache_key not in _repo_cache:
         _repo_cache[cache_key] = SqliteUserMemoryRepository(db_path=settings.peruca_db_connection_string)
+    return _repo_cache[cache_key]
+
+
+def get_user_settings_repository() -> UserSettingsRepository:
+    """
+    User Settings Repository (1:1 with a user; the `user_settings` table is
+    created on first use, like every other Sqlite repository).
+    """
+
+    settings = _get_settings()
+    cache_key = ("sqlite_user_settings", settings.peruca_db_connection_string)
+    if cache_key not in _repo_cache:
+        _repo_cache[cache_key] = SqliteUserSettingsRepository(
+            db_path=settings.peruca_db_connection_string
+        )
     return _repo_cache[cache_key]
 
 

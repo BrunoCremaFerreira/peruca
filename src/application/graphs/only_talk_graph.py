@@ -2,6 +2,7 @@ import logging
 import re
 from typing import Callable, Optional
 
+from application.appservices.datetime_presenter import format_current_datetime
 from application.appservices.prompt_sanitizer import sanitize_summary_for_prompt
 from application.graphs.graph import Graph
 from domain.entities import GraphInvokeRequest
@@ -10,7 +11,6 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.messages import HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from datetime import datetime
 
 
 logger = logging.getLogger(__name__)
@@ -225,7 +225,10 @@ class OnlyTalkGraph(Graph):
             user_summary=user.summary,
             user_memories=user_memories,
             siblings=siblings,
-            current_datetime=datetime.now().astimezone().strftime("%d/%m/%Y %H:%M"),
+            # The instant in the USER's timezone (never the server's), with the
+            # weekday spelled out: the models systematically get the weekday wrong
+            # when they have to derive it from a date, so it is handed to them.
+            current_datetime=format_current_datetime(invoke_request.user_timezone),
         )
 
     def _run_pass(self, system_message, history_messages, human_content) -> str:

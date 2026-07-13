@@ -9,7 +9,7 @@ pet's birth_date (§2.8) — only when birth_date is set.
 """
 
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 import pytest
@@ -91,11 +91,16 @@ class TestRegister:
         pet = _pet(user_id)
         pet_read_repo.get_by_id.return_value = pet
         service = PetHealthService(event_repo, pet_read_repo)
+        # Unambiguously future = UTC today + 2 days. "+1 day" is no longer a
+        # future date: occurred_at is a civil date (no timezone), so the guard is
+        # clock.max_civil_date_on_earth() (UTC+14's local date = UTC today+1),
+        # which is already "today" for a user in the earliest timezone.
+        beyond_earth = datetime.now(timezone.utc).date() + timedelta(days=2)
         with pytest.raises(ValidationError):
             service.register(
                 PetHealthEventAdd(pet_id=pet.id, event_type="vaccine",
                                   description="DHPPI",
-                                  occurred_at=date.today() + timedelta(days=1)),
+                                  occurred_at=beyond_earth),
                 user_id,
             )
         event_repo.add.assert_not_called()

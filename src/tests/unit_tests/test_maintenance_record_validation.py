@@ -7,7 +7,7 @@ non-future date not before 1950.
 """
 
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from domain.validations.maintenance_record_validation import (
     MaintenanceRecordValidator,
@@ -16,6 +16,10 @@ from domain.validations.maintenance_record_validation import (
 
 def _valid_uuid() -> str:
     return str(uuid.uuid4())
+
+
+def _utc_today() -> date:
+    return datetime.now(timezone.utc).date()
 
 
 class TestMaintenanceRecordValidatorId:
@@ -67,8 +71,11 @@ class TestMaintenanceRecordValidatorPerformedAt:
         )
 
     def test_future__error(self):
-        tomorrow = date.today() + timedelta(days=1)
-        assert MaintenanceRecordValidator().validate_performed_at(tomorrow).errors
+        # "Future" is now measured against the greatest civil date that exists
+        # anywhere on Earth (UTC+14), not against the server's own date — see
+        # TestMaintenanceRecordValidatorPerformedAtEarthBoundary below.
+        beyond_earth = _utc_today() + timedelta(days=2)
+        assert MaintenanceRecordValidator().validate_performed_at(beyond_earth).errors
 
     def test_none__error(self):
         assert MaintenanceRecordValidator().validate_performed_at(None).errors
@@ -77,6 +84,30 @@ class TestMaintenanceRecordValidatorPerformedAt:
         assert (
             MaintenanceRecordValidator().validate_performed_at(date(1949, 12, 31)).errors
         )
+
+
+class TestMaintenanceRecordValidatorPerformedAtEarthBoundary:
+    """
+    performed_at is a CIVIL date (no timezone), so the future guard must compare
+    it to ``clock.max_civil_date_on_earth()`` (= UTC today + 1 day, the local
+    date at UTC+14) instead of the server's ``date.today()``. A user in a
+    timezone ahead of the server registering "today" must not be rejected.
+    """
+
+    def test_utc_today__accepted(self):
+        assert (
+            MaintenanceRecordValidator().validate_performed_at(_utc_today()).errors == []
+        )
+
+    def test_utc_today_plus_one_day__accepted(self):
+        # It is already "today" somewhere on Earth (UTC+14).
+        earth_max = _utc_today() + timedelta(days=1)
+        assert MaintenanceRecordValidator().validate_performed_at(earth_max).errors == []
+
+    def test_utc_today_plus_two_days__rejected(self):
+        # The guard is still a guard: no date exists this far ahead anywhere.
+        beyond_earth = _utc_today() + timedelta(days=2)
+        assert MaintenanceRecordValidator().validate_performed_at(beyond_earth).errors
 
 
 class TestMaintenanceRecordValidatorOdometer:

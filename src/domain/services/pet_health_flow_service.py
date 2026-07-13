@@ -144,8 +144,18 @@ class PetHealthFlowService:
     # Deterministic reply parsing (§9.3 + §2.6)
     # ------------------------------------------------------------------ #
     def parse_slot_reply(
-        self, pending: PendingFlow, message: str, pets=None
+        self,
+        pending: PendingFlow,
+        message: str,
+        pets=None,
+        *,
+        reference: Optional[date] = None,
     ) -> SlotReplyResult:
+        """
+        ``reference`` is the civil date "hoje"/"ontem" are resolved against — the
+        caller (LlmAppService) passes the USER's local date. None keeps the
+        server's date, for callers that have no timezone to offer.
+        """
         op = pending.operation
 
         if op == "delete_confirm":
@@ -167,7 +177,7 @@ class PetHealthFlowService:
         if expected == "event_name":
             return self._parse_event_name(message)
         if expected == "date":
-            return self._parse_date(message)
+            return self._parse_date(message, reference)
         if expected == "pet":
             return self._parse_pet(message, pets or [])
         return SlotReplyResult(kind="none")
@@ -179,8 +189,10 @@ class PetHealthFlowService:
             return SlotReplyResult(kind="none")
         return SlotReplyResult(kind="value", value=" ".join(kept))
 
-    def _parse_date(self, message: str) -> SlotReplyResult:
-        reference = date.today()
+    def _parse_date(
+        self, message: str, reference: Optional[date] = None
+    ) -> SlotReplyResult:
+        reference = reference or date.today()
         content = [t for t in normalize(message).split() if t not in _DATE_FILLER]
         joined = " ".join(content)
 

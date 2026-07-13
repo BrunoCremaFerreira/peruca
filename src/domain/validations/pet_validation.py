@@ -1,5 +1,6 @@
 from datetime import date
 
+from domain.services.clock import max_civil_date_on_earth
 from domain.services.text_matching import normalize
 from domain.validations.base_validation import BaseValidation
 
@@ -78,7 +79,9 @@ class PetValidator(BaseValidation):
             return self
         if not isinstance(birth_date, date):
             self.errors.append("The 'birth_date' must be a date")
-        elif birth_date > date.today():
+        # A civil date has no timezone: the only correct upper bound is the
+        # greatest local date on Earth (UTC+14), not the server's own date.
+        elif birth_date > max_civil_date_on_earth():
             self.errors.append("The 'birth_date' cannot be in the future")
         return self
 

@@ -21,6 +21,9 @@ pytest.importorskip("langgraph")
 from application.graphs.vehicle_maintenance_graph import VehicleMaintenanceGraph
 
 
+_TZ = "America/Sao_Paulo"
+
+
 def _uuid():
     return str(uuid.uuid4())
 
@@ -53,7 +56,7 @@ def _make_graph(fleet=None, maintenance_service=None, flow_service=None):
 
 
 def _req(user, message="msg"):
-    return GraphInvokeRequest(message=message, user=user)
+    return GraphInvokeRequest(message=message, user=user, user_timezone=_TZ)
 
 
 class TestListVehicles:

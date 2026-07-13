@@ -1,5 +1,6 @@
 from datetime import date
 
+from domain.services.clock import max_civil_date_on_earth
 from domain.validations.base_validation import BaseValidation
 
 
@@ -44,7 +45,9 @@ class MaintenanceRecordValidator(BaseValidation):
             self.errors.append("The 'performed_at' is empty")
         elif not isinstance(performed_at, date):
             self.errors.append("The 'performed_at' must be a date")
-        elif performed_at > date.today():
+        # A civil date has no timezone: the only correct upper bound is the
+        # greatest local date on Earth (UTC+14), not the server's own date.
+        elif performed_at > max_civil_date_on_earth():
             self.errors.append("The 'performed_at' cannot be in the future")
         elif performed_at < _MIN_DATE:
             self.errors.append("The 'performed_at' is too far in the past")

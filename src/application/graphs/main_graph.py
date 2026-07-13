@@ -34,6 +34,7 @@ class MainGraphState(TypedDict):
     output_vehicle: Optional[str]
     output_pet: Optional[str]
     output_calculator: Optional[str]
+    output_user_settings: Optional[str]
     output: Optional[str]
     # Side channel: the factual image description produced by the only_talk
     # graph. Consumed by LlmAppService for history persistence; deliberately
@@ -58,6 +59,7 @@ class MainGraph(Graph):
         vehicle_maintenance_graph=None,
         pet_health_graph=None,
         calculator_graph=None,
+        user_settings_graph=None,
         provider: str = "OLLAMA",
         strip_think_directive: bool = False,
     ):
@@ -73,6 +75,7 @@ class MainGraph(Graph):
         self.vehicle_maintenance_graph = vehicle_maintenance_graph
         self.pet_health_graph = pet_health_graph
         self.calculator_graph = calculator_graph
+        self.user_settings_graph = user_settings_graph
         self.classification_prompt = ChatPromptTemplate.from_template(
             self.load_prompt("main_graph.md")
         )
@@ -172,6 +175,20 @@ class MainGraph(Graph):
             return {"output_calculator": self._remove_thinking_tag(output or "")}
         return {"output_calculator": result.get("output")}
 
+    def _handle_user_settings(self, data):
+        logger.info("user_settings graph triggered")
+        result = self.user_settings_graph.invoke(invoke_request=data["input"])
+        # Main-classifier false positive: the sub-classifier found no actionable
+        # setting change ("que horas são?" is conversation, not configuration).
+        # Degrade to free conversation instead of replying "I did not understand"
+        # (mirrors _handle_pet_health).
+        if result.get("intent") == ["not_recognized"]:
+            logger.info("user_settings not_recognized — falling back to only_talk")
+            fallback = self.only_talk_graph.invoke(invoke_request=data["input"])
+            output = fallback.get("output") if isinstance(fallback, dict) else fallback
+            return {"output_user_settings": self._remove_thinking_tag(output or "")}
+        return {"output_user_settings": result.get("output")}
+
     def _handle_final_response(self, data):
         output_shopping = data.get("output_shopping")
         listing = (
@@ -211,6 +228,7 @@ class MainGraph(Graph):
                 data.get("output_vehicle"),
                 data.get("output_pet"),
                 mergeable_calculator,
+                data.get("output_user_settings"),
             ]
             if e is not None and e.strip()
         ]
@@ -259,9 +277,7 @@ class MainGraph(Graph):
 
     def _handle_smart_home_security_cams(self, data):
         logger.info("smart_home_security_cams graph triggered")
-        result = self.smart_home_cameras_graph.invoke(
-            GraphInvokeRequest(message=data["input"].message, user=data["input"].user)
-        )
+        result = self.smart_home_cameras_graph.invoke(invoke_request=data["input"])
         return {"output_cams": result.get("output", "")}
 
     def _handle_shopping_list(self, data):
@@ -342,6 +358,10 @@ class MainGraph(Graph):
         # Calculator has no external dependency: wired unconditionally.
         workflow.add_node("calculator", RunnableLambda(self._handle_calculator))
         action_nodes.append("calculator")
+
+        # User settings has no external dependency either: wired unconditionally.
+        workflow.add_node("user_settings", RunnableLambda(self._handle_user_settings))
+        action_nodes.append("user_settings")
 
         workflow.add_node("final_response", RunnableLambda(self._handle_final_response))
         workflow.add_edge(START, "classify")

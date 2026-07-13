@@ -6,13 +6,17 @@ occurred_at must be a real, non-future date not before 1980-01-01.
 """
 
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from domain.validations.pet_health_event_validation import PetHealthEventValidator
 
 
 def _valid_uuid() -> str:
     return str(uuid.uuid4())
+
+
+def _utc_today() -> date:
+    return datetime.now(timezone.utc).date()
 
 
 class TestPetHealthEventValidatorId:
@@ -69,14 +73,36 @@ class TestPetHealthEventValidatorOccurredAt:
         )
 
     def test_future__error(self):
-        tomorrow = date.today() + timedelta(days=1)
-        assert PetHealthEventValidator().validate_occurred_at(tomorrow).errors
+        # "Future" is measured against the greatest civil date existing anywhere
+        # on Earth (UTC+14) — see TestPetHealthEventValidatorOccurredAtEarthBoundary.
+        beyond_earth = _utc_today() + timedelta(days=2)
+        assert PetHealthEventValidator().validate_occurred_at(beyond_earth).errors
 
     def test_none__error(self):
         assert PetHealthEventValidator().validate_occurred_at(None).errors
 
     def test_before_1980__error(self):
         assert PetHealthEventValidator().validate_occurred_at(date(1979, 12, 31)).errors
+
+
+class TestPetHealthEventValidatorOccurredAtEarthBoundary:
+    """
+    occurred_at is a CIVIL date (no timezone): the future guard must compare it
+    to ``clock.max_civil_date_on_earth()`` (UTC today + 1 day = the local date at
+    UTC+14), never to the server's ``date.today()`` — otherwise a user in a
+    timezone ahead of the server cannot register a vaccine given "today".
+    """
+
+    def test_utc_today__accepted(self):
+        assert PetHealthEventValidator().validate_occurred_at(_utc_today()).errors == []
+
+    def test_utc_today_plus_one_day__accepted(self):
+        earth_max = _utc_today() + timedelta(days=1)
+        assert PetHealthEventValidator().validate_occurred_at(earth_max).errors == []
+
+    def test_utc_today_plus_two_days__rejected(self):
+        beyond_earth = _utc_today() + timedelta(days=2)
+        assert PetHealthEventValidator().validate_occurred_at(beyond_earth).errors
 
 
 class TestPetHealthEventValidatorChain:

@@ -149,6 +149,9 @@ LLM_PET_HEALTH_GRAPH_CHAT_MODEL=gemma4:12b
 LLM_CALCULATOR_GRAPH_CHAT_MODEL=gemma4:12b
 LLM_CONTEXT_SUMMARY_GRAPH_CHAT_MODEL=gemma4:12b
 LLM_CONTEXT_SUMMARY_GRAPH_CHAT_TEMPERATURE=0.2  # fidelity over creativity (0.1 makes the 12b telegraphic on long text)
+LLM_USER_SETTINGS_GRAPH_CHAT_MODEL=gemma4:12b
+LLM_USER_SETTINGS_GRAPH_CHAT_TEMPERATURE=0.1    # classifier: the LLM only transcribes the city; Python resolves the IANA id
+DEFAULT_TIMEZONE=America/Sao_Paulo               # timezone of a user with no `user_settings` row; the only timezone literal in the system
 MAINTENANCE_FLOW_TTL_SECONDS=600                # TTL for the pending multi-turn maintenance flow AND the pet-health flow (shared; it is the flow mechanism's TTL, not a per-domain one) / focused record
 PERUCA_API_KEY=                                 # X-API-Key required on every route except /health; empty = migration mode (open, logs a warning)
 PERUCA_DB_CONNECTION_STRING=<path>/peruca.db
@@ -205,6 +208,7 @@ LlmAppService.chat()                           ← loads user memories; probes M
               ├─► VehicleMaintenanceGraph.invoke() ← vehicle maintenance records (LLM call); vehicle CRUD is REST-only
               ├─► PetHealthGraph.invoke()      ← pet vaccines/health events (LLM call); pet CRUD is REST-only
               ├─► CalculatorGraph.invoke()     ← sequential/scientific/symbolic math (LLM only transcribes; Decimal + SymPy compute)
+              ├─► UserSettingsGraph.invoke()   ← per-user preferences: get/set the timezone (LLM only transcribes the city; Python resolves the IANA id)
               ├─► OnlyTalkGraph.invoke()        ← free conversation (chain, not StateGraph); pets are injected as "siblings" via context_hints
               └─► [final_response]              ← merges multiple outputs (LLM call #2, if needed)
 
@@ -213,12 +217,12 @@ MemoryAppService.learn_from_message() ─► MemoryGraph.invoke()   ← extracts
 ContextCompactionAppService.compact_if_needed() ─► ContextSummaryGraph.invoke()  ← summarizes the OLD turns → Redis
 ```
 
-All graphs inherit from `Graph` (ABC at `application/graphs/graph.py`) and implement `invoke(GraphInvokeRequest) -> dict`. `GraphInvokeRequest` carries `message: str`, `user: User`, `memories: list[str]`, and `context_hints: dict` (e.g. `music_is_playing`) through the whole chain. `LlmAppService.chat()` returns `{"intents": [...], "output": "..."}`, not a bare string.
+All graphs inherit from `Graph` (ABC at `application/graphs/graph.py`) and implement `invoke(GraphInvokeRequest) -> dict`. `GraphInvokeRequest` carries `message: str`, `user: User`, `memories: list[str]`, `context_hints: dict` (e.g. `music_is_playing`), and `user_timezone: str` (resolved once per request by `LlmAppService.chat()`) through the whole chain. `LlmAppService.chat()` returns `{"intents": [...], "output": "..."}`, not a bare string.
 
 **Key design constraints for graphs:**
 - The `classify` node in each graph both classifies intent **and** extracts structured data in a single LLM call. Downstream action nodes consume what's already in the state — they do not re-call the LLM.
 - Intent strings returned by the LLM must match the node names in the `StateGraph` exactly. The `intent_router` function returns `state["intent"]` directly as edge targets.
-- Every `classify` node first runs the shared `Graph._extract_structured_output()` (strips `<think>` blocks, normalizes curly quotes, extracts the first balanced `[...]`/`{...}` literal). It then parses that literal: `MainGraph` and `ShoppingListGraph` use `ast.literal_eval()` (their prompts emit single-quoted Python literals — never `eval()`, which would execute injected expressions); the smart-home graphs (lights/climate/sensors/cameras), `MusicGraph`, `VehicleMaintenanceGraph`, and `PetHealthGraph` use `json.loads()`; `MemoryGraph` uses `json.loads()` directly. Do not change a graph's parser without updating its corresponding prompt to match.
+- Every `classify` node first runs the shared `Graph._extract_structured_output()` (strips `<think>` blocks, normalizes curly quotes, extracts the first balanced `[...]`/`{...}` literal). It then parses that literal: `MainGraph` and `ShoppingListGraph` use `ast.literal_eval()` (their prompts emit single-quoted Python literals — never `eval()`, which would execute injected expressions); the smart-home graphs (lights/climate/sensors/cameras), `MusicGraph`, `VehicleMaintenanceGraph`, `PetHealthGraph`, and `UserSettingsGraph` use `json.loads()`; `MemoryGraph` uses `json.loads()` directly. Do not change a graph's parser without updating its corresponding prompt to match.
 - `OnlyTalkGraph` does not use `StateGraph`. It is a plain `prompt | llm` chain that **reads** conversation history (read-only): it loads `get_session_history(user.id).messages` and injects them into the `MessagesPlaceholder("history")` (alongside the user's memories and the current datetime). It does **not** write history. The turn is persisted once, centrally, in `LlmAppService._persist_turn()` for **every** intent — so reads and writes share the same `session_id = user.id` key.
 - Each graph compiles its `StateGraph` on the first `invoke()` and caches it on `self._compiled_graph` (see `Graph.__init__`); subsequent calls reuse the compiled graph. Do not reintroduce per-request recompilation.
 
@@ -267,6 +271,18 @@ Lets the user register/query/edit/remove **health events** (vaccines, dewormers,
 - **REST-only writes, enforced structurally (ISP)**: `PetReadRepository` vs `PetRepository` in `domain/interfaces/pet_repository.py`; the chat path (graph, `PetHealthService`, `LlmAppService`) gets `ReadOnlyPetRepository` (`infra/data/read_only_pet_repository.py`), which physically lacks writes. Full repo reserved for `PetAppService` (`/pet` routes). Chat write attempts hit `pet_write_forbidden` → same fixed reply.
 - **Multi-turn slot-filling + focused record + the "tomou mais alguma?" loop**: `PetHealthFlowService` collects `pet → event_name → date`; after a **vaccine** registers via the flow it arms a `register_more` operation so the next reply ("sim, a raiva" registers another; "só esta"/"não" ends). All deterministic (no LLM), short-circuited in `LlmAppService` before `MainGraph`, dispatched by `flow_domain`. Reuses the `MAINTENANCE_FLOW_TTL_SECONDS` TTL.
 - **Dynamic persona (§2.9)**: the pets registered by the user are injected into the `OnlyTalkGraph` system prompt as Peruca's "siblings" via `context_hints["user_pets_persona"]` (the old hardcoded Caçolin/Caçolão block was removed from `only_talk_graph.md`). `MemoryGraph` was told not to re-extract dated pet-health events as durable memories.
+
+### User Timezone
+
+Every "now"/"today" the chat reasons about is the user's local one, not the server's. The preference is a `UserSettings` entity (1:1 with a user, unique `user_id` in the `user_settings` table); absence of a row means "use `DEFAULT_TIMEZONE`" — a read never writes a ghost record.
+
+- **Writing it via chat is allowed** (the damage is trivial and reversible, unlike a vehicle/pet write): the `UserSettingsGraph` (intent `user_settings` in `MainGraph`, wired unconditionally) gets the full `UserSettingsRepository`. It still has **no write access whatsoever to `UserRepository`** — that is exactly why the timezone is a separate entity instead of a column on `User`.
+- **The LLM never does timezone or calendar arithmetic.** `user_settings_graph.md` only transcribes what was said (`location`) and, when it is sure, suggests an identifier (`timezone_iana`) — the key rule being "no certainty → leave it empty". Python is the authority: `domain/services/timezone_resolver.py` accepts the suggestion only if it exists in the tz database, otherwise resolves the spoken city through a curated pt-BR dictionary + fuzzy `text_matching`; nothing resolves → a friendly, example-anchored answer and no write. `domain/services/clock.py` (pure `zoneinfo`, determinism by injecting `now_utc` — the `date_resolver` pattern) does all the conversion.
+- **Single resolution point**: `LlmAppService.chat()` reads the timezone once per request and injects it into `GraphInvokeRequest.user_timezone` (a typed field, not a `context_hint`). Graphs never touch the settings repository. The field defaults to `""` — an unresolved timezone raises a `ValidationError` in the clock instead of silently pretending a zone.
+- **Datetimes are persisted in UTC and converted only for presentation** (`format_local` / `to_local`; naive values from SQLite are assumed UTC). The visible case is `smart_home_sensors_graph`'s `last_changed`. `application/appservices/datetime_presenter.py` is the single formatting point for the pt-BR wording (weekday spelled out — the models get it wrong when they must derive it) fed to `only_talk_graph.md`, whose rule forbids inventing any other time, **including for other timezones**.
+- **Civil dates never convert.** `performed_at` / `occurred_at` / `birth_date` are timezone-less event dates: converting them would move the day. What the user's timezone changes for them is only the **reference** ("hoje"/"esta semana") handed to `date_resolver` — in the graphs and, through `parse_slot_reply(..., reference=...)`, in the multi-turn flows.
+- **`max_civil_date_on_earth()`** (UTC today + 1 day, the local date at UTC+14) is the ceiling used by the future-date guards in the validators, instead of the server's `date.today()`. A civil date carries no timezone, so comparing it against one arbitrary server timezone would reject a legitimate "today" from a user living ahead of the server. `VehicleValidator`'s year ceiling is anchored on the **UTC** year for the same reason.
+- **REST stays UTC ISO-8601** (`tests/unit_tests/test_rest_utc_contract.py` freezes this): localization is a chat-presentation concern; the API client formats.
 
 ### Chat Context Compaction
 

@@ -16,6 +16,7 @@ from domain.interfaces.data_repository import (
     ConversationContextStore,
     UserRepository,
 )
+from domain.services.clock import local_date_for_user
 from domain.services.user_memory_service import UserMemoryService
 from domain.validations.image_validation import ImageValidator
 from infra.utils import is_null_or_whitespace
@@ -55,6 +56,7 @@ class LlmAppService:
         pet_health_flow_service=None,
         pet_health_service=None,
         pet_read_repository=None,
+        user_settings_service=None,
         chat_image_max_bytes: int = 5_242_880,
         chat_image_max_count: int = 4,
         chat_image_allowed_mimes: Optional[list[str]] = None,
@@ -76,6 +78,7 @@ class LlmAppService:
         self.pet_health_flow_service = pet_health_flow_service
         self.pet_health_service = pet_health_service
         self.pet_read_repository = pet_read_repository
+        self.user_settings_service = user_settings_service
         self.chat_image_max_bytes = chat_image_max_bytes
         self.chat_image_max_count = chat_image_max_count
         self.chat_image_allowed_mimes = chat_image_allowed_mimes or [
@@ -122,6 +125,15 @@ class LlmAppService:
                 value=chat_request.external_user_id,
             )
 
+        # The user's timezone is resolved ONCE per request, here — this is the
+        # single source of truth. Everything downstream (the graphs, the flow
+        # services) receives it; nothing below reaches for the settings repository
+        # or invents a default of its own.
+        user_timezone = self._user_timezone(user)
+        local_reference = (
+            local_date_for_user(user_timezone) if user_timezone else None
+        )
+
         # A pending disambiguation short-circuits normal routing: the user's
         # reply ("a primeira" / "carne de panela" / "cancelar") is resolved
         # deterministically without invoking the MainGraph (no extra LLM cost).
@@ -146,7 +158,7 @@ class LlmAppService:
             )
             if m_pending is not None:
                 consumed = self._consume_maintenance_flow(
-                    user, m_pending, chat_request.message
+                    user, m_pending, chat_request.message, local_reference
                 )
                 if consumed is not None:
                     return consumed
@@ -160,7 +172,7 @@ class LlmAppService:
             )
             if p_pending is not None:
                 consumed = self._consume_pet_health_flow(
-                    user, p_pending, chat_request.message
+                    user, p_pending, chat_request.message, local_reference
                 )
                 if consumed is not None:
                     return consumed
@@ -195,6 +207,7 @@ class LlmAppService:
             memories=memory_contents,
             context_hints=context_hints,
             images=chat_request.images,
+            user_timezone=user_timezone,
         )
         result = self.main_graph.invoke(invoke_request=invoke_request)
         output = result.get("output")
@@ -258,6 +271,17 @@ class LlmAppService:
         "check": "Marcado como comprado",
         "uncheck": "Desmarcado",
     }
+
+    def _user_timezone(self, user: User) -> str:
+        """
+        The user's IANA timezone (the service falls back to the default injected
+        by the composition root). Empty when no settings service is wired — the
+        graphs that need a timezone then fail loudly instead of silently using a
+        made-up one.
+        """
+        if self.user_settings_service is None:
+            return ""
+        return self.user_settings_service.get_timezone(user.id)
 
     def _consume_disambiguation(self, user: User, pending, message: str):
         """
@@ -336,10 +360,15 @@ class LlmAppService:
         persona = "\n".join(persona_lines)
         return hint, persona
 
-    def _consume_maintenance_flow(self, user: User, pending, message: str):
+    def _consume_maintenance_flow(
+        self, user: User, pending, message: str, reference=None
+    ):
         """
         Resolve a reply against a pending maintenance flow. Returns a final chat
         response dict, or None to fall through to the MainGraph (§9.3).
+
+        ``reference`` is the user's local civil date: "ontem" in a multi-turn flow
+        must mean the same day it means inside the graphs.
         """
         fleet = (
             self.vehicle_read_repository.get_all_by_user_id(user.id)
@@ -347,7 +376,7 @@ class LlmAppService:
             else []
         )
         result = self.maintenance_flow_service.parse_slot_reply(
-            pending, message, vehicles=fleet
+            pending, message, vehicles=fleet, reference=reference
         )
 
         if result.kind == "none":
@@ -512,10 +541,14 @@ class LlmAppService:
     # ===============================================
     # Pet health flow (§2.5 / §2.6)
     # ===============================================
-    def _consume_pet_health_flow(self, user: User, pending, message: str):
+    def _consume_pet_health_flow(
+        self, user: User, pending, message: str, reference=None
+    ):
         """
         Resolve a reply against a pending pet-health flow. Returns a final chat
         response dict, or None to fall through to the MainGraph (§9.3).
+
+        ``reference`` is the user's local civil date, as in the maintenance flow.
         """
         pets = (
             self.pet_read_repository.get_all_by_user_id(user.id)
@@ -523,7 +556,7 @@ class LlmAppService:
             else []
         )
         result = self.pet_health_flow_service.parse_slot_reply(
-            pending, message, pets=pets
+            pending, message, pets=pets, reference=reference
         )
         op = pending.operation
 

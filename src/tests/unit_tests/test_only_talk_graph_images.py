@@ -23,6 +23,9 @@ from application.graphs.only_talk_graph import OnlyTalkGraph
 from domain.entities import GraphInvokeRequest, User
 
 
+_TZ = "America/Sao_Paulo"
+
+
 _PROMPT_TEMPLATE = "{user_name}|{user_summary}|{user_memories}|{current_datetime}"
 VALID_PNG = "data:image/png;base64,aGVsbG8="
 VALID_JPEG = "data:image/jpeg;base64,/9j/AAAA"
@@ -90,7 +93,7 @@ class TestOnlyTalkGraphMultimodalInput:
     def test_no_image__content_is_plain_string(self):
         history = _make_history()
         graph = _make_graph(MagicMock(return_value=history))
-        request = GraphInvokeRequest(message="tudo bem?", user=_sample_user())
+        request = GraphInvokeRequest(message="tudo bem?", user=_sample_user(), user_timezone=_TZ)
 
         captured = _invoke_capturing(graph, request)
 
@@ -102,8 +105,7 @@ class TestOnlyTalkGraphMultimodalInput:
         history = _make_history()
         graph = _make_graph(MagicMock(return_value=history))
         request = GraphInvokeRequest(
-            message="o que é isso?", user=_sample_user(), images=[VALID_PNG]
-        )
+            message="o que é isso?", user=_sample_user(), images=[VALID_PNG], user_timezone=_TZ)
 
         captured = _invoke_capturing(graph, request)
 
@@ -119,8 +121,7 @@ class TestOnlyTalkGraphMultimodalInput:
         history = _make_history()
         graph = _make_graph(MagicMock(return_value=history))
         request = GraphInvokeRequest(
-            message="olha essas", user=_sample_user(), images=[VALID_PNG, VALID_JPEG]
-        )
+            message="olha essas", user=_sample_user(), images=[VALID_PNG, VALID_JPEG], user_timezone=_TZ)
 
         captured = _invoke_capturing(graph, request)
 
@@ -134,8 +135,7 @@ class TestOnlyTalkGraphMultimodalInput:
         get_session_history = MagicMock(return_value=history)
         graph = _make_graph(get_session_history)
         request = GraphInvokeRequest(
-            message="e agora?", user=_sample_user(), images=[VALID_PNG]
-        )
+            message="e agora?", user=_sample_user(), images=[VALID_PNG], user_timezone=_TZ)
 
         captured = _invoke_capturing(graph, request)
 
@@ -146,8 +146,7 @@ class TestOnlyTalkGraphMultimodalInput:
         history = _make_history([HumanMessage(content="oi")])
         graph = _make_graph(MagicMock(return_value=history))
         request = GraphInvokeRequest(
-            message="e agora?", user=_sample_user(), images=[VALID_PNG]
-        )
+            message="e agora?", user=_sample_user(), images=[VALID_PNG], user_timezone=_TZ)
 
         _invoke_capturing(graph, request)
 
@@ -159,8 +158,7 @@ class TestOnlyTalkGraphImageDescription:
         history = _make_history()
         graph = _make_graph(MagicMock(return_value=history))
         request = GraphInvokeRequest(
-            message="o que é isso?", user=_sample_user(), images=[VALID_PNG]
-        )
+            message="o que é isso?", user=_sample_user(), images=[VALID_PNG], user_timezone=_TZ)
 
         captured = _invoke_capturing(
             graph,
@@ -181,8 +179,7 @@ class TestOnlyTalkGraphImageDescription:
         history = _make_history()
         graph = _make_graph(MagicMock(return_value=history))
         request = GraphInvokeRequest(
-            message="o que é isso?", user=_sample_user(), images=[VALID_PNG]
-        )
+            message="o que é isso?", user=_sample_user(), images=[VALID_PNG], user_timezone=_TZ)
 
         captured = _invoke_capturing(
             graph, request, response_content="É um lindo gato, sem marcador!"
@@ -196,8 +193,7 @@ class TestOnlyTalkGraphImageDescription:
         history = _make_history()
         graph = _make_graph(MagicMock(return_value=history))
         request = GraphInvokeRequest(
-            message="o que é isso?", user=_sample_user(), images=[VALID_PNG]
-        )
+            message="o que é isso?", user=_sample_user(), images=[VALID_PNG], user_timezone=_TZ)
 
         captured = _invoke_capturing(graph, request)
 
@@ -206,7 +202,7 @@ class TestOnlyTalkGraphImageDescription:
     def test_marker_directive_absent_without_image(self):
         history = _make_history()
         graph = _make_graph(MagicMock(return_value=history))
-        request = GraphInvokeRequest(message="oi", user=_sample_user())
+        request = GraphInvokeRequest(message="oi", user=_sample_user(), user_timezone=_TZ)
 
         captured = _invoke_capturing(graph, request)
 

@@ -7,13 +7,17 @@ Fluent validator: each validate_* appends to .errors and returns self; the final
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from domain.validations.vehicle_validation import VehicleValidator
 
 
 def _valid_uuid() -> str:
     return str(uuid.uuid4())
+
+
+def _utc_year() -> int:
+    return datetime.now(timezone.utc).year
 
 
 class TestVehicleValidatorId:
@@ -82,12 +86,15 @@ class TestVehicleValidatorYear:
         assert VehicleValidator().validate_year(1949).errors
 
     def test_after_current_plus_one__error(self):
-        future = datetime.now().year + 2
+        future = _utc_year() + 2
         assert VehicleValidator().validate_year(future).errors
 
     def test_next_year_is_allowed(self):
         # A model-year one ahead of the current calendar year is legitimate.
-        assert VehicleValidator().validate_year(datetime.now().year + 1).errors == []
+        # The ceiling is anchored on the UTC year: a naive datetime.now() makes
+        # the SERVER's timezone the authority, and on the New Year's Eve window a
+        # UTC-behind server would reject a year that is already current in UTC.
+        assert VehicleValidator().validate_year(_utc_year() + 1).errors == []
 
 
 class TestVehicleValidatorChainAndValidate:

@@ -18,6 +18,7 @@ from domain.entities import (
     PendingFlow,
 )
 from domain.exceptions import ValidationError
+from domain.services.clock import local_date_for_user
 from domain.services.date_resolver import (
     parse_explicit_date,
     resolve_date_token,
@@ -101,9 +102,13 @@ class PetHealthGraph(Graph):
         pets = self._pets(user.id)
         available = self._render_available_pets(pets)
 
+        # "Today" is the user's civil date, never the server's: a request at
+        # 02:30Z is still the previous day in São Paulo.
+        reference = local_date_for_user(request.user_timezone)
+
         payload = {
             "input": request.message,
-            "current_date": date.today().isoformat(),
+            "current_date": reference.isoformat(),
             "available_pets": available,
             "history": self._recent_history(user.id),
         }
@@ -129,9 +134,9 @@ class PetHealthGraph(Graph):
 
         pet_term = (parsed.get("pet_term") or "").strip()
         occurred_at = self._resolve_date(
-            parsed.get("date_token") or "", parsed.get("date_value") or ""
+            parsed.get("date_token") or "", parsed.get("date_value") or "", reference
         )
-        period = resolve_period(parsed.get("period") or "", date.today())
+        period = resolve_period(parsed.get("period") or "", reference)
 
         return {
             "intent": intents,
@@ -277,7 +282,10 @@ class PetHealthGraph(Graph):
                 )
             }
         update, human = self._build_edit(
-            focus, (data.get("edit_field") or ""), (data.get("new_value") or "")
+            focus,
+            (data.get("edit_field") or ""),
+            (data.get("new_value") or ""),
+            local_date_for_user(data["input"].user_timezone),
         )
         if update is None:
             return {
@@ -447,7 +455,9 @@ class PetHealthGraph(Graph):
                 {
                     "input": data.get("query") or "",
                     "user_name": user.name,
-                    "current_date": date.today().isoformat(),
+                    "current_date": local_date_for_user(
+                        data["input"].user_timezone
+                    ).isoformat(),
                     "pet_name": pet.name,
                     "records": records_block,
                 }
@@ -496,14 +506,16 @@ class PetHealthGraph(Graph):
             logger.warning("failed to load focus: %s", error)
             return None
 
-    def _build_edit(self, focus: dict, edit_field: str, new_value: str):
+    def _build_edit(
+        self, focus: dict, edit_field: str, new_value: str, reference: date
+    ):
         field = (edit_field or "").lower()
         record_id = focus.get("record_id")
         if not record_id:
             return None, None
 
         if "data" in field or "dia" in field:
-            parsed = parse_explicit_date(new_value, date.today())
+            parsed = parse_explicit_date(new_value, reference)
             if parsed is None:
                 return None, None
             human = (
@@ -530,13 +542,13 @@ class PetHealthGraph(Graph):
             return iso
 
     @staticmethod
-    def _resolve_date(token: str, value: str) -> Optional[date]:
+    def _resolve_date(token: str, value: str, reference: date) -> Optional[date]:
         if token:
-            resolved = resolve_date_token(token, date.today())
+            resolved = resolve_date_token(token, reference)
             if resolved is not None:
                 return resolved
         if value:
-            return parse_explicit_date(value, date.today())
+            return parse_explicit_date(value, reference)
         return None
 
     @staticmethod

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from domain.validations.base_validation import BaseValidation
 
@@ -61,6 +61,8 @@ class VehicleValidator(BaseValidation):
             self.errors.append("The 'year' is empty")
         elif not isinstance(year, int) or isinstance(year, bool):
             self.errors.append("The 'year' must be an integer")
-        elif year < _MIN_YEAR or year > datetime.now().year + 1:
+        # UTC, not the server's local year: the +1 slack already absorbs the
+        # new-year edge for users ahead of UTC.
+        elif year < _MIN_YEAR or year > datetime.now(timezone.utc).year + 1:
             self.errors.append(f"Invalid year: {year}")
         return self

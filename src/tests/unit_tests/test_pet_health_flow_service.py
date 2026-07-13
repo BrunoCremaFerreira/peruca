@@ -378,3 +378,46 @@ class TestResultType:
         p = _pending_register(["event_name"], {"pet_id": "p", "pet_name": "x"})
         r = _service().parse_slot_reply(p, "DHPPI")
         assert isinstance(r, SlotReplyResult)
+
+
+# --------------------------------------------------------------------------- #
+# Date reference injected by the caller (plan §8.4 / §10.6)
+#
+# Same fix as MaintenanceFlowService: `_parse_date` must stop reading the SERVER's
+# date and take the reference from the caller, which passes the user's LOCAL date.
+#
+#     parse_slot_reply(pending, message, pets=None, reference: date = None)
+# --------------------------------------------------------------------------- #
+class TestDateReference:
+    def _p(self):
+        return _pending_register(
+            ["date"], {"pet_id": "p1", "pet_name": "Caçolin", "event_name": "raiva"}
+        )
+
+    def test_today_token__resolves_against_the_given_reference(self):
+        reference = date(2026, 7, 9)
+        r = _service().parse_slot_reply(self._p(), "hoje", reference=reference)
+        assert r.kind == "value"
+        assert r.value == reference
+
+    def test_yesterday_token__resolves_against_the_given_reference(self):
+        reference = date(2026, 7, 9)
+        r = _service().parse_slot_reply(self._p(), "ontem", reference=reference)
+        assert r.kind == "value"
+        assert r.value == reference - timedelta(days=1)
+
+    def test_future_guard__is_relative_to_the_given_reference(self):
+        reference = date(2026, 7, 9)
+        r = _service().parse_slot_reply(self._p(), "10/07/2026", reference=reference)
+        assert r.kind == "invalid"
+
+    def test_reference_day_itself__is_not_in_the_future(self):
+        reference = date(2026, 7, 9)
+        r = _service().parse_slot_reply(self._p(), "09/07/2026", reference=reference)
+        assert r.kind == "value"
+        assert r.value == reference
+
+    def test_no_reference__falls_back_to_the_server_date(self):
+        r = _service().parse_slot_reply(self._p(), "hoje")
+        assert r.kind == "value"
+        assert r.value == date.today()
