@@ -246,3 +246,143 @@ class TestClassifyIntentFallback:
             f"Expected intent=['not_recognized'] for empty LLM output, "
             f"got {result['intent']!r}"
         )
+
+
+# ===========================================================================
+# TestClassifyIntentRecentHistory  (feature: add items from conversation
+# context — TDD, RED phase)
+# ===========================================================================
+
+
+def _make_graph_with_history_template() -> ShoppingListGraph:
+    """
+    Build a graph whose (patched) prompt template declares BOTH variables the
+    real shopping_list_graph.md will declare: {recent_history} and {input}.
+    _classify_intent must therefore always supply recent_history — with the
+    hint value when present, with the literal "(vazio)" otherwise.
+    """
+    llm_chat = MagicMock()
+    shopping_list_service = MagicMock()
+
+    template = "history:\n{recent_history}\nmessage: {input}"
+    with patch.object(ShoppingListGraph, "load_prompt", return_value=template):
+        graph = ShoppingListGraph(
+            llm_chat=llm_chat,
+            shopping_list_service=shopping_list_service,
+        )
+
+    return graph
+
+
+def _make_invoke_request_with_hints(context_hints=None) -> "GraphInvokeRequest":
+    from domain.entities import GraphInvokeRequest, User
+
+    return GraphInvokeRequest(
+        message="adicione esses ingredientes na lista",
+        user=User(id="user-1"),
+        context_hints=context_hints if context_hints is not None else {},
+    )
+
+
+def _llm_prompt_text(graph: ShoppingListGraph) -> str:
+    """The full prompt text the (mocked) LLM was called with."""
+    graph.llm_chat.assert_called_once()
+    prompt_value = graph.llm_chat.call_args[0][0]
+    return prompt_value.to_string()
+
+
+_VALID_ADD_OUTPUT = (
+    "{'intents': ['add_item'], 'add_item': 'ovos,3|leite,1',"
+    " 'edit_item': '', 'delete_item': '', 'check_item': '', 'uncheck_item': ''}"
+)
+
+
+class TestClassifyIntentRecentHistory:
+    def test_classify_intent__recent_history_hint_present__injected_into_prompt(
+        self,
+    ):
+        """The recent_history context hint must reach the prompt template."""
+        graph = _make_graph_with_history_template()
+        _configure_llm_output(graph, _VALID_ADD_OUTPUT)
+        hint = (
+            "usuario: como se faz bolo de laranja?\n"
+            "peruca: Você vai precisar de 3 ovos e leite."
+        )
+        request = _make_invoke_request_with_hints({"recent_history": hint})
+
+        graph._classify_intent({"input": request})
+
+        prompt_text = _llm_prompt_text(graph)
+        assert "usuario: como se faz bolo de laranja?" in prompt_text
+        assert "peruca: Você vai precisar de 3 ovos e leite." in prompt_text
+
+    def test_classify_intent__no_recent_history_hint__uses_vazio_without_keyerror(
+        self,
+    ):
+        """
+        A request without the hint (context_hints has no "recent_history" key)
+        must inject the literal "(vazio)" — never raise KeyError against the
+        template.
+        """
+        graph = _make_graph_with_history_template()
+        _configure_llm_output(graph, _VALID_ADD_OUTPUT)
+        request = _make_invoke_request_with_hints({})
+
+        result = graph._classify_intent({"input": request})
+
+        prompt_text = _llm_prompt_text(graph)
+        assert "(vazio)" in prompt_text
+        assert result["intent"] == ["add_item"]
+
+    def test_classify_intent__recent_history_hint_none__uses_vazio(self):
+        """A None hint value degrades to "(vazio)", never to "None"."""
+        graph = _make_graph_with_history_template()
+        _configure_llm_output(graph, _VALID_ADD_OUTPUT)
+        request = _make_invoke_request_with_hints({"recent_history": None})
+
+        graph._classify_intent({"input": request})
+
+        prompt_text = _llm_prompt_text(graph)
+        assert "(vazio)" in prompt_text
+
+    def test_classify_intent__history_with_braces_and_quotes__does_not_break_template(
+        self,
+    ):
+        """
+        History content containing "{", "}" and quotes is DATA injected as a
+        template variable — it must not be re-interpreted by the template
+        engine nor raise.
+        """
+        graph = _make_graph_with_history_template()
+        _configure_llm_output(graph, _VALID_ADD_OUTPUT)
+        hint = (
+            "usuario: adicione {\"leite\"} e {ovos} na lista\n"
+            "peruca: pode deixar, 'anotado'"
+        )
+        request = _make_invoke_request_with_hints({"recent_history": hint})
+
+        result = graph._classify_intent({"input": request})
+
+        prompt_text = _llm_prompt_text(graph)
+        assert '{"leite"}' in prompt_text
+        assert "{ovos}" in prompt_text
+        assert result["intent"] == ["add_item"]
+
+    def test_classify_intent__single_quoted_llm_output__still_parses_via_literal_eval(
+        self,
+    ):
+        """
+        Regression: the parser stays ast.literal_eval — a single-quoted Python
+        dict literal from the LLM must keep parsing with the history block in
+        the template.
+        """
+        graph = _make_graph_with_history_template()
+        _configure_llm_output(graph, _VALID_ADD_OUTPUT)
+        request = _make_invoke_request_with_hints(
+            {"recent_history": "usuario: oi\nperuca: olá"}
+        )
+
+        result = graph._classify_intent({"input": request})
+
+        assert result["intent"] == ["add_item"]
+        assert result["output_add_item"] == "ovos,3|leite,1"

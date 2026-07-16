@@ -74,3 +74,42 @@ class TestParseShoppingListAdd:
         graph = _make_graph()
 
         assert graph._parse_shopping_list_add("   ") == []
+
+
+class TestParseShoppingListAddItemCap:
+    """
+    Anti-flood guard (TDD — RED phase): the parser caps the batch at 30 items
+    (mirror of the maintenance _QUERY_RECORD_LIMIT), so a giant recipe or a
+    prompt-injected payload cannot flood the shopping list. The FIRST 30 items
+    are kept, in their original order.
+    """
+
+    @staticmethod
+    def _payload(count: int) -> str:
+        return "|".join(f"item{i},1" for i in range(count))
+
+    def test_above_cap__keeps_only_first_30_in_order(self):
+        graph = _make_graph()
+
+        items = graph._parse_shopping_list_add(self._payload(35))
+
+        assert len(items) == 30, (
+            f"Expected the batch capped at 30 items, got {len(items)}"
+        )
+        assert [item.name for item in items] == [f"item{i}" for i in range(30)]
+
+    def test_exactly_at_cap__keeps_all_30(self):
+        graph = _make_graph()
+
+        items = graph._parse_shopping_list_add(self._payload(30))
+
+        assert len(items) == 30
+        assert [item.name for item in items] == [f"item{i}" for i in range(30)]
+
+    def test_below_cap__regression_all_items_kept(self):
+        graph = _make_graph()
+
+        items = graph._parse_shopping_list_add(self._payload(5))
+
+        assert len(items) == 5
+        assert [item.name for item in items] == [f"item{i}" for i in range(5)]

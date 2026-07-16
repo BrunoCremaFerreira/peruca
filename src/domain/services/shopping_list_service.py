@@ -2,7 +2,11 @@ from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from typing import List
 import uuid
-from domain.commands import ShoppingListItemAdd, ShoppingListItemUpdate
+from domain.commands import (
+    ShoppingListItemAdd,
+    ShoppingListItemUpdate,
+    ShoppingListItemsAddResult,
+)
 from domain.entities import ShoppingListItem
 from domain.exceptions import ValidationError
 from domain.interfaces.data_repository import ShoppingListRepository
@@ -52,6 +56,64 @@ class ShoppingListService:
         item.when_created = datetime.now(timezone.utc)
 
         self.shopping_list_repository.add(item)
+
+    def add_items(
+        self, items_to_add: List[ShoppingListItemAdd]
+    ) -> ShoppingListItemsAddResult:
+        """
+        Add a batch of items, deduplicating against the current list as a
+        business rule (chat and REST callers get the same semantics):
+
+          - two-phase dedup per item: exact normalized (casefold/trim/accents)
+            match first, then the fuzzy resolver ``find_items_by_name``; the
+            exact match takes precedence to reduce fuzzy false positives;
+          - a duplicate is NOT re-added; a checked duplicate is reported
+            without being unchecked; a duplicate within the payload itself is
+            added once (the repetition becomes a duplicate);
+          - atomic: every item is validated BEFORE anything is persisted, so a
+            ValidationError anywhere aborts the whole batch.
+        """
+        for item_add in items_to_add:
+            ShoppingListItemValidator().validate_name(
+                item_add.name
+            ).validate_quantity(item_add.quantity).validate()
+
+        existing_items = self.shopping_list_repository.get_all() or []
+
+        added: List[ShoppingListItem] = []
+        duplicates: List[ShoppingListItem] = []
+        for item_add in items_to_add:
+            # Items added earlier in this same batch also count as "existing",
+            # so a payload repetition ("ovos, ovos") is persisted only once.
+            pool = existing_items + added
+            duplicate = self._find_duplicate(item_add.name, pool)
+            if duplicate is not None:
+                duplicates.append(duplicate)
+                continue
+
+            item = auto_map(item_add, ShoppingListItem)
+            item.id = str(uuid.uuid4())
+            item.when_created = datetime.now(timezone.utc)
+            self.shopping_list_repository.add(item)
+            added.append(item)
+
+        return ShoppingListItemsAddResult(added=added, duplicates=duplicates)
+
+    def _find_duplicate(
+        self, name: str, items: List[ShoppingListItem]
+    ) -> ShoppingListItem | None:
+        """
+        Resolve ``name`` against ``items``: exact normalized match first (it
+        short-circuits, so "carne" against "Carne" + "Carne de panela" yields
+        exactly the literal "Carne"), then the shared fuzzy resolver.
+        """
+        normalized_name = _normalize(name)
+        for item in items:
+            if _normalize(item.name) == normalized_name:
+                return item
+
+        matches = self.find_items_by_name(name, items)
+        return matches[0] if matches else None
 
     def get_all(self) -> List[ShoppingListItem]:
         """

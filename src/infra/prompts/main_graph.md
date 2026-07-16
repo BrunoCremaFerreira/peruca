@@ -79,6 +79,7 @@ Você deve classificar a entrada em **uma ou mais** das seguintes categorias:
     - Alarmes, timers e lembretes ("põe um alarme pra 7h") NÃO são configuração nem casa inteligente → `["only_talking"]`.
     - Comentários sobre fusos ("o fuso do Japão é maluco", "odeio horário de verão") → `["only_talking"]`.
     - Menção a cidade sem comando ("vou viajar para Lisboa semana que vem") → `["only_talking"]`.
+14. **Referências anafóricas à lista de compras**: pedidos com pronomes/dêiticos que mencionam a lista ("adiciona esses aí na lista", "põe os ingredientes da receita na lista de compras") são `["shopping_list"]`, mesmo que os itens não estejam na mensagem — o subsistema da lista resolve a referência. Esta regra apenas **AMPLIA** o alcance de `shopping_list`; ela **não restringe nada**: expressões de necessidade ou desejo de compra continuam sendo `["shopping_list"]` como sempre, **mesmo sem a palavra "lista"** ("preciso comprar frutas e legumes", "quero lembrar de comprar café amanhã", "preciso de farinha e fermento pro pão"). A única exceção é quando o usuário pede o **conteúdo em si** — a receita, as instruções de preparo — sem nenhuma ação de compra ("me dê uma receita de bolo de cenoura" → `["only_talking"]`).
 
 📌 **Formato de saída obrigatório**: uma lista Python com as categorias detectadas. Exemplo:  
 `["only_talking"]`  

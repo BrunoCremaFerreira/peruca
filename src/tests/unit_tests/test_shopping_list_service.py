@@ -374,3 +374,207 @@ class TestShoppingListServiceClear:
         service.clear()
         # Assert
         shopping_list_repo_mock.clear.assert_called_once()
+
+
+class TestShoppingListServiceAddItems:
+    """
+    add_items(items) -> ShoppingListItemsAddResult (TDD — RED phase).
+
+    Batch add with dedup as a DOMAIN business rule:
+      - two-phase dedup: exact normalized (casefold/trim/accents) first, then
+        fuzzy via find_items_by_name; exact takes precedence;
+      - a duplicate is NOT re-added; a checked duplicate is reported without
+        being unchecked (product decision pinned here — changing it requires
+        changing this test first);
+      - a duplicate WITHIN the payload is added once, the repetition becomes a
+        duplicate;
+      - ValidationError on any item aborts the batch BEFORE persisting anything
+        (atomic semantics);
+      - persisted ids are always UUID.
+
+    Pinned result contract: `result.added` entries expose `.name`/`.quantity`
+    of the items persisted; `result.duplicates` entries expose `.name` of the
+    EXISTING list item that matched (what "já estava na lista" shows).
+    """
+
+    def _service(self, repo, existing=None):
+        repo.get_all.return_value = existing or []
+        return ShoppingListService(shopping_list_repository=repo)
+
+    def test_add_items__all_new_items__returns_all_in_added(
+        self, shopping_list_repo_mock
+    ):
+        # Arrange
+        service = self._service(shopping_list_repo_mock, existing=[])
+        items = [
+            ShoppingListItemAdd(name="ovos", quantity=3),
+            ShoppingListItemAdd(name="açúcar", quantity=1),
+        ]
+        # Act
+        result = service.add_items(items)
+        # Assert
+        assert [entry.name for entry in result.added] == ["ovos", "açúcar"]
+        assert result.duplicates == []
+        assert shopping_list_repo_mock.add.call_count == 2
+
+    def test_add_items__generated_ids_are_uuid(self, shopping_list_repo_mock):
+        # Arrange
+        service = self._service(shopping_list_repo_mock, existing=[])
+        items = [
+            ShoppingListItemAdd(name="ovos", quantity=3),
+            ShoppingListItemAdd(name="leite", quantity=1),
+        ]
+        # Act
+        service.add_items(items)
+        # Assert — every persisted entity carries a valid, unique UUID id
+        persisted = [c.args[0] for c in shopping_list_repo_mock.add.call_args_list]
+        ids = [item.id for item in persisted]
+        for item_id in ids:
+            assert uuid.UUID(item_id)
+        assert len(set(ids)) == len(ids)
+
+    def test_add_items__exact_normalized_duplicate__not_readded(
+        self, shopping_list_repo_mock
+    ):
+        # Arrange — "Ovos " (trailing space, different case) vs existing "ovos"
+        existing = _sample_item(name="ovos")
+        service = self._service(shopping_list_repo_mock, existing=[existing])
+        # Act
+        result = service.add_items([ShoppingListItemAdd(name="Ovos ", quantity=3)])
+        # Assert
+        assert result.added == []
+        assert len(result.duplicates) == 1
+        assert result.duplicates[0].name == "ovos"
+        shopping_list_repo_mock.add.assert_not_called()
+
+    def test_add_items__fuzzy_duplicate__not_readded(self, shopping_list_repo_mock):
+        # Arrange — "farinha" must resolve to the existing "farinha de trigo"
+        # via find_items_by_name (consistency with delete/check/uncheck).
+        existing = _sample_item(name="farinha de trigo")
+        service = self._service(shopping_list_repo_mock, existing=[existing])
+        # Act
+        result = service.add_items([ShoppingListItemAdd(name="farinha", quantity=1)])
+        # Assert
+        assert result.added == []
+        assert len(result.duplicates) == 1
+        assert result.duplicates[0].name == "farinha de trigo"
+        shopping_list_repo_mock.add.assert_not_called()
+
+    def test_add_items__exact_match_takes_precedence_over_fuzzy(
+        self, shopping_list_repo_mock
+    ):
+        # Arrange — "carne" matches "Carne" exactly AND "Carne de panela"
+        # fuzzily; the exact match must win and yield exactly ONE duplicate.
+        carne = _sample_item(name="Carne")
+        panela = _sample_item(name="Carne de panela")
+        service = self._service(shopping_list_repo_mock, existing=[carne, panela])
+        # Act
+        result = service.add_items([ShoppingListItemAdd(name="carne", quantity=1)])
+        # Assert
+        assert result.added == []
+        assert len(result.duplicates) == 1
+        assert result.duplicates[0].name == "Carne"
+        shopping_list_repo_mock.add.assert_not_called()
+
+    def test_add_items__checked_duplicate__reported_as_duplicate_and_not_unchecked(
+        self, shopping_list_repo_mock
+    ):
+        # Arrange — product decision: a bought (checked) duplicate is reported
+        # as "already in the list" and is NOT automatically unchecked.
+        existing = _sample_item(name="leite", checked=True)
+        service = self._service(shopping_list_repo_mock, existing=[existing])
+        # Act
+        result = service.add_items([ShoppingListItemAdd(name="leite", quantity=1)])
+        # Assert
+        assert result.added == []
+        assert len(result.duplicates) == 1
+        assert result.duplicates[0].name == "leite"
+        assert existing.checked is True
+        shopping_list_repo_mock.add.assert_not_called()
+        shopping_list_repo_mock.update.assert_not_called()
+
+    def test_add_items__mixed_new_and_duplicates__partitions_correctly(
+        self, shopping_list_repo_mock
+    ):
+        # Arrange — the plan's canonical scenario (orange cake recipe)
+        existing = [
+            _sample_item(name="farinha de trigo"),
+            _sample_item(name="fermento em pó"),
+        ]
+        service = self._service(shopping_list_repo_mock, existing=existing)
+        items = [
+            ShoppingListItemAdd(name="ovos", quantity=3),
+            ShoppingListItemAdd(name="açúcar", quantity=1),
+            ShoppingListItemAdd(name="farinha de trigo", quantity=1),
+            ShoppingListItemAdd(name="fermento em pó", quantity=1),
+        ]
+        # Act
+        result = service.add_items(items)
+        # Assert
+        assert [entry.name for entry in result.added] == ["ovos", "açúcar"]
+        assert [entry.name for entry in result.duplicates] == [
+            "farinha de trigo",
+            "fermento em pó",
+        ]
+        assert shopping_list_repo_mock.add.call_count == 2
+
+    def test_add_items__empty_payload__returns_empty_result(
+        self, shopping_list_repo_mock
+    ):
+        # Arrange
+        service = self._service(shopping_list_repo_mock, existing=[])
+        # Act
+        result = service.add_items([])
+        # Assert
+        assert result.added == []
+        assert result.duplicates == []
+        shopping_list_repo_mock.add.assert_not_called()
+
+    def test_add_items__duplicate_within_payload__added_once(
+        self, shopping_list_repo_mock
+    ):
+        # Arrange — "ovos, ovos" in the same payload: first is added, the
+        # repetition becomes a duplicate.
+        service = self._service(shopping_list_repo_mock, existing=[])
+        items = [
+            ShoppingListItemAdd(name="ovos", quantity=1),
+            ShoppingListItemAdd(name="ovos", quantity=1),
+        ]
+        # Act
+        result = service.add_items(items)
+        # Assert
+        assert shopping_list_repo_mock.add.call_count == 1
+        assert len(result.added) == 1
+        assert result.added[0].name == "ovos"
+        assert len(result.duplicates) == 1
+        assert result.duplicates[0].name == "ovos"
+
+    def test_add_items__invalid_item_name__raises_validation_error_and_persists_nothing(
+        self, shopping_list_repo_mock
+    ):
+        # Arrange — an invalid item anywhere in the batch aborts BEFORE any
+        # persistence (atomic semantics): the valid "leite" must NOT be added.
+        service = self._service(shopping_list_repo_mock, existing=[])
+        items = [
+            ShoppingListItemAdd(name="leite", quantity=1),
+            ShoppingListItemAdd(name="", quantity=1),
+        ]
+        # Act / Assert
+        with pytest.raises(ValidationError):
+            service.add_items(items)
+        shopping_list_repo_mock.add.assert_not_called()
+
+    def test_add_items__returns_shopping_list_items_add_result_type(
+        self, shopping_list_repo_mock
+    ):
+        # Arrange — the DTO lives in domain/commands.py; imported lazily so the
+        # module stays collectable while the DTO does not exist yet (RED).
+        from domain.commands import ShoppingListItemsAddResult
+
+        service = self._service(shopping_list_repo_mock, existing=[])
+        # Act
+        result = service.add_items([ShoppingListItemAdd(name="ovos", quantity=3)])
+        # Assert
+        assert isinstance(result, ShoppingListItemsAddResult)
+        assert hasattr(result, "added")
+        assert hasattr(result, "duplicates")

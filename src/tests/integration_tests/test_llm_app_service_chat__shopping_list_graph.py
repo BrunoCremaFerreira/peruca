@@ -2,12 +2,42 @@ import uuid
 from typing import List
 
 import pytest
+from langchain_core.messages import AIMessage, HumanMessage
 
 from application.appservices.view_models import ChatRequest
 from domain.entities import ShoppingListItem
 
 
 pytestmark = pytest.mark.integration
+
+
+# ---------------------------------------------------------------------------
+# recent_history seeding helper
+#
+# The recent_history context hint is built by LlmAppService from the same
+# session history that _persist_turn writes (session_id = user.id). Seeding
+# human/ai messages directly into that history reproduces a previous
+# conversation turn (e.g. Peruca answering a recipe) without paying extra LLM
+# calls — mirroring the pattern used by the context-compaction battery.
+# ---------------------------------------------------------------------------
+RECIPE_QUESTION = "Peruca, como se faz um bolo de laranja?"
+RECIPE_ANSWER = (
+    "Claro! Para um bolo de laranja simples você vai precisar de: 3 ovos, "
+    "1 xícara de açúcar, 1 xícara de leite, 2 xícaras de farinha de trigo, "
+    "1 colher de fermento em pó e o suco de 2 laranjas. É só bater tudo no "
+    "liquidificador, misturar com a farinha e o fermento e assar por uns 40 "
+    "minutos. Fica uma delícia!"
+)
+
+
+def _seed_history(llm_app_service, user_app_service, external_id, turns):
+    """Append (human, ai) turns to the user's session history."""
+    user_id = user_app_service.get_by_external_id(external_id=external_id).id
+    messages = []
+    for human, ai in turns:
+        messages.append(HumanMessage(content=human))
+        messages.append(AIMessage(content=ai))
+    llm_app_service.get_session_history(user_id).add_messages(messages)
 
 
 @pytest.mark.parametrize(
@@ -353,3 +383,195 @@ def test_chat_shopping_list_edit_item__stub_intent__returns_response_without_exc
     # Assert
     assert "shopping_list" in intents
     assert output is not None
+
+
+# ======================================================
+# Add Items from Conversation Context (recent_history)
+# ======================================================
+
+
+class TestChatShoppingListAddFromRecentHistory:
+    def test_chat_add_items__recipe_in_history_and_anaphoric_add__adds_main_ingredients(
+        self,
+        shopping_list_repo_for_integration,
+        llm_app_service,
+        user_app_service,
+        integration_user,
+    ):
+        # Arrange — seed a previous turn where Peruca listed the recipe
+        _seed_history(
+            llm_app_service,
+            user_app_service,
+            integration_user.external_id,
+            [(RECIPE_QUESTION, RECIPE_ANSWER)],
+        )
+        chat_request = ChatRequest(
+            external_user_id=integration_user.external_id,
+            message="Adicione esses ingredientes na lista de compras",
+        )
+
+        # Act
+        response = llm_app_service.chat(chat_request=chat_request)
+        intents = response.get("intents")
+        output = response.get("output")
+        stored_names = [
+            item.name.lower()
+            for item in shopping_list_repo_for_integration.get_all()
+        ]
+
+        # Assert — the anaphoric reference was resolved against the history
+        assert "shopping_list" in intents
+        assert output
+        assert "adicionado" in output.lower(), (
+            f'Expected the "Adicionado" section in the output, got: {output}'
+        )
+        for expected_ingredient in ["ovo", "açúcar", "leite", "farinha"]:
+            assert any(expected_ingredient in name for name in stored_names), (
+                f'"{expected_ingredient}" was NOT found in stored items: '
+                f"{stored_names}"
+            )
+
+    def test_chat_add_items__ingredient_already_on_list__reports_both_sections_without_duplicate(
+        self,
+        shopping_list_repo_for_integration,
+        llm_app_service,
+        user_app_service,
+        integration_user,
+    ):
+        # Arrange — "farinha de trigo" is already on the list before the add
+        existing = ShoppingListItem(
+            id=str(uuid.uuid4()), name="farinha de trigo", quantity=1
+        )
+        shopping_list_repo_for_integration.add(existing)
+        _seed_history(
+            llm_app_service,
+            user_app_service,
+            integration_user.external_id,
+            [(RECIPE_QUESTION, RECIPE_ANSWER)],
+        )
+        chat_request = ChatRequest(
+            external_user_id=integration_user.external_id,
+            message="Adicione esses ingredientes na lista de compras",
+        )
+
+        # Act
+        response = llm_app_service.chat(chat_request=chat_request)
+        intents = response.get("intents")
+        output = response.get("output")
+        stored_items = shopping_list_repo_for_integration.get_all()
+        flour_items = [
+            item for item in stored_items if "farinha" in item.name.lower()
+        ]
+
+        # Assert — both sections rendered, no duplicate persisted
+        assert "shopping_list" in intents
+        assert output
+        assert "adicionado" in output.lower(), (
+            f'Expected the "Adicionado" section in the output, got: {output}'
+        )
+        assert "já estava" in output.lower(), (
+            f'Expected the "Já estava na lista" section in the output, got: {output}'
+        )
+        assert len(flour_items) == 1, (
+            f'Expected a single "farinha" entry (no duplicate), got: '
+            f"{[item.name for item in stored_items]}"
+        )
+
+    @pytest.mark.parametrize(
+        "history_turns",
+        [
+            pytest.param(None, id="no_history"),
+            pytest.param(
+                [
+                    (
+                        "Será que vai chover hoje à tarde?",
+                        "Pelo jeito o céu está fechado, é bom levar um "
+                        "guarda-chuva se for sair.",
+                    ),
+                    (
+                        "E o jogo de ontem, quem ganhou?",
+                        "O time da casa venceu por 2 a 1, com um golaço nos "
+                        "acréscimos!",
+                    ),
+                ],
+                id="irrelevant_history",
+            ),
+        ],
+    )
+    def test_chat_add_items__explicit_item_with_no_or_irrelevant_history__adds_only_named_item(
+        self,
+        history_turns,
+        shopping_list_repo_for_integration,
+        llm_app_service,
+        user_app_service,
+        integration_user,
+    ):
+        # Arrange — prompt regression: the history block must never leak items
+        if history_turns:
+            _seed_history(
+                llm_app_service,
+                user_app_service,
+                integration_user.external_id,
+                history_turns,
+            )
+        chat_request = ChatRequest(
+            external_user_id=integration_user.external_id,
+            message="Adicione leite na lista de compras",
+        )
+
+        # Act
+        response = llm_app_service.chat(chat_request=chat_request)
+        intents = response.get("intents")
+        output = response.get("output")
+        stored_items = shopping_list_repo_for_integration.get_all()
+        stored_names = [item.name.lower() for item in stored_items]
+
+        # Assert — only the named item was added, nothing from the history
+        assert "shopping_list" in intents
+        assert output
+        assert any("leite" in name for name in stored_names), (
+            f'"leite" was NOT found in stored items: {stored_names}'
+        )
+        assert len(stored_items) == 1, (
+            f"Expected only the named item on the list, got: {stored_names}"
+        )
+
+    def test_chat_add_items__recipe_in_history_but_message_names_item__ignores_history(
+        self,
+        shopping_list_repo_for_integration,
+        llm_app_service,
+        user_app_service,
+        integration_user,
+    ):
+        # Arrange — recipe in history, but the message has no anaphora
+        _seed_history(
+            llm_app_service,
+            user_app_service,
+            integration_user.external_id,
+            [(RECIPE_QUESTION, RECIPE_ANSWER)],
+        )
+        chat_request = ChatRequest(
+            external_user_id=integration_user.external_id,
+            message="Adicione pilhas na lista de compras",
+        )
+
+        # Act
+        response = llm_app_service.chat(chat_request=chat_request)
+        intents = response.get("intents")
+        output = response.get("output")
+        stored_names = [
+            item.name.lower()
+            for item in shopping_list_repo_for_integration.get_all()
+        ]
+
+        # Assert — only "pilhas"; no recipe ingredient leaked into the list
+        assert "shopping_list" in intents
+        assert output
+        assert any("pilha" in name for name in stored_names), (
+            f'"pilhas" was NOT found in stored items: {stored_names}'
+        )
+        for recipe_ingredient in ["ovo", "açúcar", "leite", "farinha", "laranja", "fermento"]:
+            assert all(recipe_ingredient not in name for name in stored_names), (
+                f'Recipe ingredient "{recipe_ingredient}" leaked into the list: '
+                f"{stored_names}"
+            )

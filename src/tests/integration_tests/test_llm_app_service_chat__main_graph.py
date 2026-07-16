@@ -3,12 +3,23 @@ LlmAppService Integration Tests - Main Graph Classification Tests
 """
 
 import pytest
+from langchain_core.messages import AIMessage, HumanMessage
 
 from application.appservices.view_models import ChatRequest
 from domain.exceptions import EmptyParamValidationError, NofFoundValidationError
 
 
 pytestmark = pytest.mark.integration
+
+
+def _seed_history(llm_app_service, user_app_service, external_id, turns):
+    """Append (human, ai) turns to the user's session history (session_id = user.id)."""
+    user_id = user_app_service.get_by_external_id(external_id=external_id).id
+    messages = []
+    for human, ai in turns:
+        messages.append(HumanMessage(content=human))
+        messages.append(AIMessage(content=ai))
+    llm_app_service.get_session_history(user_id).add_messages(messages)
 
 
 # ======================================================
@@ -429,6 +440,65 @@ def test_chat_smart_home_security_cams_and_smart_home_lights(
     assert "only_talking" not in intents
     assert "shopping_list" not in intents
     assert output
+
+
+# ======================================================
+# Anaphoric Shopping-List Reference Routing
+# ======================================================
+
+
+class TestMainGraphAnaphoricListReference:
+    def test_llm_app_service_chat__anaphoric_reference_naming_the_list__routes_to_shopping_list(
+        self, llm_app_service, user_app_service, integration_user
+    ):
+        # Arrange — a recipe answered on a previous turn; the current message
+        # only references its ingredients but names the list explicitly, which
+        # is the lexical marker the MainGraph routes on (it never sees history).
+        _seed_history(
+            llm_app_service,
+            user_app_service,
+            integration_user.external_id,
+            [
+                (
+                    "Peruca, como se faz um bolo de laranja?",
+                    "Claro! Você vai precisar de: 3 ovos, 1 xícara de açúcar, "
+                    "1 xícara de leite, 2 xícaras de farinha de trigo, 1 colher "
+                    "de fermento em pó e o suco de 2 laranjas.",
+                ),
+            ],
+        )
+        chat_request = ChatRequest(
+            external_user_id=integration_user.external_id,
+            message="Põe os ingredientes da receita na lista de compras",
+        )
+
+        # Act
+        response = llm_app_service.chat(chat_request=chat_request)
+        intents = response.get("intents")
+        output = response.get("output")
+
+        # Assert
+        assert "shopping_list" in intents
+        assert output
+
+    def test_llm_app_service_chat__recipe_request__still_routes_to_only_talking(
+        self, llm_app_service, integration_user
+    ):
+        # Arrange — regression: the new anaphora instruction must not capture
+        # the recipe request itself into shopping_list
+        chat_request = ChatRequest(
+            external_user_id=integration_user.external_id,
+            message="Me dê uma receita de bolo de cenoura",
+        )
+
+        # Act
+        response = llm_app_service.chat(chat_request=chat_request)
+        intents = response.get("intents")
+        output = response.get("output")
+
+        # Assert
+        assert intents == ["only_talking"]
+        assert output
 
 
 # ======================================================

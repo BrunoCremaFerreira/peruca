@@ -122,8 +122,12 @@ class TestLlmAppServiceWritesTurn:
         request = _request(user)
         # Act
         service.chat(request)
-        # Assert
-        get_session_history.assert_called_once_with(user.id)
+        # Assert — the factory is also consulted by the recent_history hint
+        # (read-only), so we pin the write itself: exactly one persisted turn.
+        assert all(
+            call.args == (user.id,)
+            for call in get_session_history.call_args_list
+        )
         _assert_turn_written(history, message="oi", output="Liguei a luz")
 
     def test_chat__only_talking_intent__writes_consolidated_output(self):
@@ -169,8 +173,13 @@ class TestLlmAppServiceWritesTurn:
         request = _request(user)
         # Act
         service.chat(request)
-        # Assert — same key the OnlyTalkGraph reads from.
-        get_session_history.assert_called_once_with(user.id)
+        # Assert — same key the OnlyTalkGraph reads from. Both the
+        # recent_history hint (read) and _persist_turn (write) must use it.
+        assert get_session_history.call_args_list
+        assert all(
+            call.args == (user.id,)
+            for call in get_session_history.call_args_list
+        )
 
 
 # ===========================================================================
