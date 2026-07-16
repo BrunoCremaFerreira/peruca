@@ -7,6 +7,7 @@ manutenções.
 
 Data atual: {current_date}
 Veículos cadastrados do usuário: {available_vehicles}
+Imagem anexada à mensagem: {has_images}
 
 ## Últimas mensagens da conversa (contexto, pode estar vazio)
 {history}
@@ -49,6 +50,13 @@ passado" em uma data — o sistema faz isso.
 - "query_limit": número de registros pedidos ("2 últimas" -> 2); 0 se não disser.
 - Comentários, opiniões e perguntas hipotéticas ("gosto do meu Outlander", "o
   Outlander dá muita manutenção?") -> "not_recognized".
+- **Registro por documento anexado**: quando há imagem anexada (ver contexto
+  acima) e o pedido é referencial ("registra essa manutenção", "adiciona essa
+  nota", "lança esse recibo", "essa ordem de serviço"), classifique
+  "register_maintenance" com os demais campos vazios — os dados (veículo, data,
+  quilometragem, serviços) virão da leitura do documento, não do texto. Se o
+  texto TAMBÉM citar um dado (ex.: "registra essa nota, foi no Pajero"),
+  preencha esse campo normalmente.
 
 ## Formato de saída (todos os campos sempre presentes)
 {{"intents": ["register_maintenance"], "vehicle_term": "", "description": "", "date_token": "", "date_value": "", "period": "", "odometer_km": 0, "query": "", "query_kind": "", "query_limit": 0, "edit_field": "", "new_value": ""}}
@@ -62,6 +70,8 @@ passado" em uma data — o sistema faz isso.
 "Cadastre meu carro novo, um Corolla 2024" -> {{"intents": ["vehicle_write_forbidden"], "vehicle_term": "Corolla", "description": "", "date_token": "", "date_value": "", "period": "", "odometer_km": 0, "query": "", "query_kind": "", "query_limit": 0, "edit_field": "", "new_value": ""}}
 "Altere a quilometragem desse registro para 100821" -> {{"intents": ["edit_maintenance"], "vehicle_term": "", "description": "", "date_token": "", "date_value": "", "period": "", "odometer_km": 0, "query": "", "query_kind": "", "query_limit": 0, "edit_field": "quilometragem", "new_value": "100821"}}
 "Remova este registro" -> {{"intents": ["delete_maintenance"], "vehicle_term": "", "description": "", "date_token": "", "date_value": "", "period": "", "odometer_km": 0, "query": "", "query_kind": "", "query_limit": 0, "edit_field": "", "new_value": ""}}
+"Registra essa manutenção" (com imagem anexada) -> {{"intents": ["register_maintenance"], "vehicle_term": "", "description": "", "date_token": "", "date_value": "", "period": "", "odometer_km": 0, "query": "", "query_kind": "", "query_limit": 0, "edit_field": "", "new_value": ""}}
+"Adiciona essa nota fiscal, foi no Pajero" (com imagem anexada) -> {{"intents": ["register_maintenance"], "vehicle_term": "Pajero", "description": "", "date_token": "", "date_value": "", "period": "", "odometer_km": 0, "query": "", "query_kind": "", "query_limit": 0, "edit_field": "", "new_value": ""}}
 "O Outlander dá muita manutenção?" -> {{"intents": ["not_recognized"], "vehicle_term": "Outlander", "description": "", "date_token": "", "date_value": "", "period": "", "odometer_km": 0, "query": "", "query_kind": "", "query_limit": 0, "edit_field": "", "new_value": ""}}
 
 Mensagem do usuário:
