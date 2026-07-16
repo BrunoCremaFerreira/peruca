@@ -9,6 +9,11 @@ response without crashing.
 If no camera entity aliases are registered in the test database, the cameras graph
 will find no matching entities and still produce a response via the final_response
 node (which formats whatever camera data is available, even if empty).
+
+NOTE: this battery documents the GRACEFUL DEGRADATION path (no seeded aliases).
+The real live end-to-end path — alias seeding via WebSocket discovery, actual
+PNG snapshot data URIs, pt-BR state mapping, and the multi-intent merge bypass —
+is covered by test_llm_app_service_chat__smart_home_cameras_live.py.
 """
 
 import pytest

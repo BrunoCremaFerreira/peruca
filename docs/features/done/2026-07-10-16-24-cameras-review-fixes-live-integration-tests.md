@@ -1,9 +1,9 @@
 # Plano: Correções da funcionalidade de Câmeras + bateria de integração real
 
-- **Status:** todo
+- **Status:** done
 - **Criado em:** 2026-07-10 16:24
-- **Implementado em:** —
-- **PR/commit:** —
+- **Implementado em:** 2026-07-16
+- **PR/commit:** — (aguardando commit na branch `fix/cameras-review`)
 - **Branch (a criar quando o plano for aprovado):** `fix/cameras-review`
 - **Consultorias realizadas (obrigatórias):** `arquiteto`, `especialista-de-prompt`,
   `programador-tester` (2026-07-10)

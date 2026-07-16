@@ -118,6 +118,45 @@ class TestMemoryAppServiceResilience:
         # Act / Assert (must not raise)
         service.learn_from_message("ext-1", "msg", "resp")
 
+
+# ===========================================================================
+# TestMemoryAppServiceDataUriSanitization (F1 — cameras review plan §3.2)
+# ===========================================================================
+
+
+class TestMemoryAppServiceDataUriSanitization:
+    def test_learn_from_message__assistant_output_with_data_uri__memory_graph_never_receives_uri(
+        self,
+    ):
+        """
+        F1: routes.py hands the RAW chat output to learn_from_message. When it
+        carries a camera snapshot data URI ("data:image/..." line), that
+        base64 blob must NEVER reach the MemoryGraph LLM — the text handed to
+        memory_graph.invoke must contain no 'data:image/' fragment (the URI
+        line is replaced by the sanitizer placeholder before the graph call).
+        """
+        # Arrange
+        import base64
+
+        user = _sample_user()
+        service, memory_graph, _, _, _ = _make_service(user=user, extracted=[])
+        encoded = base64.b64encode(b"\x89PNG\r\n\x1a\nfake_png").decode()
+        uri = f"data:image/png;base64,{encoded}"
+        assistant_output = f"{uri}\nCamera Sala: gravando"
+        # Act
+        service.learn_from_message(
+            "ext-1", "mostra a câmera da sala", assistant_output
+        )
+        # Assert — nothing that reaches the MemoryGraph may carry the URI.
+        assert memory_graph.invoke.called, (
+            "Expected the MemoryGraph to be invoked for a valid user"
+        )
+        everything_sent = str(memory_graph.invoke.call_args)
+        assert "data:image/" not in everything_sent, (
+            f"Camera data URI leaked into the MemoryGraph input: "
+            f"{everything_sent[:200]!r}"
+        )
+
     def test_learn_from_message__unknown_user__returns_without_error(self):
         # Arrange
         service, memory_graph, _, _, _ = _make_service(user=None)

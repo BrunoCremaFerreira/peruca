@@ -7,7 +7,11 @@ from langchain_core.prompts import ChatPromptTemplate
 from typing import Optional, TypedDict
 from langchain_core.language_models.chat_models import BaseChatModel
 from application.graphs.graph import Graph
-from application.graphs.markers import CALCULATOR_RESULT_HEADER, SHOPPING_LIST_HEADER
+from application.graphs.markers import (
+    CALCULATOR_RESULT_HEADER,
+    IMAGE_DATA_URI_PREFIX,
+    SHOPPING_LIST_HEADER,
+)
 from application.graphs.only_talk_graph import OnlyTalkGraph
 from application.graphs.shopping_list_graph import ShoppingListGraph
 from application.graphs.smart_home_lights_graph import SmartHomeLightsGraph
@@ -227,12 +231,30 @@ class MainGraph(Graph):
 
         mergeable_calculator = None if calculator_result else output_calculator
 
+        # Camera snapshot bypass (plan §3.1): output_cams is split BY LINE.
+        # Lines starting with the data URI prefix never reach the merge LLM (a
+        # 12B model cannot reproduce megabytes of base64); status lines keep
+        # flowing through the normal merge. Detection is by line prefix, never
+        # substring — a sentence merely mentioning "data:image/" is not a URI.
+        output_cams = data.get("output_cams")
+        camera_uri_lines = []
+        mergeable_cams = output_cams
+        if output_cams:
+            lines = output_cams.splitlines()
+            camera_uri_lines = [
+                line for line in lines if line.startswith(IMAGE_DATA_URI_PREFIX)
+            ]
+            mergeable_cams = "\n".join(
+                line for line in lines if not line.startswith(IMAGE_DATA_URI_PREFIX)
+            )
+        camera_uri_block = "\n".join(camera_uri_lines)
+
         outputs = [
             e
             for e in [
                 data.get("output_lights"),
                 mergeable_shopping,
-                data.get("output_cams"),
+                mergeable_cams,
                 data.get("output_only_talking"),
                 data.get("output_climate"),
                 data.get("output_sensors"),
@@ -244,6 +266,18 @@ class MainGraph(Graph):
             ]
             if e is not None and e.strip()
         ]
+
+        # Defense in depth: no line carrying an image data URI may ever enter
+        # the merge LLM input, whatever output it came from.
+        outputs = [
+            "\n".join(
+                line
+                for line in e.splitlines()
+                if not line.startswith(IMAGE_DATA_URI_PREFIX)
+            )
+            for e in outputs
+        ]
+        outputs = [e for e in outputs if e.strip()]
 
         if len(outputs) <= 1:
             merged = outputs[0] if outputs else ""
@@ -261,7 +295,9 @@ class MainGraph(Graph):
         # LLM (the model can never rewrite their bytes), but any legitimate
         # merged conversational content is still appended after them so nothing
         # the user asked for is dropped.
-        verbatim_parts = [part for part in (listing, calculator_result) if part]
+        verbatim_parts = [
+            part for part in (listing, calculator_result, camera_uri_block) if part
+        ]
         verbatim = "\n\n".join(verbatim_parts)
         if verbatim and merged and merged.strip():
             response = f"{verbatim}\n\n{merged}"

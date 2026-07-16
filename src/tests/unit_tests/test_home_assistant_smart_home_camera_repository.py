@@ -90,15 +90,20 @@ def _mock_aiohttp_session_json(json_response):
     return mock_cm_session, mock_session
 
 
-def _mock_aiohttp_session_bytes(image_bytes: bytes):
+def _mock_aiohttp_session_bytes(image_bytes: bytes, content_type: str = "image/jpeg"):
     """
     Returns a mock aiohttp.ClientSession that yields a response whose
     .read() coroutine returns image_bytes (binary snapshot content).
+
+    content_type mirrors aiohttp's response.content_type semantics: it is
+    ALWAYS a str — when the Content-Type header is absent, aiohttp reports
+    "application/octet-stream", never None.
     """
     mock_resp = AsyncMock()
     mock_resp.raise_for_status = MagicMock()
     mock_resp.read = AsyncMock(return_value=image_bytes)
     mock_resp.status = 200
+    mock_resp.content_type = content_type
 
     mock_cm_resp = AsyncMock()
     mock_cm_resp.__aenter__ = AsyncMock(return_value=mock_resp)
@@ -390,6 +395,90 @@ class TestHomeAssistantSmartHomeCameraRepositoryGetSnapshot:
             f"get_snapshot must NOT call /api/states, got URL: {called_url!r}"
         )
 
+    def test_get_snapshot__png_content_type_header__snapshot_content_type_is_image_png(
+        self,
+    ):
+        """
+        F3: when HA answers with Content-Type: image/png, the repository must
+        propagate it to SmartHomeCameraSnapshot.content_type so the graph can
+        build a correct data URI (instead of hardcoding image/jpeg).
+        """
+        repo = _make_repo()
+        _, mock_session = _mock_aiohttp_session_bytes(
+            b"\x89PNG\r\n\x1a\nfake_png", content_type="image/png"
+        )
+
+        with patch.object(repo, "_get_session", return_value=mock_session):
+            result = asyncio.get_event_loop().run_until_complete(
+                repo.get_snapshot("camera.cozinha")
+            )
+
+        assert result.content_type == "image/png", (
+            f"Expected content_type='image/png' from the response header, "
+            f"got {result.content_type!r}"
+        )
+
+    def test_get_snapshot__jpeg_content_type_header__snapshot_content_type_is_image_jpeg(
+        self,
+    ):
+        """F3: Content-Type: image/jpeg must be captured as-is."""
+        repo = _make_repo()
+        _, mock_session = _mock_aiohttp_session_bytes(
+            b"\xff\xd8\xff\xe0fake_jpeg", content_type="image/jpeg"
+        )
+
+        with patch.object(repo, "_get_session", return_value=mock_session):
+            result = asyncio.get_event_loop().run_until_complete(
+                repo.get_snapshot("camera.cozinha")
+            )
+
+        assert result.content_type == "image/jpeg", (
+            f"Expected content_type='image/jpeg', got {result.content_type!r}"
+        )
+
+    def test_get_snapshot__octet_stream_content_type__defaults_to_image_jpeg(self):
+        """
+        F3 guard: a missing Content-Type header surfaces as
+        'application/octet-stream' in aiohttp (never None). Non-image values
+        must NOT leak into the entity — fall back to the 'image/jpeg' default
+        so the data URI is always valid.
+        """
+        repo = _make_repo()
+        _, mock_session = _mock_aiohttp_session_bytes(
+            b"raw_bytes", content_type="application/octet-stream"
+        )
+
+        with patch.object(repo, "_get_session", return_value=mock_session):
+            result = asyncio.get_event_loop().run_until_complete(
+                repo.get_snapshot("camera.cozinha")
+            )
+
+        assert result.content_type == "image/jpeg", (
+            f"Expected fallback content_type='image/jpeg' for "
+            f"'application/octet-stream', got {result.content_type!r}"
+        )
+
+    def test_get_snapshot__non_image_content_type__defaults_to_image_jpeg(self):
+        """
+        F3 guard: any Content-Type outside image/* (e.g. text/html from a
+        misconfigured proxy) must fall back to 'image/jpeg' — an invalid data
+        URI must never be produced downstream.
+        """
+        repo = _make_repo()
+        _, mock_session = _mock_aiohttp_session_bytes(
+            b"<html>oops</html>", content_type="text/html"
+        )
+
+        with patch.object(repo, "_get_session", return_value=mock_session):
+            result = asyncio.get_event_loop().run_until_complete(
+                repo.get_snapshot("camera.cozinha")
+            )
+
+        assert result.content_type == "image/jpeg", (
+            f"Expected fallback content_type='image/jpeg' for 'text/html', "
+            f"got {result.content_type!r}"
+        )
+
     def test_get_snapshot__ha_returns_404__propagates_exception(self):
         """A 4xx response must propagate as aiohttp.ClientResponseError."""
         repo = _make_repo()
@@ -440,6 +529,7 @@ def _make_reusable_session_bytes(image_bytes: bytes):
     mock_resp.raise_for_status = MagicMock()
     mock_resp.read = AsyncMock(return_value=image_bytes)
     mock_resp.status = 200
+    mock_resp.content_type = "image/jpeg"
 
     mock_cm_resp = AsyncMock()
     mock_cm_resp.__aenter__ = AsyncMock(return_value=mock_resp)

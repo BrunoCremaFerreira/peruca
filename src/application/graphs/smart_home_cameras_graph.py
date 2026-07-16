@@ -18,6 +18,20 @@ from domain.services.smart_home_service import SmartHomeService
 
 logger = logging.getLogger(__name__)
 
+# Closed pt-BR presentation map for the known HA camera states (F5). The graph
+# is the presentation layer of this flow; unknown states fall back to the raw
+# value — never invent a translation.
+_CAMERA_STATE_PT = {
+    "idle": "em espera",
+    "recording": "gravando",
+    "streaming": "transmitindo ao vivo",
+    "unavailable": "indisponível",
+}
+
+# Cap for multi-camera snapshot requests (F4): each data URI can be multiple
+# MBs, so the response size must stay bounded.
+_MAX_SNAPSHOTS_PER_REQUEST = 3
+
 
 class SmartHomeCamerasGraphState(TypedDict):
     input: str
@@ -97,25 +111,36 @@ class SmartHomeCamerasGraph(Graph):
         raw = data.get("output_show_snapshot", "")
         logger.debug("handle_show_snapshot raw=%r", raw)
 
+        available_entities = data.get("available_entities", {})
+
         if not raw:
+            # Generic request ("show all cameras") with cameras available (F7):
+            # ask the user to specify instead of the misleading "not found".
+            if available_entities:
+                return {
+                    "output_show_snapshot": (
+                        "Qual câmera você quer ver? Por favor, especifique."
+                    )
+                }
             return {}
 
-        available_entities = data.get("available_entities", {})
         entity_ids = self._find_entity_ids(raw, available_entities)
 
         if not entity_ids:
             return {"output_show_snapshot": "Dispositivo não encontrado."}
 
-        entity_id = entity_ids[0]
-        try:
-            snapshot: SmartHomeCameraSnapshot = async_runner.run(
-                self.smart_home_service.camera_get_snapshot(entity_id)
-            )
-            encoded = base64.b64encode(snapshot.image_bytes).decode()
-            return {"output_show_snapshot": f"data:image/jpeg;base64,{encoded}"}
-        except Exception as exc:
-            logger.error("handle_show_snapshot failed: %s", exc, exc_info=True)
-            return {"output_show_snapshot": f"{entity_id}: snapshot indisponível"}
+        lines = []
+        for entity_id in entity_ids[:_MAX_SNAPSHOTS_PER_REQUEST]:
+            try:
+                snapshot: SmartHomeCameraSnapshot = async_runner.run(
+                    self.smart_home_service.camera_get_snapshot(entity_id)
+                )
+                encoded = base64.b64encode(snapshot.image_bytes).decode()
+                lines.append(f"data:{snapshot.content_type};base64,{encoded}")
+            except Exception as exc:
+                logger.error("handle_show_snapshot failed: %s", exc, exc_info=True)
+                lines.append(f"{entity_id}: snapshot indisponível")
+        return {"output_show_snapshot": "\n".join(lines)}
 
     def _handle_check_status(self, data):
         raw = data.get("output_check_status", "")
@@ -130,16 +155,19 @@ class SmartHomeCamerasGraph(Graph):
         if not entity_ids:
             return {"output_check_status": "Dispositivo não encontrado."}
 
-        entity_id = entity_ids[0]
-        try:
-            camera: SmartHomeCamera = async_runner.run(
-                self.smart_home_service.camera_get_state(entity_id)
-            )
-            name = camera.friendly_name or camera.entity_id
-            return {"output_check_status": f"{name}: {camera.state}"}
-        except Exception as exc:
-            logger.error("handle_check_status failed: %s", exc, exc_info=True)
-            return {"output_check_status": f"{entity_id}: estado indisponível"}
+        lines = []
+        for entity_id in entity_ids:
+            try:
+                camera: SmartHomeCamera = async_runner.run(
+                    self.smart_home_service.camera_get_state(entity_id)
+                )
+                name = camera.friendly_name or camera.entity_id
+                state_pt = _CAMERA_STATE_PT.get(camera.state.lower(), camera.state)
+                lines.append(f"{name}: {state_pt}")
+            except Exception as exc:
+                logger.error("handle_check_status failed: %s", exc, exc_info=True)
+                lines.append(f"{entity_id}: estado indisponível")
+        return {"output_check_status": "\n".join(lines)}
 
     def _handle_not_recognized(self, data):
         logger.info("handle_not_recognized triggered")
@@ -150,18 +178,24 @@ class SmartHomeCamerasGraph(Graph):
     def _handle_final_response(self, data):
         logger.info("handle_final_response: aggregating response")
 
-        if data.get("output_not_recognized"):
-            return {
-                "output": "Não consegui identificar qual câmera você quer consultar."
-            }
-
         parts = []
         if data.get("output_show_snapshot"):
             parts.append(data["output_show_snapshot"])
         if data.get("output_check_status"):
             parts.append(data["output_check_status"])
 
-        return {"output": "\n".join(parts) if parts else "Dispositivo não encontrado."}
+        if parts:
+            # A coexisting not_recognized (compound message: the non-camera
+            # half) is silently dropped — the other MainGraph subgraphs answer
+            # that part; the successful camera outputs must never be discarded.
+            return {"output": "\n".join(parts)}
+
+        if data.get("output_not_recognized"):
+            return {
+                "output": "Não consegui identificar qual câmera você quer consultar."
+            }
+
+        return {"output": "Dispositivo não encontrado."}
 
     # ===============================================
     # Private Methods
@@ -197,8 +231,14 @@ class SmartHomeCamerasGraph(Graph):
             self.load_prompt("smart_home_cameras_graph_id_parser_by_alias.md")
         )
 
+        # Inject the aliases exactly as the prompt declares and its few-shots
+        # show ('friendly_name' = 'entity_id', ...), not the Python dict repr.
+        formatted_entities = ", ".join(
+            f"'{alias}' = '{entity_id}'"
+            for alias, entity_id in available_entities.items()
+        )
         prompt = parser_template.format(
-            input=entity_alias_delimited_str, available_entities=str(available_entities)
+            input=entity_alias_delimited_str, available_entities=formatted_entities
         )
 
         async def _invoke_with_timeout():

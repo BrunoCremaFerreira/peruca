@@ -31,6 +31,12 @@ Usuário: Mostre a câmera do portão e verifique se a câmera da garagem está 
 Usuário: A câmera da sala está ativa?
 {{"intents": ["check_status"], "show_snapshot": "", "check_status": "sala", "not_recognized": ""}}
 
+Usuário: As câmeras da sala e da garagem estão gravando?
+{{"intents": ["check_status"], "show_snapshot": "", "check_status": "sala|garagem", "not_recognized": ""}}
+
+Usuário: As câmeras estão funcionando?
+{{"intents": ["check_status"], "show_snapshot": "", "check_status": "", "not_recognized": ""}}
+
 Usuário: Quero ver o que as câmeras estão captando agora.
 {{"intents": ["show_snapshot"], "show_snapshot": "", "check_status": "", "not_recognized": ""}}
 
@@ -41,7 +47,7 @@ Usuário: Mostre a câmera da cozinha e a do portão.
 {{"intents": ["show_snapshot"], "show_snapshot": "cozinha|portão", "check_status": "", "not_recognized": ""}}
 
 Usuário: Acende a luz da sala.
-{{"intents": ["not_recognized"], "show_snapshot": "", "check_status": "", "not_recognized": "nao_relacionado_a_cameras"}}
+{{"intents": ["not_recognized"], "show_snapshot": "", "check_status": "", "not_recognized": ""}}
 
 ## Entrada do usuário:
 {input}

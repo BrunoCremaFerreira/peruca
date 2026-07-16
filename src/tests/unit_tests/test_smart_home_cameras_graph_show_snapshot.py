@@ -78,14 +78,19 @@ def _state(**kwargs) -> dict:
 
 
 def _make_snapshot(
-    entity_id: str = "camera.cozinha", image_bytes: bytes = b"fake_jpeg"
+    entity_id: str = "camera.cozinha",
+    image_bytes: bytes = b"fake_jpeg",
+    content_type: str = "image/jpeg",
 ) -> "SmartHomeCameraSnapshot":
     """Build a SmartHomeCameraSnapshot for use in mocked service responses."""
     return SmartHomeCameraSnapshot(
         entity_id=entity_id,
         image_bytes=image_bytes,
-        content_type="image/jpeg",
+        content_type=content_type,
     )
+
+
+_PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
 
 # ===========================================================================
@@ -257,3 +262,241 @@ class TestHandleShowSnapshot:
         assert "output_check_status" not in result, (
             "show_snapshot handler must not write to 'output_check_status'"
         )
+
+
+# ===========================================================================
+# TestHandleShowSnapshotContentType (F3 — dynamic MIME in the data URI)
+# ===========================================================================
+
+
+@_SKIP_IF_NOT_IMPLEMENTED
+class TestHandleShowSnapshotContentType:
+    def test_handle_show_snapshot__png_snapshot__data_uri_prefix_is_image_png(self):
+        """
+        F3: when the snapshot carries content_type='image/png', the data URI
+        must declare image/png — never a hardcoded image/jpeg.
+        """
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(return_value=["camera.sala"])
+        graph.smart_home_service.camera_get_snapshot.return_value = _make_snapshot(
+            entity_id="camera.sala",
+            image_bytes=_PNG_MAGIC + b"fake_png_body",
+            content_type="image/png",
+        )
+        state = _state(
+            output_show_snapshot="sala",
+            available_entities={"sala": "camera.sala"},
+        )
+
+        result = graph._handle_show_snapshot(state)
+
+        output = result.get("output_show_snapshot", "")
+        assert output.startswith("data:image/png;base64,"), (
+            f"Expected data URI to start with 'data:image/png;base64,' for a "
+            f"PNG snapshot, got: {output[:60]!r}"
+        )
+
+    def test_handle_show_snapshot__png_snapshot__base64_decodes_to_original_png_bytes(
+        self,
+    ):
+        """
+        F3 roundtrip: the base64 payload after the FIRST comma must decode back
+        to the exact original PNG bytes (real magic bytes included).
+        """
+        raw_bytes = _PNG_MAGIC + b"\x00\x00\x00\rIHDRfake_png_payload"
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(return_value=["camera.sala"])
+        graph.smart_home_service.camera_get_snapshot.return_value = _make_snapshot(
+            entity_id="camera.sala",
+            image_bytes=raw_bytes,
+            content_type="image/png",
+        )
+        state = _state(
+            output_show_snapshot="sala",
+            available_entities={"sala": "camera.sala"},
+        )
+
+        result = graph._handle_show_snapshot(state)
+
+        output = result.get("output_show_snapshot", "")
+        assert "," in output, f"Expected a data URI with a comma, got: {output[:60]!r}"
+        b64_part = output.split(",", 1)[1]
+        decoded = base64.b64decode(b64_part)
+        assert decoded == raw_bytes, (
+            f"Expected decoded bytes to match the original PNG bytes. "
+            f"Got decoded[:16]={decoded[:16]!r}, expected[:16]={raw_bytes[:16]!r}"
+        )
+        assert decoded.startswith(_PNG_MAGIC), (
+            "Decoded payload lost the PNG magic bytes"
+        )
+
+    def test_handle_show_snapshot__snapshot_with_default_content_type__uri_uses_jpeg(
+        self,
+    ):
+        """
+        F3 backward compatibility: a snapshot constructed without an explicit
+        content_type (entity default 'image/jpeg') must keep producing a
+        'data:image/jpeg;base64,' URI.
+        """
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(return_value=["camera.cozinha"])
+        graph.smart_home_service.camera_get_snapshot.return_value = (
+            SmartHomeCameraSnapshot(
+                entity_id="camera.cozinha",
+                image_bytes=b"\xff\xd8\xff\xe0fake_jpeg",
+            )
+        )
+        state = _state(
+            output_show_snapshot="cozinha",
+            available_entities={"cozinha": "camera.cozinha"},
+        )
+
+        result = graph._handle_show_snapshot(state)
+
+        output = result.get("output_show_snapshot", "")
+        assert output.startswith("data:image/jpeg;base64,"), (
+            f"Expected default-content-type snapshot to produce a jpeg URI, "
+            f"got: {output[:60]!r}"
+        )
+
+
+# ===========================================================================
+# TestHandleShowSnapshotMultiCamera (F4/F7 — iterate ALL resolved entity_ids)
+# ===========================================================================
+
+
+@_SKIP_IF_NOT_IMPLEMENTED
+class TestHandleShowSnapshotMultiCamera:
+    def test_handle_show_snapshot__two_cameras__two_data_uri_lines(self):
+        """
+        F4: when _find_entity_ids resolves TWO cameras, the handler must fetch
+        BOTH snapshots and emit one data URI per line (2 lines total) —
+        today only entity_ids[0] is used and the second camera is dropped.
+        """
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(
+            return_value=["camera.sala", "camera.garagem"]
+        )
+        snap_sala = _make_snapshot(
+            entity_id="camera.sala", image_bytes=b"sala_bytes"
+        )
+        snap_garagem = _make_snapshot(
+            entity_id="camera.garagem", image_bytes=b"garagem_bytes"
+        )
+        graph.smart_home_service.camera_get_snapshot.side_effect = [
+            snap_sala,
+            snap_garagem,
+        ]
+        state = _state(
+            output_show_snapshot="sala|garagem",
+            available_entities={
+                "sala": "camera.sala",
+                "garagem": "camera.garagem",
+            },
+        )
+
+        result = graph._handle_show_snapshot(state)
+
+        output = result.get("output_show_snapshot", "")
+        uri_lines = [
+            line
+            for line in output.splitlines()
+            if line.startswith("data:image/")
+        ]
+        assert len(uri_lines) == 2, (
+            f"Expected 2 data URI lines (one per camera), got {len(uri_lines)}: "
+            f"{output[:120]!r}"
+        )
+        assert graph.smart_home_service.camera_get_snapshot.call_count == 2, (
+            "Expected camera_get_snapshot to be called once per resolved camera"
+        )
+        decoded = [
+            base64.b64decode(line.split(",", 1)[1]) for line in uri_lines
+        ]
+        assert decoded == [b"sala_bytes", b"garagem_bytes"], (
+            f"Expected both cameras' bytes in order, got {decoded!r}"
+        )
+
+    def test_handle_show_snapshot__more_than_cap__truncated_to_cap(self):
+        """
+        F4 cap: with more resolved cameras than _MAX_SNAPSHOTS_PER_REQUEST (3),
+        only the first 3 snapshots may be fetched and emitted — N multi-MB
+        URIs must not multiply the HTTP response unbounded.
+        """
+        graph = _make_graph()
+        entity_ids = [
+            "camera.sala",
+            "camera.garagem",
+            "camera.cozinha",
+            "camera.portao",
+        ]
+        graph._find_entity_ids = MagicMock(return_value=entity_ids)
+        graph.smart_home_service.camera_get_snapshot.side_effect = [
+            _make_snapshot(entity_id=eid, image_bytes=eid.encode())
+            for eid in entity_ids
+        ]
+        state = _state(
+            output_show_snapshot="sala|garagem|cozinha|portao",
+            available_entities={
+                "sala": "camera.sala",
+                "garagem": "camera.garagem",
+                "cozinha": "camera.cozinha",
+                "portao": "camera.portao",
+            },
+        )
+
+        result = graph._handle_show_snapshot(state)
+
+        output = result.get("output_show_snapshot", "")
+        uri_lines = [
+            line
+            for line in output.splitlines()
+            if line.startswith("data:image/")
+        ]
+        assert len(uri_lines) == 3, (
+            f"Expected the output truncated to the cap of 3 data URI lines, "
+            f"got {len(uri_lines)}"
+        )
+        assert graph.smart_home_service.camera_get_snapshot.call_count == 3, (
+            "Snapshots beyond the cap must not even be fetched "
+            f"(got {graph.smart_home_service.camera_get_snapshot.call_count} calls)"
+        )
+
+    def test_handle_show_snapshot__generic_request_with_available_entities__asks_to_specify(
+        self,
+    ):
+        """
+        F7: a generic request ("mostre todas as câmeras") reaches the handler
+        with an empty/None payload. With cameras available, the handler must
+        answer asking the user to specify which camera — NOT the misleading
+        'Dispositivo não encontrado.' and NOT an empty {}.
+        """
+        graph = _make_graph()
+        state = _state(
+            output_show_snapshot=None,
+            intent=["show_snapshot"],
+            available_entities={
+                "sala": "camera.sala",
+                "garagem": "camera.garagem",
+            },
+        )
+
+        result = graph._handle_show_snapshot(state)
+
+        output = result.get("output_show_snapshot")
+        assert output, (
+            f"Expected a non-empty 'ask to specify' message for a generic "
+            f"request with available cameras, got: {result!r}"
+        )
+        assert output != "Dispositivo não encontrado.", (
+            "Generic request must not be answered with 'Dispositivo não "
+            "encontrado.' when cameras exist"
+        )
+        assert not output.startswith("data:image/"), (
+            "Generic request must not silently pick a camera and return a URI"
+        )
+        assert "qual" in output.lower() or "especifi" in output.lower(), (
+            f"Expected the reply to ask the user to specify a camera, "
+            f"got: {output!r}"
+        )
+        graph.smart_home_service.camera_get_snapshot.assert_not_called()
