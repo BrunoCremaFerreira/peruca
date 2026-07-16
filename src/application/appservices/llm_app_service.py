@@ -6,6 +6,7 @@ from typing import Callable, Optional
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.messages import AIMessage, HumanMessage
 
+from application.appservices.output_sanitizer import replace_image_data_uris
 from application.appservices.prompt_sanitizer import sanitize_for_prompt
 from application.appservices.view_models import ChatRequest
 from application.graphs.main_graph import MainGraph
@@ -907,10 +908,18 @@ class LlmAppService:
             message, image_description, image_handles
         )
 
+        # History-only sanitization (F1): a camera snapshot data URI is the
+        # HTTP deliverable, but persisting the multi-MB base64 would explode
+        # the context window when the history is reinjected on the next turn.
+        persisted_output = replace_image_data_uris(output)
+
         try:
             history = self.get_session_history(user.id)
             history.add_messages(
-                [HumanMessage(content=human_content), AIMessage(content=output)]
+                [
+                    HumanMessage(content=human_content),
+                    AIMessage(content=persisted_output),
+                ]
             )
         except Exception as error:
             logger.error("Failed to persist turn: %s", error, exc_info=True)

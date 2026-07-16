@@ -300,3 +300,152 @@ class TestHandleCheckStatus:
             graph.smart_home_service.camera_get_snapshot.assert_not_called(),
             ("check_status handler must not call camera_get_snapshot"),
         )
+
+
+# ===========================================================================
+# TestHandleCheckStatusPtBrStates (F5 — closed pt-BR state map)
+# ===========================================================================
+
+
+@_SKIP_IF_NOT_IMPLEMENTED
+class TestHandleCheckStatusPtBrStates:
+    @pytest.mark.parametrize(
+        "ha_state,expected_pt_br",
+        [
+            ("idle", "em espera"),
+            ("recording", "gravando"),
+            ("streaming", "transmitindo ao vivo"),
+            ("unavailable", "indisponível"),
+        ],
+    )
+    def test_handle_check_status__known_states__mapped_to_pt_br(
+        self, ha_state, expected_pt_br
+    ):
+        """
+        F5: the four known HA camera states must be presented in pt-BR while
+        the friendly_name is preserved — e.g. 'Camera Sala: gravando'.
+        """
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(return_value=["camera.sala"])
+        graph.smart_home_service.camera_get_state.return_value = _make_camera(
+            entity_id="camera.sala",
+            state=ha_state,
+            friendly_name="Camera Sala",
+        )
+        state = _state(
+            output_check_status="sala",
+            available_entities={"sala": "camera.sala"},
+        )
+
+        result = graph._handle_check_status(state)
+
+        output = result.get("output_check_status", "")
+        assert output == f"Camera Sala: {expected_pt_br}", (
+            f"Expected 'Camera Sala: {expected_pt_br}' for HA state "
+            f"{ha_state!r}, got: {output!r}"
+        )
+
+    def test_handle_check_status__unknown_state__falls_back_to_raw_state(self):
+        """
+        F5: a state outside the closed map (e.g. 'buffering') must fall back
+        to the raw state — never crash and never invent a translation.
+        """
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(return_value=["camera.sala"])
+        graph.smart_home_service.camera_get_state.return_value = _make_camera(
+            entity_id="camera.sala",
+            state="buffering",
+            friendly_name="Camera Sala",
+        )
+        state = _state(
+            output_check_status="sala",
+            available_entities={"sala": "camera.sala"},
+        )
+
+        result = graph._handle_check_status(state)
+
+        output = result.get("output_check_status", "")
+        assert output == "Camera Sala: buffering", (
+            f"Expected fallback to the raw state for an unmapped value, "
+            f"got: {output!r}"
+        )
+
+    def test_handle_check_status__uppercase_known_state__still_mapped(self):
+        """
+        F5: the map lookup must be case-insensitive (state.lower()) — an
+        uppercase 'IDLE' from HA must still map to 'em espera'.
+        """
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(return_value=["camera.sala"])
+        graph.smart_home_service.camera_get_state.return_value = _make_camera(
+            entity_id="camera.sala",
+            state="IDLE",
+            friendly_name="Camera Sala",
+        )
+        state = _state(
+            output_check_status="sala",
+            available_entities={"sala": "camera.sala"},
+        )
+
+        result = graph._handle_check_status(state)
+
+        output = result.get("output_check_status", "")
+        assert output == "Camera Sala: em espera", (
+            f"Expected case-insensitive mapping for 'IDLE', got: {output!r}"
+        )
+
+
+# ===========================================================================
+# TestHandleCheckStatusMultiCamera (F4 — iterate ALL resolved entity_ids)
+# ===========================================================================
+
+
+@_SKIP_IF_NOT_IMPLEMENTED
+class TestHandleCheckStatusMultiCamera:
+    def test_handle_check_status__two_cameras__two_status_lines(self):
+        """
+        F4: when _find_entity_ids resolves TWO cameras, the handler must query
+        BOTH states and join one status line per camera — today only
+        entity_ids[0] is reported and the second camera is silently ignored.
+        """
+        graph = _make_graph()
+        graph._find_entity_ids = MagicMock(
+            return_value=["camera.sala", "camera.garagem"]
+        )
+        graph.smart_home_service.camera_get_state.side_effect = [
+            _make_camera(
+                entity_id="camera.sala",
+                state="idle",
+                friendly_name="Camera Sala",
+            ),
+            _make_camera(
+                entity_id="camera.garagem",
+                state="recording",
+                friendly_name="Camera Garagem",
+            ),
+        ]
+        state = _state(
+            output_check_status="sala|garagem",
+            available_entities={
+                "sala": "camera.sala",
+                "garagem": "camera.garagem",
+            },
+        )
+
+        result = graph._handle_check_status(state)
+
+        output = result.get("output_check_status", "")
+        lines = [line for line in output.splitlines() if line.strip()]
+        assert len(lines) == 2, (
+            f"Expected 2 status lines (one per camera), got {len(lines)}: "
+            f"{output!r}"
+        )
+        assert lines[0] == "Camera Sala: em espera", (
+            f"Expected first line 'Camera Sala: em espera', got: {lines[0]!r}"
+        )
+        assert lines[1] == "Camera Garagem: gravando", (
+            f"Expected second line 'Camera Garagem: gravando', got: {lines[1]!r}"
+        )
+        assert graph.smart_home_service.camera_get_state.call_count == 2, (
+            "Expected camera_get_state to be called once per resolved camera"
+        )

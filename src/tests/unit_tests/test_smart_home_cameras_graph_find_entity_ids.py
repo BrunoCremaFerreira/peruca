@@ -129,3 +129,33 @@ class TestFindEntityIds:
         )
 
         assert result == [], f"Expected [], got: {result!r}"
+
+    def test_find_entity_ids__injects_aliases_in_declared_prompt_format(self):
+        """
+        The id-parser prompt declares (and its few-shots show) the available
+        cameras as `'friendly_name' = 'entity_id'` entries joined by ", ".
+        The code must inject exactly that format — not the Python dict repr
+        (`{'name': 'id'}`) that str(dict) produces.
+        """
+        graph = _make_graph()
+        _stub_parser_output(graph, "camera.cozinha|camera.portao")
+
+        graph._find_entity_ids(
+            "cozinha|portão",
+            available_entities={
+                "Câmera da cozinha": "camera.cozinha",
+                "Câmera do portão": "camera.portao",
+            },
+        )
+
+        prompt_sent = graph.llm_chat.ainvoke.call_args.args[0]
+        expected = (
+            "'Câmera da cozinha' = 'camera.cozinha', "
+            "'Câmera do portão' = 'camera.portao'"
+        )
+        assert expected in prompt_sent, (
+            f"Aliases must be injected as 'name' = 'id' entries, got: {prompt_sent!r}"
+        )
+        assert "{'Câmera da cozinha': 'camera.cozinha'" not in prompt_sent, (
+            "Python dict repr must not be injected into the parser prompt"
+        )

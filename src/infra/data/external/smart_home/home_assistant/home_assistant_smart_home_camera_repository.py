@@ -13,9 +13,10 @@ class HomeAssistantSmartHomeCameraRepository(SmartHomeCameraRepository):
 
     def __init__(self, base_url: str, token: str):
         self._base_url = base_url.rstrip("/")
+        # GET-only repository: no Content-Type header (there is no request
+        # body, and the snapshot endpoint returns binary, not JSON).
         self._headers = {
             "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
         }
         self._session: aiohttp.ClientSession | None = None
 
@@ -30,7 +31,6 @@ class HomeAssistantSmartHomeCameraRepository(SmartHomeCameraRepository):
         session = self._get_session()
         async with session.get(
             f"{self._base_url}/api/states/{entity_id}",
-            headers=self._headers,
         ) as response:
             response.raise_for_status()
             data = await response.json()
@@ -45,10 +45,19 @@ class HomeAssistantSmartHomeCameraRepository(SmartHomeCameraRepository):
         session = self._get_session()
         async with session.get(
             f"{self._base_url}/api/camera_proxy/{entity_id}",
-            headers=self._headers,
         ) as response:
             response.raise_for_status()
             image_bytes = await response.read()
+            # aiohttp reports "application/octet-stream" when the header is
+            # absent; only image/* values are trusted, anything else keeps the
+            # entity default ("image/jpeg") so the data URI is never invalid.
+            content_type = response.content_type or ""
+            if content_type.startswith("image/"):
+                return SmartHomeCameraSnapshot(
+                    entity_id=entity_id,
+                    image_bytes=image_bytes,
+                    content_type=content_type,
+                )
             return SmartHomeCameraSnapshot(
                 entity_id=entity_id,
                 image_bytes=image_bytes,

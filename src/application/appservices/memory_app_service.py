@@ -1,6 +1,7 @@
 import logging
 from typing import Callable
 
+from application.appservices.output_sanitizer import replace_image_data_uris
 from application.graphs.memory_graph import MemoryGraph
 from domain.commands import UserMemoryAdd
 from domain.entities import GraphInvokeRequest
@@ -33,6 +34,10 @@ class MemoryAppService:
     def learn_from_message(
         self, external_user_id: str, message: str, assistant_output: str
     ) -> None:
+        # F1 chokepoint: routes.py hands the RAW chat output here. Sanitize a
+        # camera snapshot data URI at the entry so no downstream use (current
+        # or future) can ever feed the base64 blob to the MemoryGraph LLM.
+        assistant_output = replace_image_data_uris(assistant_output)
         repo = None
         try:
             repo = self.user_memory_repository_factory()

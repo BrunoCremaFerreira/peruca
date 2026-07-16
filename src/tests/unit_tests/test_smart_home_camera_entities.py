@@ -184,6 +184,24 @@ class TestSmartHomeCameraSnapshotEntity:
             f"Expected image_bytes=b'', got {snapshot.image_bytes!r}"
         )
 
+    def test_smart_home_camera_snapshot__constructed_without_content_type__defaults_to_image_jpeg(
+        self,
+    ):
+        """
+        F3 backward-compatibility lock: every constructor call that predates the
+        content_type wiring (entity_id + image_bytes only) must keep producing
+        a snapshot whose content_type is exactly 'image/jpeg'.
+        """
+        snapshot = SmartHomeCameraSnapshot(
+            entity_id="camera.cozinha",
+            image_bytes=b"\xff\xd8\xff\xe0legacy_call",
+        )
+
+        assert snapshot.content_type == "image/jpeg", (
+            f"Expected default content_type='image/jpeg' for legacy "
+            f"constructor calls, got {snapshot.content_type!r}"
+        )
+
     def test_smart_home_camera_snapshot__default_content_type_not_none(self):
         """content_type default must never be None — it must be a non-empty string."""
         snapshot = SmartHomeCameraSnapshot(
