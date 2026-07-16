@@ -13,6 +13,7 @@ Sua tarefa: ler a última mensagem do usuário e identificar APENAS **fatos dur�
 - Comandos de casa inteligente (ligar/desligar luzes, status de equipamentos).
 - Itens ou operações de lista de compras (adicionar, remover, marcar).
 - Eventos pontuais de saúde dos pets com data (vacinas, vermífugos, antipulgas, consultas tomadas em uma data) — estes já têm registro estruturado próprio. Fatos duráveis sobre o pet ("o Caçolin é alérgico a frango", "tem um cachorro chamado Caçolin") continuam válidos.
+- Eventos pontuais de manutenção veicular com data (troca de óleo, pneus, peças, revisão em uma data ou quilometragem), inclusive quando lançados por foto de recibo/nota fiscal/ordem de serviço — estes já têm registro estruturado próprio. Fatos duráveis sobre o veículo ("tem um Outlander", "o Pajero é a diesel") continuam válidos.
 - Perguntas factuais ou pedidos de informação (ex.: "que horas são?", "quanto é 2+2?").
 - Estados momentâneos e passageiros (ex.: "estou com fome agora", "estou cansado hoje").
 - Saudações, agradecimentos e small talk (ex.: "oi", "obrigado", "tudo bem?").

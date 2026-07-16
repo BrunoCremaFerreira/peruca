@@ -54,6 +54,16 @@ _NO_TOKENS = {"nao"} | _CANCEL_WORDS
 
 _MAX_VEHICLE_TOKENS = 5
 
+# Connector tokens dropped from a "sim, mas a km é 101000" amendment before the
+# remainder is re-parsed as a slot correction.
+_AMENDMENT_CONNECTORS = {"mas", "porem", "que", "entao", "e", "na", "verdade"}
+_TOKEN_PUNCTUATION = ".,!?;:"
+
+# register_receipt_confirm accepts "confirma" on top of the delete_confirm
+# vocabulary (a registration is confirmed, not "apagado").
+_RECEIPT_YES_TOKENS = (_YES_TOKENS | {"confirma"}) - {"apagar", "remover", "excluir"}
+_RECEIPT_STRONG_YES = _STRONG_YES | {"confirma"}
+
 
 @dataclass
 class SlotReplyResult:
@@ -155,6 +165,9 @@ class MaintenanceFlowService:
         if op == "delete_confirm":
             return self._parse_confirmation(message)
 
+        if op == "register_receipt_confirm":
+            return self._parse_receipt_confirmation(message, pending, reference)
+
         if op == "choose_vehicle":
             if is_cancel(message):
                 return SlotReplyResult(kind="cancel")
@@ -178,6 +191,52 @@ class MaintenanceFlowService:
             return result
 
         correction = self._try_correction(message, pending, expected, reference)
+        if correction is not None:
+            return correction
+        return SlotReplyResult(kind="none")
+
+    def _parse_receipt_confirmation(
+        self,
+        message: str,
+        pending: PendingFlow,
+        reference: Optional[date],
+    ) -> SlotReplyResult:
+        """
+        Mirror of delete_confirm, plus the "sim, mas a km é 101000" case (§3.5):
+        an affirmative carrying an amendment is a CORRECTION — the confirmation
+        stays armed with the corrected slot, nothing is confirmed on this turn.
+        An unrelated command falls through (kind "none") so it is never
+        swallowed as a confirmation.
+        """
+        tokens = [
+            t.strip(_TOKEN_PUNCTUATION) for t in normalize(message).split()
+        ]
+        tokens = [t for t in tokens if t]
+        token_set = set(tokens)
+
+        if token_set and len(token_set) <= 3 and (token_set & _NO_TOKENS):
+            return SlotReplyResult(kind="cancel")
+        if (
+            token_set
+            and token_set <= _RECEIPT_YES_TOKENS
+            and (token_set & _RECEIPT_STRONG_YES)
+        ):
+            return SlotReplyResult(kind="value", value=True)
+
+        # "sim, mas a km é 101000": an affirmative opening followed by content
+        # is an amendment — re-parse the remainder as a correction.
+        if tokens and tokens[0] in _RECEIPT_STRONG_YES:
+            remainder = " ".join(
+                t for t in tokens[1:] if t not in _AMENDMENT_CONNECTORS
+            )
+            if remainder:
+                correction = self._try_correction(
+                    remainder, pending, None, reference
+                )
+                if correction is not None:
+                    return correction
+
+        correction = self._try_correction(message, pending, None, reference)
         if correction is not None:
             return correction
         return SlotReplyResult(kind="none")

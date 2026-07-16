@@ -22,6 +22,7 @@ from application.graphs.smart_home_climate_graph import SmartHomeClimateGraph
 from application.graphs.smart_home_sensors_graph import SmartHomeSensorsGraph
 from application.graphs.smart_home_cameras_graph import SmartHomeCamerasGraph
 from application.graphs.vehicle_maintenance_graph import VehicleMaintenanceGraph
+from application.graphs.vehicle_receipt_extractor import VehicleReceiptExtractor
 from application.graphs.pet_health_graph import PetHealthGraph
 from application.graphs.calculator_graph import CalculatorGraph
 from application.graphs.user_settings_graph import UserSettingsGraph
@@ -262,6 +263,35 @@ def get_vehicle_maintenance_graph() -> VehicleMaintenanceGraph:
             maintenance_service=get_maintenance_service(),
             maintenance_flow_service=get_maintenance_flow_service(),
             get_session_history=_get_session_history_factory(),
+            receipt_extractor=get_vehicle_receipt_extractor(),
+            provider=settings.llm_provider_type,
+            strip_think_directive=settings.llm_strip_think_directive,
+        )
+    return _repo_cache[cache_key]
+
+
+def get_vehicle_receipt_extractor() -> VehicleReceiptExtractor:
+    """
+    IOC for the receipt vision extractor. The vision model is overridable on its
+    own (LLM_VEHICLE_MAINTENANCE_VISION_MODEL); empty falls back to the
+    maintenance graph model (plan §3.6).
+    """
+
+    settings = _get_settings()
+
+    cache_key = ("extractor", "vehicle_receipt")
+    if cache_key not in _repo_cache:
+        llm_vision = get_llm_chat(
+            model=settings.llm_vehicle_maintenance_vision_model
+            or settings.llm_vehicle_maintenance_graph_chat_model,
+            temperature=settings.llm_vehicle_maintenance_graph_chat_temperature,
+            reasoning=_resolve_reasoning(
+                settings.llm_vehicle_maintenance_graph_chat_reasoning
+            ),
+        )
+
+        _repo_cache[cache_key] = VehicleReceiptExtractor(
+            llm_vision=llm_vision,
             provider=settings.llm_provider_type,
             strip_think_directive=settings.llm_strip_think_directive,
         )

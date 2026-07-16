@@ -34,6 +34,24 @@ _FORBIDDEN_MESSAGE = "Não tenho permissão para realizar esta operação"
 _QUERY_RECORD_LIMIT = 20
 _MAX_RECORD_DESCRIPTION_CHARS = 200
 
+# Deterministic refusal templates for a rejected receipt image (§3.1 stage 2).
+# The gate decision is Python over the extraction JSON — no extra LLM call.
+_RECEIPT_REJECTION_MESSAGES = {
+    "not_a_document": (
+        "Não consegui identificar um documento nessa imagem — não parece ser "
+        "um recibo, nota fiscal ou ordem de serviço. Não registrei nada."
+    ),
+    "not_vehicle_maintenance": (
+        "Esse documento não parece ser de uma manutenção de veículo, então "
+        "não registrei nada."
+    ),
+    "unreadable": (
+        "Não consegui ler os dados dessa imagem. Pode mandar uma foto melhor "
+        "ou me ditar os dados da manutenção?"
+    ),
+}
+_RECEIPT_MISSING_FIELD = "não encontrei no documento"
+
 
 class VehicleMaintenanceGraphState(TypedDict, total=False):
     input: GraphInvokeRequest
@@ -77,6 +95,7 @@ class VehicleMaintenanceGraph(Graph):
         maintenance_service,
         maintenance_flow_service,
         get_session_history=None,
+        receipt_extractor=None,
         provider: str = "OLLAMA",
         strip_think_directive: bool = False,
     ):
@@ -86,6 +105,7 @@ class VehicleMaintenanceGraph(Graph):
         self.maintenance_service = maintenance_service
         self.maintenance_flow_service = maintenance_flow_service
         self.get_session_history = get_session_history
+        self.receipt_extractor = receipt_extractor
         self.classification_prompt = ChatPromptTemplate.from_template(
             self.load_prompt("vehicle_maintenance_graph.md")
         )
@@ -106,11 +126,14 @@ class VehicleMaintenanceGraph(Graph):
         # 02:30Z is still the previous day in São Paulo.
         reference = local_date_for_user(request.user_timezone)
 
+        # The classifier stays text-only: the images never enter the payload,
+        # only the fact that they exist (§3.1 stage 1).
         payload = {
             "input": request.message,
             "current_date": reference.isoformat(),
             "available_vehicles": available,
             "history": self._recent_history(user.id),
+            "has_images": "Sim, há imagem anexada." if request.images else "Não.",
         }
         chain = self.classification_prompt | self.llm_chat
         try:
@@ -131,6 +154,7 @@ class VehicleMaintenanceGraph(Graph):
         intents = parsed.get("intents") or ["not_recognized"]
         if isinstance(intents, str):
             intents = [intents]
+        intents = self._apply_receipt_override(intents, request.images)
 
         vehicle_term = (parsed.get("vehicle_term") or "").strip()
         performed_at = self._resolve_date(
@@ -230,6 +254,145 @@ class VehicleMaintenanceGraph(Graph):
                 f"{performed_at.strftime('%d/%m/%Y')} e quilometragem {odometer_km}."
             )
         }
+
+    def _handle_register_from_receipt(self, data):
+        request: GraphInvokeRequest = data["input"]
+        user = request.user
+
+        try:
+            extraction = self.receipt_extractor.extract(request.images)
+        except Exception as error:  # noqa: BLE001
+            logger.error("receipt extraction failed: %s", error, exc_info=True)
+            return {
+                "output_register": _RECEIPT_REJECTION_MESSAGES["unreadable"]
+            }
+
+        if not extraction.is_maintenance_document:
+            return {
+                "output_register": _RECEIPT_REJECTION_MESSAGES.get(
+                    extraction.reject_reason,
+                    _RECEIPT_REJECTION_MESSAGES["unreadable"],
+                )
+            }
+
+        # Deterministic merge (§3.4): a field dictated in the USER's text beats
+        # the same field read from the document — it is the user speaking.
+        vehicle_term = (data.get("vehicle_term") or "").strip() or (
+            extraction.vehicle_term or ""
+        )
+        description = (data.get("description") or "").strip() or (
+            extraction.description or ""
+        )
+        performed_at = data.get("resolved_performed_at") or extraction.performed_at
+        odometer_km = data.get("odometer_km")
+        if odometer_km is None:
+            odometer_km = extraction.odometer_km
+
+        fleet = self._fleet(user.id)
+        matched = find_vehicles_by_term(vehicle_term, fleet) if vehicle_term else []
+        vehicle = matched[0] if len(matched) == 1 else None
+
+        # The image is read ONCE — the flow carries only structured slots,
+        # never base64. "from_receipt" keeps a later choose_vehicle continuation
+        # on the receipt path (confirmation before persistence, §3.5).
+        slots = {
+            "vehicle_id": vehicle.id if vehicle else None,
+            "vehicle_name": vehicle.name if vehicle else None,
+            "description": description,
+            "date": performed_at.isoformat() if performed_at else None,
+            "odometer_km": odometer_km,
+            "from_receipt": True,
+        }
+        summary = self._receipt_summary(
+            vehicle, vehicle_term, performed_at, description, odometer_km
+        )
+
+        if len(matched) > 1:
+            self._store_flow(
+                user,
+                PendingFlow(
+                    operation="choose_vehicle",
+                    slots=slots,
+                    candidates=[
+                        DisambiguationCandidate(id=v.id, name=v.name)
+                        for v in matched
+                    ],
+                ),
+            )
+            names = " ou ".join(v.name for v in matched)
+            return {"output_register": f"{summary}\n\nQual deles? {names}?"}
+
+        missing = []
+        if vehicle is None:
+            missing.append("vehicle")
+        if performed_at is None:
+            missing.append("date")
+        if odometer_km is None:
+            missing.append("km")
+
+        if missing:
+            self._store_flow(
+                user,
+                PendingFlow(
+                    operation="register_receipt",
+                    slots=slots,
+                    missing_slots=missing,
+                ),
+            )
+            return {
+                "output_register": (
+                    f"{summary}\n\nAntes de salvar, "
+                    f"{self._receipt_slot_question(missing[0])}"
+                )
+            }
+
+        # Everything extracted: NEVER persist here — arm the mandatory
+        # confirmation turn (§3.5, structural invariant).
+        self._store_flow(
+            user,
+            PendingFlow(operation="register_receipt_confirm", slots=slots),
+        )
+        return {
+            "output_register": f"{summary}\n\nPosso registrar essa manutenção?"
+        }
+
+    def _receipt_summary(
+        self, vehicle, vehicle_term, performed_at, description, odometer_km
+    ) -> str:
+        if vehicle is not None:
+            vehicle_line = vehicle.name
+        elif vehicle_term:
+            safe_term = sanitize_for_prompt(vehicle_term, 100)
+            vehicle_line = (
+                f'"{safe_term}" — você não tem esse veículo cadastrado'
+            )
+        else:
+            vehicle_line = _RECEIPT_MISSING_FIELD
+        date_line = (
+            performed_at.strftime("%d/%m/%Y")
+            if performed_at
+            else _RECEIPT_MISSING_FIELD
+        )
+        services_line = description or _RECEIPT_MISSING_FIELD
+        km_line = (
+            str(odometer_km) if odometer_km is not None else _RECEIPT_MISSING_FIELD
+        )
+        return (
+            "Encontrei estes dados no documento:\n"
+            f"- Veículo: {vehicle_line}\n"
+            f"- Data: {date_line}\n"
+            f"- Serviços: {services_line}\n"
+            f"- Quilometragem: {km_line}"
+        )
+
+    @staticmethod
+    def _receipt_slot_question(slot: str) -> str:
+        questions = {
+            "vehicle": "me diga de qual dos seus veículos é essa manutenção.",
+            "date": "me diga quando essa manutenção foi realizada.",
+            "km": "me diga a quilometragem do veículo nesse dia.",
+        }
+        return questions.get(slot, "me dê esse dado.")
 
     def _handle_query_maintenance(self, data):
         user = data["input"].user
@@ -544,6 +707,24 @@ class VehicleMaintenanceGraph(Graph):
             return iso
 
     @staticmethod
+    def _apply_receipt_override(intents: List[str], images: List[str]) -> List[str]:
+        """
+        Routing to the receipt node is deterministic IN CODE, never trusted to
+        the LLM (§3.4): with images attached, a register intent goes through the
+        vision path; a receipt intent without images is demoted to the textual
+        register.
+        """
+        if images:
+            return [
+                "register_from_receipt" if i == "register_maintenance" else i
+                for i in intents
+            ]
+        return [
+            "register_maintenance" if i == "register_from_receipt" else i
+            for i in intents
+        ]
+
+    @staticmethod
     def _resolve_date(token: str, value: str, reference: date) -> Optional[date]:
         if token:
             resolved = resolve_date_token(token, reference)
@@ -576,6 +757,10 @@ class VehicleMaintenanceGraph(Graph):
             "register_maintenance", RunnableLambda(self._handle_register_maintenance)
         )
         workflow.add_node(
+            "register_from_receipt",
+            RunnableLambda(self._handle_register_from_receipt),
+        )
+        workflow.add_node(
             "query_maintenance", RunnableLambda(self._handle_query_maintenance)
         )
         workflow.add_node(
@@ -600,6 +785,7 @@ class VehicleMaintenanceGraph(Graph):
         for node in [
             "list_vehicles",
             "register_maintenance",
+            "register_from_receipt",
             "query_maintenance",
             "edit_maintenance",
             "delete_maintenance",

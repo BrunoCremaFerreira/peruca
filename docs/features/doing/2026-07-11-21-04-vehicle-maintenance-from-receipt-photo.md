@@ -1,10 +1,10 @@
 # Plano: Lançamento de manutenção veicular por foto de recibo/nota fiscal
 
-- **Status:** todo
+- **Status:** doing (código + testes completos em 2026-07-15; falta validação manual com fotos reais e commit)
 - **Criado em:** 2026-07-11 21:04
-- **Implementado em:** —
-- **PR/commit:** —
-- **Branch (a criar quando o plano for aprovado):** `feature/maintenance-from-receipt`
+- **Implementado em:** 2026-07-15 (2220 unit + 4 integração verdes)
+- **PR/commit:** — (sem commit ainda; branch `feature/maintenance-from-receipt`)
+- **Branch:** `feature/maintenance-from-receipt` (criado em 2026-07-14)
 - **Consultorias realizadas (obrigatórias):** `arquiteto`, `especialista-de-prompt`,
   `programador-tester` (2026-07-11)
 

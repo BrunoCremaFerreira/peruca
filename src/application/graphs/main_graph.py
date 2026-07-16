@@ -102,17 +102,29 @@ class MainGraph(Graph):
         )
         user_vehicles = data["input"].context_hints.get("user_vehicles") or "nenhum"
         user_pets = data["input"].context_hints.get("user_pets") or "nenhum"
+        # The classifier stays text-only: it learns THAT images are attached
+        # (same pattern as music_is_playing), never the base64 payload itself.
+        has_images = (
+            "Sim, há imagem anexada." if request.images else "Não."
+        )
         invoke_payload = {
             "input": data["input"].message,
             "music_is_playing": hint_str,
             "user_vehicles": user_vehicles,
             "user_pets": user_pets,
+            "has_images": has_images,
         }
         chain = self.classification_prompt | self.llm_chat
         try:
             response = chain.invoke(invoke_payload)
         except Exception:
-            response = chain.invoke({"input": data["input"].message, "music_is_playing": hint_str})
+            response = chain.invoke(
+                {
+                    "input": data["input"].message,
+                    "music_is_playing": hint_str,
+                    "has_images": has_images,
+                }
+            )
         raw_content = response.content
         extracted = self._extract_structured_output(raw_content)
         if extracted is None:

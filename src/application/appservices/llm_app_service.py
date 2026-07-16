@@ -401,25 +401,68 @@ class LlmAppService:
                 output = "Ok."
             return self._flow_reply(user, message, output)
 
+        if pending.operation == "register_receipt_confirm":
+            from domain.entities import PendingFlow
+
+            if result.kind == "correction":
+                # "Sim, mas a km é 101000": keep the confirmation armed with
+                # the corrected slot — nothing is persisted on this turn.
+                slots = dict(pending.slots)
+                if result.corrected_slot == "date":
+                    slots["date"] = result.value.isoformat()
+                elif result.corrected_slot == "km":
+                    slots["odometer_km"] = result.value
+                async_runner.run(
+                    self.maintenance_flow_service.set_pending(
+                        user.id,
+                        PendingFlow(
+                            operation="register_receipt_confirm", slots=slots
+                        ),
+                    )
+                )
+                return self._flow_reply(
+                    user, message, self._receipt_confirm_question(slots)
+                )
+            async_runner.run(self.maintenance_flow_service.clear_pending(user.id))
+            if result.kind == "value" and result.value is True:
+                output = self._register_maintenance_from_slots(user, pending.slots)
+            else:
+                output = "Ok."
+            return self._flow_reply(user, message, output)
+
         if pending.operation == "choose_vehicle":
             if result.kind == "value":
                 slots = dict(pending.slots)
                 slots["vehicle_id"] = result.value.id
                 slots["vehicle_name"] = result.value.name
-                return self._advance_register(user, slots, ["date", "km"], message)
+                # A receipt-born disambiguation stays on the receipt path: it
+                # must end in register_receipt_confirm, never persist directly.
+                operation = (
+                    "register_receipt" if slots.get("from_receipt") else "register"
+                )
+                return self._advance_register(
+                    user, slots, ["date", "km"], message, operation=operation
+                )
             async_runner.run(self.maintenance_flow_service.clear_pending(user.id))
             return None
 
-        # register / edit slot filling.
+        # register / register_receipt / edit slot filling.
         slots = dict(pending.slots)
         missing = list(pending.missing_slots)
+        operation = (
+            "register_receipt"
+            if pending.operation == "register_receipt"
+            else "register"
+        )
 
         if result.kind == "correction":
             if result.corrected_slot == "date":
                 slots["date"] = result.value.isoformat()
             elif result.corrected_slot == "km":
                 slots["odometer_km"] = result.value
-            return self._advance_register(user, slots, missing, message)
+            return self._advance_register(
+                user, slots, missing, message, operation=operation
+            )
 
         current = missing[0] if missing else None
         if current == "date":
@@ -452,16 +495,24 @@ class LlmAppService:
             slots["vehicle_id"] = result.value.id
             slots["vehicle_name"] = result.value.name
 
-        return self._advance_register(user, slots, missing[1:], message)
+        return self._advance_register(
+            user, slots, missing[1:], message, operation=operation
+        )
 
-    def _advance_register(self, user: User, slots: dict, remaining: list, message: str):
+    def _advance_register(
+        self,
+        user: User,
+        slots: dict,
+        remaining: list,
+        message: str,
+        operation: str = "register",
+    ):
         """
-        Ask for the next missing slot, or register the maintenance when the slot
-        queue is empty.
+        Ask for the next missing slot, or finish the flow when the slot queue is
+        empty: a "register" flow persists right away; a "register_receipt" flow
+        arms the mandatory confirmation turn instead (§3.5) — there is no code
+        path from a receipt to persistence without the user's "sim".
         """
-        from datetime import date as _date
-
-        from domain.commands import MaintenanceRecordAdd
         from domain.entities import PendingFlow
 
         # Recompute what is still missing so a slot filled by a correction is not
@@ -479,7 +530,9 @@ class LlmAppService:
                 self.maintenance_flow_service.set_pending(
                     user.id,
                     PendingFlow(
-                        operation="register", slots=slots, missing_slots=pending_missing
+                        operation=operation,
+                        slots=slots,
+                        missing_slots=pending_missing,
                     ),
                 )
             )
@@ -492,7 +545,27 @@ class LlmAppService:
                 user, message, questions.get(pending_missing[0], "Pode me dar esse dado?")
             )
 
+        if operation == "register_receipt":
+            async_runner.run(
+                self.maintenance_flow_service.set_pending(
+                    user.id,
+                    PendingFlow(operation="register_receipt_confirm", slots=slots),
+                )
+            )
+            return self._flow_reply(
+                user, message, self._receipt_confirm_question(slots)
+            )
+
         async_runner.run(self.maintenance_flow_service.clear_pending(user.id))
+        return self._flow_reply(
+            user, message, self._register_maintenance_from_slots(user, slots)
+        )
+
+    def _register_maintenance_from_slots(self, user: User, slots: dict) -> str:
+        from datetime import date as _date
+
+        from domain.commands import MaintenanceRecordAdd
+
         performed_at = (
             _date.fromisoformat(slots["date"]) if slots.get("date") else None
         )
@@ -508,14 +581,24 @@ class LlmAppService:
             )
         except Exception as error:  # noqa: BLE001
             logger.error("flow register failed: %s", error, exc_info=True)
-            return self._flow_reply(
-                user, message, "Não consegui registrar essa manutenção."
-            )
+            return "Não consegui registrar essa manutenção."
 
         name = slots.get("vehicle_name") or "veículo"
-        return self._flow_reply(
-            user, message, f"Registrei {slots.get('description')} para o {name}."
-        )
+        return f"Registrei {slots.get('description')} para o {name}."
+
+    @staticmethod
+    def _receipt_confirm_question(slots: dict) -> str:
+        from datetime import date as _date
+
+        name = slots.get("vehicle_name") or "veículo"
+        description = slots.get("description") or "a manutenção"
+        date_part = ""
+        if slots.get("date"):
+            when = _date.fromisoformat(slots["date"]).strftime("%d/%m/%Y")
+            date_part = f", em {when}"
+        km = slots.get("odometer_km")
+        km_part = f", com km {km}" if km is not None else ""
+        return f"Registro então {description} para o {name}{date_part}{km_part}?"
 
     def _delete_focused_record(self, user: User, pending) -> str:
         record_id = pending.slots.get("record_id")

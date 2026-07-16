@@ -95,6 +95,11 @@ class Settings(BaseSettings):
     llm_vehicle_maintenance_graph_chat_temperature: float = 0.1
     llm_vehicle_maintenance_graph_chat_reasoning: bool | None = None
 
+    # Vision model for the receipt gate+extraction call only. Empty means "use
+    # the maintenance graph model"; set it to point just this call at a model
+    # with better OCR (e.g. gemma4:27b) without touching code (plan §3.6).
+    llm_vehicle_maintenance_vision_model: str = ""
+
     # Pet health classifier: near-deterministic like the other classifier graphs.
     llm_pet_health_graph_chat_model: str = "gemma4:12b"
     llm_pet_health_graph_chat_temperature: float = 0.1
