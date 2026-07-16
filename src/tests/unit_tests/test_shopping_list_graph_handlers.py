@@ -73,6 +73,9 @@ def _sample_item(name="Leite", quantity=1.0) -> ShoppingListItem:
 class TestHandleAddItemOutputLanguage:
     def test_handle_add_item__single_item__output_contains_adicionado(self):
         graph = _make_graph()
+        graph.shopping_list_service.add_items.return_value = _add_result(
+            added=[_add_cmd("leite", 1.0)]
+        )
         # "leite,1" is the pipe-delimited format parsed by _parse_shopping_list_add
         state = {"output_add_item": "leite,1"}
 
@@ -84,6 +87,9 @@ class TestHandleAddItemOutputLanguage:
 
     def test_handle_add_item__single_item__output_contains_item_name(self):
         graph = _make_graph()
+        graph.shopping_list_service.add_items.return_value = _add_result(
+            added=[_add_cmd("leite", 1.0)]
+        )
         state = {"output_add_item": "leite,1"}
 
         result = graph._handle_add_item(state)
@@ -92,6 +98,9 @@ class TestHandleAddItemOutputLanguage:
 
     def test_handle_add_item__multiple_items__output_contains_adicionado(self):
         graph = _make_graph()
+        graph.shopping_list_service.add_items.return_value = _add_result(
+            added=[_add_cmd("leite", 1.0), _add_cmd("arroz", 2.0)]
+        )
         state = {"output_add_item": "leite,1|arroz,2"}
 
         result = graph._handle_add_item(state)
@@ -101,6 +110,9 @@ class TestHandleAddItemOutputLanguage:
     def test_handle_add_item__single_item__does_not_return_english_prefix(self):
         """Regression: previous implementation used 'Items Add:' prefix."""
         graph = _make_graph()
+        graph.shopping_list_service.add_items.return_value = _add_result(
+            added=[_add_cmd("leite", 1.0)]
+        )
         state = {"output_add_item": "leite,1"}
 
         result = graph._handle_add_item(state)
@@ -109,25 +121,33 @@ class TestHandleAddItemOutputLanguage:
             "English prefix 'Items Add' must be replaced with Portuguese"
         )
 
-    def test_handle_add_item__service_called_once_per_item(self):
+    def test_handle_add_item__service_called_once_with_whole_batch(self):
+        """The write path is a SINGLE batch call, never one add per item."""
         graph = _make_graph()
+        graph.shopping_list_service.add_items.return_value = _add_result(
+            added=[_add_cmd("leite", 1.0), _add_cmd("arroz", 2.0)]
+        )
         state = {"output_add_item": "leite,1|arroz,2"}
 
         graph._handle_add_item(state)
 
-        assert graph.shopping_list_service.add.call_count == 2
+        graph.shopping_list_service.add_items.assert_called_once()
+        graph.shopping_list_service.add.assert_not_called()
+        batch = graph.shopping_list_service.add_items.call_args[0][0]
+        assert [item.name for item in batch] == ["leite", "arroz"]
 
     def test_handle_add_item__validation_error__returns_error_in_output(self):
         graph = _make_graph()
-        graph.shopping_list_service.add.side_effect = ValidationError(
+        graph.shopping_list_service.add_items.side_effect = ValidationError(
             errors=["Name is required"]
         )
         state = {"output_add_item": "leite,1"}
 
         result = graph._handle_add_item(state)
 
-        # Should not raise; error surfaced in the output key
+        # Should not raise; error surfaced in the output key as a STRING
         assert "output_add_item" in result
+        assert isinstance(result["output_add_item"], str)
 
 
 # ---------------------------------------------------------------------------
@@ -794,12 +814,12 @@ class TestHandleNotRecognizedOutputLanguage:
 class TestHandleAddItemExceptionLanguage:
     def test_handle_add_item__generic_exception__does_not_return_english(self):
         """
-        RED: when shopping_list_service.add raises a non-validation Exception the
-        handler currently returns 'An internal error was ocurred'. The fallback
-        message must be in Portuguese.
+        RED: when shopping_list_service.add_items raises a non-validation
+        Exception the handler currently returns 'An internal error was ocurred'.
+        The fallback message must be in Portuguese.
         """
         graph = _make_graph()
-        graph.shopping_list_service.add.side_effect = Exception("boom")
+        graph.shopping_list_service.add_items.side_effect = Exception("boom")
         state = {"output_add_item": "leite,1"}
 
         result = graph._handle_add_item(state)
@@ -810,7 +830,7 @@ class TestHandleAddItemExceptionLanguage:
 
     def test_handle_add_item__generic_exception__output_is_in_portuguese(self):
         graph = _make_graph()
-        graph.shopping_list_service.add.side_effect = Exception("boom")
+        graph.shopping_list_service.add_items.side_effect = Exception("boom")
         state = {"output_add_item": "leite,1"}
 
         result = graph._handle_add_item(state)
@@ -1099,3 +1119,165 @@ class TestHandleUncheckItemResolution:
         assert "?" in result["output_uncheck_item"]
         disambig.set_pending.assert_called_once()
         assert disambig.set_pending.call_args[0][1].operation == "uncheck"
+
+
+# ---------------------------------------------------------------------------
+# Feature — _handle_add_item uses ShoppingListService.add_items and formats the
+# "Adicionado" / "Já estava na lista" sections (TDD — RED phase).
+#
+# New behaviour under test:
+#   - the handler calls shopping_list_service.add_items (batch, dedup in the
+#     domain) instead of one shopping_list_service.add per item;
+#   - the reply has an "Adicionado" section for result.added, a "Já estava na
+#     lista" section for result.duplicates, and always ends with the question
+#     "Deseja mais alguma coisa?" when an operation happened;
+#   - a section with no entries is omitted entirely;
+#   - quantity formatting reuses the listing convention: integers without
+#     ".0" and quantity 1 without any suffix.
+# ---------------------------------------------------------------------------
+
+
+def _add_result(added=None, duplicates=None):
+    """
+    Build the domain result DTO. Imported lazily so this module stays
+    collectable while ShoppingListItemsAddResult does not exist yet (RED).
+    """
+    from domain.commands import ShoppingListItemsAddResult
+
+    return ShoppingListItemsAddResult(
+        added=added or [], duplicates=duplicates or []
+    )
+
+
+def _add_cmd(name, quantity=1.0):
+    from domain.commands import ShoppingListItemAdd
+
+    return ShoppingListItemAdd(name=name, quantity=quantity)
+
+
+class TestHandleAddItemSections:
+    def test_handle_add_item__calls_add_items_not_add(self):
+        # Arrange
+        graph = _make_graph()
+        graph.shopping_list_service.add_items.return_value = _add_result(
+            added=[_add_cmd("leite", 1.0)]
+        )
+        state = {"output_add_item": "leite,1"}
+        # Act
+        graph._handle_add_item(state)
+        # Assert — the batch domain method is the single write path
+        graph.shopping_list_service.add_items.assert_called_once()
+        graph.shopping_list_service.add.assert_not_called()
+        batch = graph.shopping_list_service.add_items.call_args[0][0]
+        assert [item.name for item in batch] == ["leite"]
+
+    def test_handle_add_item__only_added__formats_adicionado_section(self):
+        # Arrange
+        graph = _make_graph()
+        graph.shopping_list_service.add_items.return_value = _add_result(
+            added=[_add_cmd("ovos", 3.0), _add_cmd("açúcar", 1.0)]
+        )
+        state = {"output_add_item": "ovos,3|açúcar,1"}
+        # Act
+        result = graph._handle_add_item(state)
+        # Assert
+        output = result["output_add_item"]
+        assert "Adicionado" in output
+        assert "- ovos (3)" in output
+        assert "Já estava na lista" not in output, (
+            f"Duplicates section must be omitted when empty: {output!r}"
+        )
+        assert "Deseja mais alguma coisa?" in output
+
+    def test_handle_add_item__added_and_duplicates__formats_both_sections(self):
+        # Arrange
+        graph = _make_graph()
+        graph.shopping_list_service.add_items.return_value = _add_result(
+            added=[_add_cmd("ovos", 3.0)],
+            duplicates=[_add_cmd("farinha de trigo", 1.0)],
+        )
+        state = {"output_add_item": "ovos,3|farinha de trigo,1"}
+        # Act
+        result = graph._handle_add_item(state)
+        # Assert
+        output = result["output_add_item"]
+        assert "Adicionado" in output
+        assert "- ovos (3)" in output
+        assert "Já estava na lista" in output
+        assert "- farinha de trigo" in output
+        assert "Deseja mais alguma coisa?" in output
+        # "Adicionado" comes before "Já estava na lista"
+        assert output.index("Adicionado") < output.index("Já estava na lista")
+
+    def test_handle_add_item__only_duplicates__formats_only_duplicates_section(self):
+        # Arrange
+        graph = _make_graph()
+        graph.shopping_list_service.add_items.return_value = _add_result(
+            duplicates=[_add_cmd("farinha de trigo", 1.0)]
+        )
+        state = {"output_add_item": "farinha de trigo,1"}
+        # Act
+        result = graph._handle_add_item(state)
+        # Assert
+        output = result["output_add_item"]
+        assert "Já estava na lista" in output
+        assert "- farinha de trigo" in output
+        assert "Adicionado" not in output, (
+            f"'Adicionado' section must be omitted when nothing was added: {output!r}"
+        )
+        assert "Deseja mais alguma coisa?" in output
+
+    def test_handle_add_item__quantity_formatting__integer_without_decimal(self):
+        # Arrange — 3.0 renders as "(3)", 1.0 has no suffix, 1.5 stays "(1.5)"
+        graph = _make_graph()
+        graph.shopping_list_service.add_items.return_value = _add_result(
+            added=[
+                _add_cmd("ovos", 3.0),
+                _add_cmd("leite", 1.0),
+                _add_cmd("queijo", 1.5),
+            ]
+        )
+        state = {"output_add_item": "ovos,3|leite,1|queijo,1.5"}
+        # Act
+        result = graph._handle_add_item(state)
+        # Assert
+        output = result["output_add_item"]
+        assert "- ovos (3)" in output
+        assert "(3.0)" not in output
+        assert "- queijo (1.5)" in output
+        # quantity 1 has no suffix at all
+        assert any(
+            line.strip() == "- leite" for line in output.splitlines()
+        ), f"Expected a bare '- leite' line (no quantity suffix), got: {output!r}"
+
+    def test_handle_add_item__empty_payload__does_not_call_add_items(self):
+        # Arrange
+        graph = _make_graph()
+        state = {"output_add_item": "   "}
+        # Act
+        result = graph._handle_add_item(state)
+        # Assert — nothing to add: no service call, no success claim
+        graph.shopping_list_service.add_items.assert_not_called()
+        output = result["output_add_item"]
+        assert isinstance(output, str)
+        assert "Adicionado" not in output, (
+            f"Empty payload must not claim anything was added: {output!r}"
+        )
+
+    def test_handle_add_item__validation_error_from_service__graceful_message(self):
+        # Arrange
+        graph = _make_graph()
+        graph.shopping_list_service.add_items.side_effect = ValidationError(
+            errors=["Name is required"]
+        )
+        state = {"output_add_item": "leite,1"}
+        # Act — must not raise
+        result = graph._handle_add_item(state)
+        # Assert — the error surfaces as a non-empty STRING (never a raw list)
+        graph.shopping_list_service.add_items.assert_called_once()
+        output = result["output_add_item"]
+        assert isinstance(output, str)
+        assert output.strip()
+        assert "Adicionado" not in output, (
+            f"A failed batch must not claim success: {output!r}"
+        )

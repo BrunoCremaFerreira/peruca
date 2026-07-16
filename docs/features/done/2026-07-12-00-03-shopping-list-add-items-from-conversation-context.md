@@ -1,9 +1,9 @@
 # Plano: Adicionar Itens à Lista de Compras a partir do Contexto da Conversa
 
-- **Status:** todo
+- **Status:** done
 - **Criado em:** 2026-07-12 00:03
-- **Implementado em:** —
-- **PR/commit:** —
+- **Implementado em:** 2026-07-16 16:41 (branch `feature/shopping-list-add-items-from-conversation-context`)
+- **PR/commit:** `feat(shopping-list): add items from the conversation context` (branch `feature/shopping-list-add-items-from-conversation-context`)
 - **Consultorias realizadas (obrigatórias):** `arquiteto`, `especialista-de-prompt`,
   `programador-tester` (2026-07-12)
 

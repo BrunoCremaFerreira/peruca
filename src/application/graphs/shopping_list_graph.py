@@ -23,6 +23,15 @@ from infra import async_runner
 
 logger = logging.getLogger(__name__)
 
+# Anti-flood guard (mirror of the maintenance graph's _QUERY_RECORD_LIMIT): a
+# single add batch never exceeds this many items, so a giant recipe or a
+# prompt-injected payload cannot flood the shopping list. The FIRST items win,
+# in their original order.
+_ADD_ITEM_LIMIT = 30
+
+# Placeholder injected when the request carries no usable recent_history hint.
+_EMPTY_RECENT_HISTORY = "(vazio)"
+
 
 class ShoppingListGraphState(TypedDict):
     input: str
@@ -64,7 +73,12 @@ class ShoppingListGraph(Graph):
     # ===============================================
     def _classify_intent(self, data):
         chain = self.classification_prompt | self.llm_chat
-        response = chain.invoke({"input": data["input"].message})
+        response = chain.invoke(
+            {
+                "input": data["input"].message,
+                "recent_history": self._recent_history_from(data["input"]),
+            }
+        )
         extracted = self._extract_structured_output(response.content)
         if extracted is None:
             return {"intent": ["not_recognized"], "input": data["input"],
@@ -122,14 +136,19 @@ class ShoppingListGraph(Graph):
         try:
             items_to_add = self._parse_shopping_list_add(payload)
 
-            for item in items_to_add:
-                self.shopping_list_service.add(item)
+            if not items_to_add:
+                return {
+                    "output_add_item": "Não encontrei itens para colocar na lista."
+                }
 
-            return {
-                "output_add_item": f"Adicionado: {', '.join(item.name for item in items_to_add)}"
-            }
+            result = self.shopping_list_service.add_items(items_to_add)
+
+            return {"output_add_item": self._format_add_result(result)}
         except ValidationError as validation_error:
-            return {"output_add_item": validation_error.errors}
+            errors = "; ".join(str(error) for error in validation_error.errors)
+            return {
+                "output_add_item": f"Não consegui incluir os itens na lista: {errors}"
+            }
         except Exception as exception:
             logger.error("handle_add_item failed: %s", exception, exc_info=True)
             return {
@@ -246,6 +265,49 @@ class ShoppingListGraph(Graph):
     # ===============================================
     # Private Methods
     # ===============================================
+
+    @staticmethod
+    def _recent_history_from(invoke_request: GraphInvokeRequest) -> str:
+        """
+        The recent_history context hint for the classifier prompt. Anything
+        unusable (missing key, None, blank, non-dict hints) degrades to the
+        "(vazio)" placeholder — the template variable is always supplied, so
+        the prompt never raises a KeyError.
+        """
+        hints = getattr(invoke_request, "context_hints", None)
+        hint = hints.get("recent_history") if isinstance(hints, dict) else None
+        if isinstance(hint, str) and hint.strip():
+            return hint
+        return _EMPTY_RECENT_HISTORY
+
+    def _format_add_result(self, result) -> str:
+        """
+        Render the batch outcome as the "Adicionado" / "Já estava na lista"
+        sections (each omitted when empty), always closing with the follow-up
+        question. Quantity formatting follows the listing convention: integers
+        without ".0" and quantity 1 without any suffix.
+        """
+        sections = []
+
+        if result.added:
+            lines = ["Adicionado"]
+            for entry in result.added:
+                quantity = (
+                    f" ({self._format_quantity(entry.quantity)})"
+                    if entry.quantity != 1
+                    else ""
+                )
+                lines.append(f"- {entry.name}{quantity}")
+            sections.append("\n".join(lines))
+
+        if result.duplicates:
+            lines = ["Já estava na lista"]
+            for entry in result.duplicates:
+                lines.append(f"- {entry.name}")
+            sections.append("\n".join(lines))
+
+        sections.append("Deseja mais alguma coisa?")
+        return "\n\n".join(sections)
 
     def _resolve_and_apply(self, data, payload, operation, apply, all_items):
         """
@@ -376,6 +438,11 @@ class ShoppingListGraph(Graph):
             match = re.search(r"\d+(?:[.,]\d+)?", quantity_raw)
             quantity = float(match.group().replace(",", ".")) if match else 1.0
             items.append(ShoppingListItemAdd(name=name, quantity=quantity))
+            if len(items) >= _ADD_ITEM_LIMIT:
+                logger.warning(
+                    "add payload capped at %d items", _ADD_ITEM_LIMIT
+                )
+                break
         return items
 
     # ===============================================

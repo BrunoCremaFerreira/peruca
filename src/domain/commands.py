@@ -43,6 +43,19 @@ class ShoppingListItemUpdate:
     quantity: float = 1
 
 
+@dataclass
+class ShoppingListItemsAddResult:
+    """
+    Outcome of a batch add: ``added`` carries the items persisted by the call;
+    ``duplicates`` carries the EXISTING list item that matched each skipped
+    entry (what "already in the list" reports). Structured data only — the
+    domain never phrases user-facing text.
+    """
+
+    added: List = field(default_factory=list)
+    duplicates: List = field(default_factory=list)
+
+
 # =====================================
 # Vehicle Maintenance Commands
 # =====================================

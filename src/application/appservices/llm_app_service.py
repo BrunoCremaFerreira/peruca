@@ -32,6 +32,17 @@ _MUSIC_PROBE_TIMEOUT = 2.0
 # newlines (so it cannot forge extra turns) and cap its length.
 _MAX_IMAGE_DESCRIPTION_CHARS = 500
 
+# recent_history context hint: the last 2 full turns (4 messages) of the
+# conversation, rendered as "usuario:"/"peruca:" lines for the graph
+# classifiers. Total cap of ~3000 chars, dropping the OLDEST lines first — the
+# most recent answer (where a referenced recipe lives) must survive intact, so
+# the per-message sanitizer cap is raised near the total budget instead of the
+# default 500 (which would cut it), leaving room for the role prefix.
+_RECENT_HISTORY_MAX_MESSAGES = 4
+_RECENT_HISTORY_CAP_CHARS = 3000
+_RECENT_HISTORY_MESSAGE_CAP_CHARS = 2900
+_RECENT_HISTORY_EMPTY = "(vazio)"
+
 
 class LlmAppService:
     """
@@ -189,6 +200,10 @@ class LlmAppService:
         pets_hint, pets_persona = self._user_pets_hints(user.id)
         context_hints["user_pets"] = pets_hint
         context_hints["user_pets_persona"] = pets_persona
+        # Short textual window of the conversation so graph classifiers can
+        # resolve anaphoric references ("esses ingredientes") without coupling
+        # to the history store.
+        context_hints["recent_history"] = self._recent_history_hint(user.id)
         if self.music_service is not None:
             try:
                 players = async_runner.run(
@@ -360,6 +375,58 @@ class LlmAppService:
         hint = ", ".join(hint_parts) or "nenhum"
         persona = "\n".join(persona_lines)
         return hint, persona
+
+    def _recent_history_hint(self, user_id: str) -> str:
+        """
+        Render the last 2 full turns of the user's conversation as a compact
+        textual hint ("usuario: ..." / "peruca: ..." lines, chronological).
+
+        Best-effort, like _persist_turn: a missing factory, an empty history or
+        a read failure all degrade to the literal "(vazio)" — never an empty
+        string, never an exception. Each message goes through
+        sanitize_for_prompt BEFORE joining (its internal newlines are collapsed
+        so one message cannot forge extra turn lines; the "\\n" separators are
+        added afterwards by construction). Non-string content (multimodal
+        blocks) is skipped. The total is capped by dropping whole OLDEST lines
+        first — the most recent message always survives intact.
+        """
+        if self.get_session_history is None:
+            return _RECENT_HISTORY_EMPTY
+
+        try:
+            messages = self.get_session_history(user_id).messages
+        except Exception as error:  # noqa: BLE001
+            logger.warning("recent_history hint failed: %s", error)
+            return _RECENT_HISTORY_EMPTY
+
+        lines = []
+        for message in (messages or [])[-_RECENT_HISTORY_MAX_MESSAGES:]:
+            if isinstance(message, HumanMessage):
+                role = "usuario"
+            elif isinstance(message, AIMessage):
+                role = "peruca"
+            else:
+                continue
+            if not isinstance(message.content, str):
+                continue
+            content = sanitize_for_prompt(
+                message.content, _RECENT_HISTORY_MESSAGE_CAP_CHARS
+            )
+            if not content:
+                continue
+            lines.append(f"{role}: {content}")
+
+        kept: list[str] = []
+        total = 0
+        for line in reversed(lines):
+            candidate = total + len(line) + (1 if kept else 0)
+            if kept and candidate > _RECENT_HISTORY_CAP_CHARS:
+                break
+            kept.append(line)
+            total = candidate
+        kept.reverse()
+
+        return "\n".join(kept) if kept else _RECENT_HISTORY_EMPTY
 
     def _consume_maintenance_flow(
         self, user: User, pending, message: str, reference=None
